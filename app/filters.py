@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from app.competition import competition_cols_for_mode, get_competition_display_col
+from app.competition import get_active_competition_col, is_grouped_mode
 
 
 def _sorted_values(df: pd.DataFrame, col: str) -> list:
@@ -19,7 +19,10 @@ def _int_sorted_values(df: pd.DataFrame, col: str) -> list[str]:
             ints.append(int(str(value)))
         except Exception:
             continue
-    return [str(v) for v in sorted(set(ints))]
+    sorted_values = [str(v) for v in sorted(set(ints))]
+    if col in df.columns and df[col].isna().any():
+        sorted_values.append("Unspecified")
+    return sorted_values
 
 
 def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
@@ -39,11 +42,7 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
             season_options = _int_sorted_values(player_df, "season")
             season_vals = st.multiselect("Season", season_options, default=season_options)
 
-    competitions_col = get_competition_display_col(comp_mode)
-    for fallback_col in competition_cols_for_mode(comp_mode):
-        if fallback_col in player_df.columns:
-            competitions_col = fallback_col
-            break
+    competitions_col = get_active_competition_col(is_grouped_mode(comp_mode))
 
     with map_col:
         f1, f2, f3 = st.columns(3, gap="small")
@@ -89,15 +88,15 @@ def apply_filters(df, filters):
     out = df.copy()
 
     if filters.get("season") and "season" in out.columns:
-        valid = {str(v) for v in filters["season"]}
-        out = out[out["season"].astype(str).isin(valid)]
+        selected_seasons = {str(v) for v in filters["season"]}
+        valid = {s for s in selected_seasons if s != "Unspecified"}
+        include_unspecified = "Unspecified" in selected_seasons
+        season_mask = out["season"].astype(str).isin(valid)
+        if include_unspecified:
+            season_mask = season_mask | out["season"].isna()
+        out = out[season_mask]
 
-    comp_col = filters.get("competition_col") or get_competition_display_col(filters.get("competition_mode"))
-    if comp_col not in out.columns:
-        for fallback_col in competition_cols_for_mode(filters.get("competition_mode")):
-            if fallback_col in out.columns:
-                comp_col = fallback_col
-                break
+    comp_col = filters.get("competition_col") or get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))
     if filters.get("competition") and comp_col in out.columns:
         out = out[out[comp_col].isin(filters["competition"])]
 

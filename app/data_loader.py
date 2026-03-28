@@ -143,10 +143,26 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
         df["side"] = df["side"].astype(str).str.title().replace({"Ct": "Blue", "T": "Red"})
     if "competition" in df.columns:
         df["raw_competition_name"] = df["competition"].fillna("").astype(str).str.strip()
-        df = normalize_competitions(df, name_col="raw_competition_name", date_col="date")
     elif "raw_competition_name" in df.columns:
+        df["raw_competition_name"] = df["raw_competition_name"].fillna("").astype(str).str.strip()
+    elif "grouped_competition_name" in df.columns:
+        # Legacy edge-case: grouped existed without raw; preserve row-level identity.
+        df["raw_competition_name"] = df["grouped_competition_name"].fillna("").astype(str).str.strip()
+
+    if "raw_competition_name" in df.columns and "competition" not in df.columns:
         # Ensure legacy callers still have a `competition` column if only raw_* is present.
         df["competition"] = df["raw_competition_name"]
+
+    if "raw_competition_name" in df.columns:
+        df = normalize_competitions(df, name_col="raw_competition_name", date_col="date")
+
+    if "raw_competition_name" in df.columns and "grouped_competition_name" not in df.columns:
+        # Failsafe for any unexpected input shape.
+        df["grouped_competition_name"] = df["raw_competition_name"]
+    if "grouped_competition_name" in df.columns and "raw_competition_name" not in df.columns:
+        df["raw_competition_name"] = df["grouped_competition_name"]
+    if "competition_group" not in df.columns and "grouped_competition_name" in df.columns:
+        df["competition_group"] = df["grouped_competition_name"]
     return df
 
 
