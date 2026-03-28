@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from app.config import FILES
+from app.grouping import parse_competition_name
 
 SYNONYMS = {
     "date": ["date", "match_date"],
@@ -26,6 +27,7 @@ MEDISPORTS_ALIASES = {
     "med",
     "m",
 }
+MEDISPORTS_PLAYER_MARKER = "ⓜ"
 
 
 def normalize_team_name(team_name: str | None) -> str:
@@ -40,6 +42,33 @@ def normalize_team_name(team_name: str | None) -> str:
 def is_medisports_team(team_name: str | None) -> bool:
     key = normalize_team_name(team_name)
     return any(alias in key for alias in MEDISPORTS_ALIASES) if key else False
+
+
+def is_medisports_player(player_name: str | None) -> bool:
+    return MEDISPORTS_PLAYER_MARKER in str(player_name or "")
+
+
+def medisports_player_roster(df: pd.DataFrame, player_col: str = "player") -> list[str]:
+    if df.empty or player_col not in df.columns:
+        return []
+
+    names = (
+        df[player_col]
+        .dropna()
+        .astype(str)
+        .str.strip()
+    )
+    names = names[names.str.contains(MEDISPORTS_PLAYER_MARKER, regex=False)]
+    if names.empty:
+        return []
+
+    cleaned = names.str.replace(r"\s+", " ", regex=True).str.replace(r"\s*\|\s*", " | ", regex=True).str.strip()
+    unique = {}
+    for value in cleaned.sort_values(key=lambda s: s.str.casefold()).tolist():
+        key = value.casefold()
+        if key not in unique:
+            unique[key] = value
+    return list(unique.values())
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -88,16 +117,9 @@ def _safe_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
 
 
 def _extract_comp_group(comp: str) -> tuple[str, str | None]:
-    if not isinstance(comp, str) or not comp.strip():
-        return "Unknown Competition", None
-    text = comp.strip()
-    family = re.sub(r"([#sꜱ]?\d+[\.]?\d*)$", "", text, flags=re.IGNORECASE).strip(" -_")
-    season_match = re.search(r"(?:season|s|ꜱ)\s*(\d+(?:\.\d+)?)", text, flags=re.IGNORECASE)
-    season = season_match.group(1) if season_match else None
-    if not family:
-        family = text
-    grouped = f"{family} Season {season}" if season else family
-    return grouped, season
+    family, season, _instance = parse_competition_name(comp)
+    grouped = f"{family} Season {season}" if season is not None else family
+    return grouped, str(season) if season is not None else None
 
 
 def _derive_core(df: pd.DataFrame) -> pd.DataFrame:

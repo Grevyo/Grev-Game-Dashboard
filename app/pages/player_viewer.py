@@ -9,22 +9,14 @@ except ModuleNotFoundError:
     PLOTLY_AVAILABLE = False
 
 from app.components import section_header, stat_card
-from app.data_loader import is_medisports_team
+from app.data_loader import is_medisports_player, medisports_player_roster
 from app.transforms import best_contexts
 
 
-def _is_medisports_row(row) -> bool:
-    team_ok = is_medisports_team(row.get("my_team", ""))
-    player_tag = str(row.get("player", "")).strip().lower().startswith("ⓜ")
-    return team_ok or player_tag
-
-
-def _medisports_roster(df):
+def _medisports_only(df):
     if df.empty or "player" not in df.columns:
-        return []
-    mask = df.apply(_is_medisports_row, axis=1)
-    roster = sorted(df[mask]["player"].dropna().unique().tolist())
-    return roster
+        return df
+    return df[df["player"].map(is_medisports_player)]
 
 
 def _form_delta(p):
@@ -40,7 +32,7 @@ def _form_delta(p):
 
 
 def render(ctx):
-    df = ctx["player_matches"]
+    df = _medisports_only(ctx["player_matches"])
     achievements = ctx["achievements"]
     players = ctx["players"]
     team_name = ctx.get("team_name", "Medisports")
@@ -49,7 +41,7 @@ def render(ctx):
         st.warning("No player data found for current filters.")
         return
 
-    medisports_roster = _medisports_roster(df)
+    medisports_roster = medisports_player_roster(df)
     if not medisports_roster:
         st.warning("No Medisports players found in the filtered data yet. Try relaxing global filters.")
         return

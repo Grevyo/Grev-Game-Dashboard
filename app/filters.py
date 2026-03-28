@@ -1,39 +1,65 @@
+import pandas as pd
 import streamlit as st
 
 
-def _sidebar_section(title: str):
-    st.sidebar.markdown(f"<div class='sidebar-card'><div class='sidebar-head'>{title}</div></div>", unsafe_allow_html=True)
+def _sorted_values(df: pd.DataFrame, col: str) -> list:
+    if df.empty or col not in df.columns:
+        return []
+    vals = [v for v in df[col].dropna().unique().tolist()]
+    return sorted(vals)
 
 
-def build_global_filters(player_df, tactics_df):
-    st.sidebar.markdown("## Control Center")
+def _int_sorted_values(df: pd.DataFrame, col: str) -> list[str]:
+    values = _sorted_values(df, col)
+    ints = []
+    for value in values:
+        try:
+            ints.append(int(str(value)))
+        except Exception:
+            continue
+    return [str(v) for v in sorted(set(ints))]
 
-    _sidebar_section("Theme")
-    theme = st.sidebar.selectbox("Theme", ["Dark", "Light"], index=0)
 
-    _sidebar_section("Global Context")
-    comp_mode = st.sidebar.radio("Competition display", ["Grouped competitions", "Individual competitions"], index=0)
+def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
+    st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title' style='margin-bottom:4px;'>Context Controls</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Compact page-level filters replacing the old sidebar stack.</div>", unsafe_allow_html=True)
 
-    seasons = sorted([s for s in player_df.get("season", []).dropna().unique().tolist()]) if not player_df.empty and "season" in player_df.columns else []
+    context_col, map_col, recency_col = st.columns([2.5, 2.2, 1.3], gap="small")
+
+    with context_col:
+        c1, c2, c3 = st.columns([0.9, 1.3, 2.0], gap="small")
+        with c1:
+            theme = st.selectbox("Theme", ["Dark", "Light"], index=0)
+        with c2:
+            comp_mode = st.radio("Competition mode", ["Grouped competitions", "Individual competitions"], index=0, horizontal=True)
+        with c3:
+            season_options = _int_sorted_values(player_df, "season")
+            season_vals = st.multiselect("Season", season_options, default=season_options)
+
     competitions_col = "competition_group" if comp_mode == "Grouped competitions" else "competition"
 
-    with st.sidebar.expander("Scope Filters", expanded=True):
-        season_vals = st.multiselect("Season", seasons, default=seasons)
-        competition_vals = st.multiselect(
-            "Competition",
-            sorted(player_df.get(competitions_col, []).dropna().unique().tolist()) if not player_df.empty and competitions_col in player_df.columns else [],
-        )
-        map_vals = st.multiselect("Map", sorted(player_df.get("map", []).dropna().unique().tolist()) if not player_df.empty and "map" in player_df.columns else [])
-        side_vals = st.multiselect("Side", ["Red", "Blue"], default=[])
+    with map_col:
+        f1, f2, f3 = st.columns(3, gap="small")
+        with f1:
+            competition_vals = st.multiselect("Competition", _sorted_values(player_df, competitions_col))
+        with f2:
+            map_vals = st.multiselect("Map", _sorted_values(player_df, "map"))
+        with f3:
+            opp_vals = st.multiselect("Opponent", _sorted_values(player_df, "opponent_team"))
 
-    with st.sidebar.expander("Opponent + Recent Window", expanded=False):
-        opp_vals = st.multiselect(
-            "Opponent", sorted(player_df.get("opponent_team", []).dropna().unique().tolist()) if not player_df.empty and "opponent_team" in player_df.columns else []
-        )
-        last_days = st.selectbox("Last X days", [None, 5, 10, 20, 30], index=0)
-        last_matches = st.selectbox("Last X matches", [None, 5, 10, 20, 30], index=0)
+    with recency_col:
+        r1, r2, r3 = st.columns(3, gap="small")
+        with r1:
+            side_vals = st.multiselect("Side", ["Red", "Blue"], default=[])
+        with r2:
+            last_days = st.selectbox("Last X days", [None, 5, 10, 20, 30], index=0)
+        with r3:
+            last_matches = st.selectbox("Last X matches", [None, 5, 10, 20, 30], index=0)
 
-    filters = {
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    return {
         "theme": theme,
         "season": season_vals,
         "competition_mode": comp_mode,
@@ -45,29 +71,39 @@ def build_global_filters(player_df, tactics_df):
         "last_days": last_days,
         "last_matches": last_matches,
     }
-    return filters
 
 
 def apply_filters(df, filters):
     if df.empty:
         return df
     out = df.copy()
+
     if filters.get("season") and "season" in out.columns:
-        out = out[out["season"].isin(filters["season"])]
+        valid = {str(v) for v in filters["season"]}
+        out = out[out["season"].astype(str).isin(valid)]
+
     comp_col = filters.get("competition_col", "competition")
     if filters.get("competition") and comp_col in out.columns:
         out = out[out[comp_col].isin(filters["competition"])]
+
     if filters.get("map") and "map" in out.columns:
         out = out[out["map"].isin(filters["map"])]
     if filters.get("opponent") and "opponent_team" in out.columns:
         out = out[out["opponent_team"].isin(filters["opponent"])]
     if filters.get("side") and "side" in out.columns:
         out = out[out["side"].isin(filters["side"])]
+
     if filters.get("last_days") and "date" in out.columns:
-        cutoff = out["date"].max() - __import__("pandas").Timedelta(days=filters["last_days"])
+        cutoff = out["date"].max() - pd.Timedelta(days=filters["last_days"])
         out = out[out["date"] >= cutoff]
-    if filters.get("last_matches") and "date" in out.columns and "player" in out.columns:
-        out = out.sort_values("date").groupby("player", group_keys=False).tail(filters["last_matches"])
+
+    if filters.get("last_matches") and "date" in out.columns:
+        group_col = "player" if "player" in out.columns else None
+        if group_col:
+            out = out.sort_values("date").groupby(group_col, group_keys=False).tail(filters["last_matches"])
+        else:
+            out = out.sort_values("date").tail(filters["last_matches"])
+
     return out
 
 

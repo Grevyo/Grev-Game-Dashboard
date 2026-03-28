@@ -119,25 +119,6 @@ def inject_styles(theme_name: str = "Dark"):
     .stat-good {{ color:var(--good); }} .stat-mid {{ color:var(--mid); }}
     .stat-poor {{ color:var(--poor); }} .stat-bad {{ color:var(--bad); }}
 
-    section[data-testid="stSidebar"] {{ border-right: 1px solid var(--border); }}
-    section[data-testid="stSidebar"] .stMarkdown {{ margin-bottom: 4px; }}
-    .sidebar-card {{
-      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 91%, #fff 9%), var(--surface));
-      border:1px solid var(--border); border-radius:12px;
-      padding:8px 10px; margin: 6px 0;
-    }}
-    .sidebar-head {{
-      color: var(--text); font-size: 11px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
-    }}
-    section[data-testid="stSidebar"] .stSelectbox label,
-    section[data-testid="stSidebar"] .stMultiSelect label,
-    section[data-testid="stSidebar"] .stRadio label,
-    section[data-testid="stSidebar"] .stSlider label {{
-      font-size: 0.74rem !important; color: var(--muted) !important;
-      text-transform: uppercase; letter-spacing: 0.05em;
-    }}
-
     div[data-testid="stHorizontalBlock"] > div {{ align-self: stretch; }}
     </style>
     """
