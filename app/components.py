@@ -1,3 +1,5 @@
+import math
+
 import streamlit as st
 
 from app.metrics import classify_quality
@@ -5,30 +7,95 @@ from app.styles import tier_badge
 
 
 def section_header(title: str, subtitle: str = ""):
-    st.markdown(f"### {title}")
+    st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
     if subtitle:
         st.caption(subtitle)
 
 
-def stat_card(label: str, value, help_text: str = ""):
-    quality = classify_quality(float(value)) if isinstance(value, (int, float)) else "mid"
-    st.markdown(f"<div class='panel'><div class='muted'>{label}</div><div class='stat-{quality}' style='font-size:24px;font-weight:700'>{value}</div><div class='muted'>{help_text}</div></div>", unsafe_allow_html=True)
+def stat_card(label: str, value, help_text: str = "", quality_override: str | None = None):
+    num_value = None
+    try:
+        num_value = float(value)
+    except Exception:
+        num_value = None
+    quality = quality_override or (classify_quality(num_value) if isinstance(num_value, (int, float)) and not math.isnan(num_value) else "mid")
+    st.markdown(
+        f"""
+        <div class='panel panel-tight accent-{quality}'>
+            <div class='metric-title'>{label}</div>
+            <div class='metric-value stat-{quality}'>{value}</div>
+            <div class='muted'>{help_text}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
-def player_card(row, photo_path=None):
-    cols = st.columns([1, 3, 2])
-    with cols[0]:
-        if photo_path:
-            st.image(photo_path, use_container_width=True)
-    with cols[1]:
-        st.markdown(f"**{row.get('player','Unknown')}**")
-        st.markdown(f"{row.get('desc','')}")
-        st.markdown(tier_badge(row.get("tier", "-")), unsafe_allow_html=True)
-    with cols[2]:
-        st.metric("GrevScore", f"{row.get('grevscore',0):.1f}")
-        st.metric("K/D", f"{row.get('kpd',0):.2f}")
+def _tone_from_score(score: float) -> str:
+    if score >= 72:
+        return "good"
+    if score >= 58:
+        return "mid"
+    if score >= 44:
+        return "poor"
+    return "bad"
+
+
+def trend_chip(trend: str) -> str:
+    key = str(trend or "Flat").strip().lower()
+    tone = "mid"
+    icon = "•"
+    if "up" in key or "hot" in key or "rise" in key:
+        tone = "good"
+        icon = "↗"
+    elif "down" in key or "cold" in key or "fall" in key:
+        tone = "bad"
+        icon = "↘"
+    return f"<span class='chip chip-{tone}'>{icon} {trend}</span>"
+
+
+def player_card(row: dict):
+    grev = float(row.get("grevscore", 0) or 0)
+    tone = _tone_from_score(grev)
+    identity_bits = [row.get("team_tag", "Medisports")]
+    if row.get("country"):
+        identity_bits.append(str(row.get("country")))
+    if row.get("role"):
+        identity_bits.append(str(row.get("role")))
+
+    stat_items = [
+        ("GrevScore", f"{grev:.1f}"),
+        ("Rating", f"{float(row.get('rating', 0) or 0):.2f}"),
+        ("K/D", f"{float(row.get('kpd', 0) or 0):.2f}"),
+        ("Impact", f"{float(row.get('impact', 0) or 0):.1f}"),
+        ("HS%", f"{float(row.get('hs_pct', 0) or 0):.1f}%"),
+        ("Matches", f"{int(row.get('matches', 0) or 0)}"),
+    ]
+    stats_html = "".join(
+        f"<div class='stat-item'><div class='label'>{label}</div><div class='value'>{value}</div></div>" for label, value in stat_items
+    )
+
+    card_html = f"""
+    <div class='panel player-card accent-{tone}'>
+        <div class='player-name'>{row.get('player', 'Unknown')}</div>
+        <div class='identity-line'>{' • '.join(identity_bits)}</div>
+        <div>{tier_badge(row.get('tier', '-'))} {trend_chip(row.get('trend', 'Flat'))}</div>
+        <div class='player-desc'>{row.get('desc', '')}</div>
+        <div class='stats-grid'>{stats_html}</div>
+        <div class='muted'>Best map: <strong>{row.get('best_map', 'N/A')}</strong> · Best side: <strong>{row.get('best_side', 'N/A')}</strong></div>
+    </div>
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
 
 
 def insight_card(title: str, body: str, level: str = "info"):
-    icon = {"info": "ℹ️", "warn": "⚠️", "good": "✅"}.get(level, "ℹ️")
-    st.markdown(f"<div class='panel'><strong>{icon} {title}</strong><br><span class='muted'>{body}</span></div>", unsafe_allow_html=True)
+    tone = {"info": "mid", "warn": "poor", "good": "good", "bad": "bad"}.get(level, "mid")
+    icon = {"info": "ℹ", "warn": "⚠", "good": "▲", "bad": "▼"}.get(level, "ℹ")
+    st.markdown(
+        f"<div class='panel panel-tight accent-{tone}'><strong>{icon} {title}</strong><br><span class='muted'>{body}</span></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_filter_chip(label: str, value: str):
+    st.markdown(f"<span class='chip'>{label}: {value}</span>", unsafe_allow_html=True)
