@@ -1,9 +1,9 @@
 import streamlit as st
 
 from app.components import insight_card, player_card, section_header, stat_card
-from app.data_loader import is_medisports_player, medisports_player_roster
+from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.descriptions import player_description
-from app.image_helpers import find_player_photo, find_team_logo, image_data_uri
+from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
 from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
 
@@ -29,19 +29,18 @@ def _trend_for_player(df, player_name: str) -> str:
 
 
 def render(ctx):
-    df = ctx["player_matches"]
+    full_df = ctx["player_matches"]
     players_meta = ctx["players"]
     team_name = ctx["team_name"]
     filters = ctx.get("filters", {})
 
-    if "player" in df.columns:
-        df = df[df["player"].map(is_medisports_player)]
+    df = get_medisports_roster_df(full_df, player_col="player")
 
     if df.empty:
         st.warning("No Medisports rows available after filters.")
         return
 
-    medisports_roster = medisports_player_roster(df)
+    medisports_roster = get_medisports_player_names(df, player_col="player")
     if not medisports_roster:
         st.warning("No Medisports roster available for Overview.")
         return
@@ -129,8 +128,10 @@ def render(ctx):
             merged["best_map"] = _context_for_player(df, str(row["player"]), "map")
             merged["best_side"] = _context_for_player(df, str(row["player"]), "side")
             merged["trend"] = _trend_for_player(df, str(row["player"]))
-            merged["photo_uri"] = image_data_uri(find_player_photo(str(row["player"])))
+            photo = resolve_player_photo(str(row["player"]))
+            merged["photo_uri"] = image_data_uri(photo.get("path"))
             merged["team_logo_uri"] = team_logo
+            merged["photo_missing_reason"] = photo.get("reason")
 
             with cols[c_idx]:
                 player_card(merged)

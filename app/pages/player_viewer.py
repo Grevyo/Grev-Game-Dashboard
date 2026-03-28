@@ -9,22 +9,16 @@ except ModuleNotFoundError:
     PLOTLY_AVAILABLE = False
 
 from app.components import section_header, stat_card
-from app.data_loader import is_medisports_player, medisports_player_roster
+from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.image_helpers import (
     find_achievement_image,
     find_competition_logo,
     find_map_image,
-    find_player_photo,
     find_team_logo,
     image_data_uri,
+    resolve_player_photo,
 )
 from app.transforms import best_contexts
-
-
-def _medisports_only(df):
-    if df.empty or "player" not in df.columns:
-        return df
-    return df[df["player"].map(is_medisports_player)]
 
 
 def _form_delta(p):
@@ -40,7 +34,7 @@ def _form_delta(p):
 
 
 def render(ctx):
-    df = _medisports_only(ctx["player_matches"])
+    df = get_medisports_roster_df(ctx["player_matches"], player_col="player")
     achievements = ctx["achievements"]
     players = ctx["players"]
     team_name = ctx.get("team_name", "Medisports")
@@ -49,7 +43,7 @@ def render(ctx):
         st.warning("No player data found for current filters.")
         return
 
-    medisports_roster = medisports_player_roster(df)
+    medisports_roster = get_medisports_player_names(df, player_col="player")
     if not medisports_roster:
         st.warning("No Medisports players found in the filtered data yet. Try relaxing global filters.")
         return
@@ -102,9 +96,14 @@ def render(ctx):
     trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
     streak = f"{int((p['grevscore'] >= p['grevscore'].mean()).tail(5).sum())}/5 solid"
 
-    player_photo = image_data_uri(find_player_photo(player))
+    player_photo_match = resolve_player_photo(player)
+    player_photo = image_data_uri(player_photo_match.get("path"))
     team_logo = image_data_uri(find_team_logo(team_name) or find_team_logo("Medisports"))
-    hero_photo = f"<img class='hero-player-photo' src='{player_photo}' alt='Player photo'/>" if player_photo else "<div class='player-avatar fallback-avatar'>No Photo</div>"
+    hero_photo = (
+        f"<img class='hero-player-photo' src='{player_photo}' alt='Player photo'/>"
+        if player_photo
+        else f"<div class='player-avatar fallback-avatar'>No Photo ({player_photo_match.get('reason', 'not found')})</div>"
+    )
     hero_logo = f"<img class='hero-logo' src='{team_logo}' alt='Medisports logo'/>" if team_logo else ""
 
     st.markdown(

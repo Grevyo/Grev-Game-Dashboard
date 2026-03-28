@@ -48,7 +48,7 @@ def is_medisports_player(player_name: str | None) -> bool:
     return MEDISPORTS_PLAYER_MARKER in str(player_name or "")
 
 
-def medisports_player_roster(df: pd.DataFrame, player_col: str = "player") -> list[str]:
+def get_medisports_player_names(df: pd.DataFrame, player_col: str = "player") -> list[str]:
     if df.empty or player_col not in df.columns:
         return []
 
@@ -69,6 +69,18 @@ def medisports_player_roster(df: pd.DataFrame, player_col: str = "player") -> li
         if key not in unique:
             unique[key] = value
     return list(unique.values())
+
+
+def get_medisports_roster_df(df: pd.DataFrame, player_col: str = "player") -> pd.DataFrame:
+    if df.empty or player_col not in df.columns:
+        return df.iloc[0:0].copy()
+    mask = df[player_col].map(is_medisports_player)
+    return df[mask].copy()
+
+
+def medisports_player_roster(df: pd.DataFrame, player_col: str = "player") -> list[str]:
+    """Backward-compatible alias for existing imports."""
+    return get_medisports_player_names(df, player_col=player_col)
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
