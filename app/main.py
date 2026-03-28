@@ -2,7 +2,7 @@ import streamlit as st
 
 from app.data_loader import detect_our_team, load_data, validate_columns
 from app.filters import apply_filters, build_global_filters, filter_summary
-from app.pages import overview, player_viewer, tactics_breakdown, tactic_set_recommendations, vs_teams, vs_tournaments
+from app.pages import overview, player_viewer, tactic_set_recommendations, tactics_breakdown, vs_teams, vs_tournaments
 from app.styles import inject_styles
 from app.transforms import with_player_metrics
 
@@ -19,8 +19,6 @@ PAGES = {
 
 def run_app():
     st.set_page_config(page_title="Medisports Analytics", page_icon="🎮", layout="wide")
-    theme = st.sidebar.selectbox("Theme", ["Dark", "Light"], index=0)
-    inject_styles(theme)
 
     data = load_data()
     p_df = with_player_metrics(data["player_matches"])
@@ -31,6 +29,8 @@ def run_app():
     validate_columns(t_df, ["map", "side", "tactic_name", "wins", "losses", "total_rounds"], "TacticsDataMaster.csv")
 
     filters = build_global_filters(p_df, t_df)
+    inject_styles(filters.get("theme", "Dark"))
+
     filtered = {
         "player_matches": apply_filters(p_df, filters),
         "tactics": apply_filters(t_df, filters),
@@ -40,7 +40,6 @@ def run_app():
         "filters": filters,
     }
 
-    st.sidebar.markdown("---")
-    st.sidebar.caption(filter_summary(filters))
-    page = st.sidebar.radio("Page", list(PAGES.keys()))
+    filter_summary(filters)
+    page = st.sidebar.radio("Page", list(PAGES.keys()), label_visibility="collapsed")
     PAGES[page](filtered)

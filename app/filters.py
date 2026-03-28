@@ -1,14 +1,24 @@
 import streamlit as st
 
 
+def _sidebar_section(title: str):
+    st.sidebar.markdown(f"<div class='sidebar-card'><div class='sidebar-head'>{title}</div></div>", unsafe_allow_html=True)
+
+
 def build_global_filters(player_df, tactics_df):
-    st.sidebar.subheader("Global Filters")
-    comp_mode = st.sidebar.radio("Competition display", ["Grouped competitions", "Individual competitions"], index=0)
+    st.sidebar.markdown("## 🎛 Control Panel")
+
+    _sidebar_section("Theme")
+    theme = st.sidebar.selectbox("Theme", ["Dark", "Light"], index=0)
+
+    _sidebar_section("Global Filters")
+    comp_mode = st.sidebar.radio("Competition display", ["Grouped competitions", "Individual competitions"], index=0, horizontal=True)
 
     seasons = sorted([s for s in player_df.get("season", []).dropna().unique().tolist()]) if not player_df.empty and "season" in player_df.columns else []
     competitions_col = "competition_group" if comp_mode == "Grouped competitions" else "competition"
 
     filters = {
+        "theme": theme,
         "season": st.sidebar.multiselect("Season", seasons, default=seasons),
         "competition_mode": comp_mode,
         "competition_col": competitions_col,
@@ -24,6 +34,8 @@ def build_global_filters(player_df, tactics_df):
         "last_days": st.sidebar.selectbox("Last X days", [None, 5, 10, 20, 30], index=0),
         "last_matches": st.sidebar.selectbox("Last X matches", [None, 5, 10, 20, 30], index=0),
     }
+
+    _sidebar_section("Page Navigation")
     return filters
 
 
@@ -51,9 +63,17 @@ def apply_filters(df, filters):
 
 
 def filter_summary(filters):
-    items = []
-    for k in ["season", "competition", "map", "opponent", "side", "last_days", "last_matches"]:
-        v = filters.get(k)
-        if v:
-            items.append(f"{k}: {v}")
-    return " • ".join(items) if items else "No global filters active"
+    active = []
+    for key in ["season", "competition", "map", "opponent", "side", "last_days", "last_matches"]:
+        value = filters.get(key)
+        if value:
+            active.append((key.replace("_", " ").title(), value if not isinstance(value, list) else f"{len(value)} selected"))
+
+    if not active:
+        st.sidebar.markdown("<div class='sidebar-card'><div class='sidebar-head'>Active Filters</div><span class='muted'>None active</span></div>", unsafe_allow_html=True)
+        return "No global filters active"
+
+    st.sidebar.markdown("<div class='sidebar-card'><div class='sidebar-head'>Active Filters</div></div>", unsafe_allow_html=True)
+    for label, value in active[:8]:
+        st.sidebar.markdown(f"<span class='chip'>{label}: {value}</span>", unsafe_allow_html=True)
+    return " • ".join([f"{k}: {v}" for k, v in active])

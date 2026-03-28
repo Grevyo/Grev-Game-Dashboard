@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from pathlib import Path
 from typing import Iterable
 
@@ -17,6 +18,28 @@ SYNONYMS = {
     "player": ["player", "name"],
     "tier": ["tier", "league_tier"],
 }
+
+MEDISPORTS_ALIASES = {
+    "medisports",
+    "medisport",
+    "medisportsm",
+    "med",
+    "m",
+}
+
+
+def normalize_team_name(team_name: str | None) -> str:
+    """Normalize stylized team names into a compact comparison key."""
+    if team_name is None:
+        return ""
+    text = unicodedata.normalize("NFKD", str(team_name)).casefold()
+    text = "".join(ch for ch in text if ch.isalnum())
+    return text
+
+
+def is_medisports_team(team_name: str | None) -> bool:
+    key = normalize_team_name(team_name)
+    return any(alias in key for alias in MEDISPORTS_ALIASES) if key else False
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -147,7 +170,7 @@ def detect_our_team(player_matches: pd.DataFrame, tactics: pd.DataFrame) -> str:
     if not team_cols:
         return "Medisports"
     s = pd.Series(team_cols).astype(str)
-    likely = s[s.str.contains("med", case=False, regex=True)]
+    likely = s[s.map(is_medisports_team)]
     return likely.mode().iloc[0] if not likely.empty else s.mode().iloc[0]
 
 
