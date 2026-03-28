@@ -114,6 +114,7 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
     out["competition_family"] = parsed.map(lambda p: p.competition_family)
     out["parsed_season_number"] = pd.array(parsed.map(lambda p: p.parsed_season_number), dtype="Int64")
     out["parsed_event_instance_number"] = pd.array(parsed.map(lambda p: p.parsed_event_instance_number), dtype="Int64")
+    out["should_group_competition"] = parsed.map(lambda p: bool(p.grouping_allowed))
 
     inferred = pd.Series([None] * len(out), index=out.index, dtype="object")
     if date_col in out.columns:
@@ -146,6 +147,7 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
         else:
             strategies.append("standalone_raw")
 
+    out["raw_competition_name"] = out[name_col].fillna("").astype(str).str.strip()
     out["grouped_competition_name"] = grouped_names
     out["grouping_strategy"] = strategies
     out["season"] = pd.to_numeric(final_season, errors="coerce").astype("Int64").astype(str).replace("<NA>", None)

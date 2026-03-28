@@ -10,7 +10,7 @@ except ModuleNotFoundError:
 
 from app.components import section_header, stat_card
 from app.achievements import achievements_for_player
-from app.competition import competition_cols_for_mode, get_competition_display_col
+from app.competition import get_active_competition_col, is_grouped_mode
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.image_helpers import (
     find_competition_logo,
@@ -201,11 +201,7 @@ def render(ctx):
         st.dataframe(best_contexts(p, "side").head(8), use_container_width=True, hide_index=True)
     with c3:
         st.markdown("#### By Competition")
-        by_comp_key = get_competition_display_col(filters.get("competition_mode"))
-        for fallback_col in competition_cols_for_mode(filters.get("competition_mode")):
-            if fallback_col in p.columns:
-                by_comp_key = fallback_col
-                break
+        by_comp_key = get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))
         by_comp = best_contexts(p, by_comp_key).head(8)
         st.dataframe(by_comp, use_container_width=True, hide_index=True)
         if not by_comp.empty:
