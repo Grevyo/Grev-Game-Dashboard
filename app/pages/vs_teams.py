@@ -1,8 +1,13 @@
 import streamlit as st
+
 try:
     import plotly.express as px
+    import plotly.graph_objects as go
+    PLOTLY_AVAILABLE = True
 except ModuleNotFoundError:
     px = None
+    go = None
+    PLOTLY_AVAILABLE = False
 
 from app.components import insight_card, section_header
 from app.descriptions import matchup_insight
@@ -30,8 +35,8 @@ def render(ctx):
     section_header("Matchup Overview")
     st.dataframe(view.sort_values("win_rate", ascending=False), use_container_width=True, hide_index=True)
 
-    if px is None:
-        st.warning("Plotly is unavailable, so the matchup chart cannot be displayed.")
+    if not PLOTLY_AVAILABLE:
+        st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")
     else:
         fig = px.bar(view.sort_values("win_rate"), x="win_rate", y="opponent_team", orientation="h", color="confidence", title="Win rate by opponent")
         st.plotly_chart(fig, use_container_width=True)
