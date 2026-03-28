@@ -63,6 +63,13 @@ def player_card(row: dict):
     if row.get("role"):
         identity_bits.append(str(row.get("role")))
 
+    photo_uri = row.get("photo_uri")
+    logo_uri = row.get("team_logo_uri")
+    profile_visual = (
+        f"<img class='player-avatar' src='{photo_uri}' alt='Player photo'/>" if photo_uri else "<div class='player-avatar fallback-avatar'>No Photo</div>"
+    )
+    logo_visual = f"<img class='team-mini-logo' src='{logo_uri}' alt='Team logo'/>" if logo_uri else ""
+
     stat_items = [
         ("GrevScore", f"{grev:.1f}"),
         ("Rating", f"{float(row.get('rating', 0) or 0):.2f}"),
@@ -77,9 +84,13 @@ def player_card(row: dict):
 
     card_html = f"""
     <div class='panel player-card accent-{tone}'>
-        <div>
-          <p class='player-name'>{row.get('player', 'Unknown')}</p>
-          <p class='identity-line'>{' • '.join(identity_bits)}</p>
+        <div class='player-head'>
+          <div class='player-head-left'>{profile_visual}</div>
+          <div class='player-head-meta'>
+            <p class='player-name'>{row.get('player', 'Unknown')}</p>
+            <p class='identity-line'>{' • '.join(identity_bits)}</p>
+          </div>
+          <div>{logo_visual}</div>
         </div>
         <div>{tier_badge(row.get('tier', '-'))}{trend_chip(row.get('trend', 'Stable'))}</div>
         <p class='player-desc'>{row.get('desc', '')}</p>

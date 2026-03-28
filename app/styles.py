@@ -92,6 +92,30 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .player-card {{ min-height: 290px; display:flex; flex-direction:column; gap: 10px; }}
+    .player-head {{ display:flex; align-items:center; gap:10px; }}
+    .player-head-left {{ flex:0 0 auto; }}
+    .player-head-meta {{ flex:1; min-width:0; }}
+    .player-avatar {{
+      width: 52px; height: 52px; object-fit: cover;
+      border-radius: 12px; border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 72%, #fff 28%);
+    }}
+    .fallback-avatar {{ display:flex; align-items:center; justify-content:center; font-size:10px; color: var(--muted); }}
+    .team-mini-logo {{
+      width: 32px; height: 32px; object-fit: contain;
+      border-radius: 8px; padding: 3px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 70%, #fff 30%);
+    }}
+    .hero-logo {{ width: 72px; height: 72px; object-fit: contain; border-radius: 12px; border: 1px solid var(--border); padding: 6px; background: color-mix(in srgb, var(--surface) 72%, #fff 28%); }}
+    .hero-player-photo {{ width: 88px; height: 88px; object-fit: cover; border-radius: 14px; border: 1px solid var(--border); }}
+    .achievement-thumb, .competition-thumb, .map-thumb {{
+      width: 42px; height: 42px; object-fit: contain;
+      border-radius: 10px; border: 1px solid var(--border);
+      padding: 4px; background: color-mix(in srgb, var(--surface) 72%, #fff 28%);
+      margin-bottom: 8px;
+    }}
+
     .player-name {{ font-size: 1.03rem; font-weight: 720; margin: 0; }}
     .identity-line {{ color: var(--muted); font-size: 12px; margin: 0; }}
     .player-desc {{ font-size: 12px; color: color-mix(in srgb, var(--text) 88%, #fff 12%); margin: 0; min-height: 30px; }}

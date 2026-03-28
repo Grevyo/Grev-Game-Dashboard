@@ -1,7 +1,9 @@
 import streamlit as st
 
 from app.components import insight_card, player_card, section_header, stat_card
+from app.data_loader import is_medisports_player, medisports_player_roster
 from app.descriptions import player_description
+from app.image_helpers import find_player_photo, find_team_logo, image_data_uri
 from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
 
@@ -32,31 +34,50 @@ def render(ctx):
     team_name = ctx["team_name"]
     filters = ctx.get("filters", {})
 
+    if "player" in df.columns:
+        df = df[df["player"].map(is_medisports_player)]
+
     if df.empty:
-        st.warning("No rows available after filters.")
+        st.warning("No Medisports rows available after filters.")
+        return
+
+    medisports_roster = medisports_player_roster(df)
+    if not medisports_roster:
+        st.warning("No Medisports roster available for Overview.")
         return
 
     summary = summarize_player(df)
     if summary.empty:
-        st.warning("No player summary available with current filters.")
+        st.warning("No Medisports player summary available with current filters.")
+        return
+
+    summary = summary[summary["player"].isin(medisports_roster)]
+    if summary.empty:
+        st.warning("No Medisports roster available for Overview.")
         return
 
     seasons = filters.get("season") or ["All seasons"]
     maps = filters.get("map") or ["All maps"]
 
+    team_logo = image_data_uri(find_team_logo(team_name) or find_team_logo("Medisports"))
+    team_logo_html = f"<img class='hero-logo' src='{team_logo}' alt='Medisports logo'/>" if team_logo else ""
+
     st.markdown(
         f"""
         <div class='hero-band'>
             <div style='display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;'>
-              <div>
-                <div class='section-title' style='margin-top:0'>Squad Command Hub</div>
-                <div class='section-subtitle' style='margin-bottom:8px;'>Live team pulse for <strong>{team_name}</strong> across map, side, and form context.</div>
-                <span class='chip'>Season: {', '.join(map(str, seasons[:2]))}{'…' if len(seasons) > 2 else ''}</span>
-                <span class='chip'>Map scope: {', '.join(map(str, maps[:2]))}{'…' if len(maps) > 2 else ''}</span>
+              <div style='display:flex;align-items:center;gap:14px;'>
+                {team_logo_html}
+                <div>
+                  <div class='section-title' style='margin-top:0'>Squad Command Hub</div>
+                  <div class='section-subtitle' style='margin-bottom:8px;'>Live Medisports pulse across map, side, and form context.</div>
+                  <span class='chip'>Season: {', '.join(map(str, seasons[:2]))}{'…' if len(seasons) > 2 else ''}</span>
+                  <span class='chip'>Map scope: {', '.join(map(str, maps[:2]))}{'…' if len(maps) > 2 else ''}</span>
+                </div>
               </div>
               <div>
                 <span class='chip chip-good'>Context: Active</span>
-                <span class='chip'>Roster Tracked: {summary['player'].nunique()}</span>
+                <span class='chip'>Medisports Roster: {summary['player'].nunique()}</span>
               </div>
             </div>
         </div>
@@ -108,6 +129,8 @@ def render(ctx):
             merged["best_map"] = _context_for_player(df, str(row["player"]), "map")
             merged["best_side"] = _context_for_player(df, str(row["player"]), "side")
             merged["trend"] = _trend_for_player(df, str(row["player"]))
+            merged["photo_uri"] = image_data_uri(find_player_photo(str(row["player"])))
+            merged["team_logo_uri"] = team_logo
 
             with cols[c_idx]:
                 player_card(merged)
