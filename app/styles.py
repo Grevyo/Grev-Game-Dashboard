@@ -96,7 +96,7 @@ def inject_styles(theme_name: str = "Dark"):
     .player-head-left {{ flex:0 0 auto; }}
     .player-head-meta {{ flex:1; min-width:0; }}
     .player-avatar-frame {{
-      width: 82px; height: 104px; border-radius: 14px; overflow:hidden;
+      width: 96px; height: 124px; border-radius: 14px; overflow:hidden;
       border: 1px solid var(--border);
       background: color-mix(in srgb, var(--surface) 72%, #fff 28%);
       display:flex; align-items:center; justify-content:center;
@@ -115,7 +115,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .hero-logo {{ width: 72px; height: 72px; object-fit: contain; border-radius: 12px; border: 1px solid var(--border); padding: 6px; background: color-mix(in srgb, var(--surface) 72%, #fff 28%); }}
     .hero-player-photo-frame {{
-      width: 128px; height: 156px; border-radius: 16px; overflow:hidden;
+      width: 152px; height: 192px; border-radius: 16px; overflow:hidden;
       border: 1px solid var(--border); flex: 0 0 auto;
       background: color-mix(in srgb, var(--surface) 72%, #fff 28%);
     }}

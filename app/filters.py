@@ -124,6 +124,8 @@ def apply_filters(df, filters):
 
 def _active_items(filters):
     active = []
+    if filters.get("competition_mode"):
+        active.append(("Competition Mode", filters["competition_mode"]))
     for key in ["season", "competition", "map", "opponent", "side", "last_days", "last_matches"]:
         value = filters.get(key)
         if value:
