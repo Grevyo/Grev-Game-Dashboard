@@ -65,8 +65,11 @@ def player_card(row: dict):
 
     photo_uri = row.get("photo_uri")
     logo_uri = row.get("team_logo_uri")
+    photo_missing_reason = str(row.get("photo_missing_reason", "not found"))
     profile_visual = (
-        f"<img class='player-avatar' src='{photo_uri}' alt='Player photo'/>" if photo_uri else "<div class='player-avatar fallback-avatar'>No Photo</div>"
+        f"<img class='player-avatar' src='{photo_uri}' alt='Player photo'/>"
+        if photo_uri
+        else f"<div class='player-avatar fallback-avatar'>No Photo<br><small>{photo_missing_reason}</small></div>"
     )
     logo_visual = f"<img class='team-mini-logo' src='{logo_uri}' alt='Team logo'/>" if logo_uri else ""
 
