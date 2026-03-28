@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from app.config import FILES
-from app.grouping import parse_competition_name
+from app.grouping import normalize_competitions
 
 SYNONYMS = {
     "date": ["date", "match_date"],
@@ -128,11 +128,6 @@ def _safe_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     return df
 
 
-def _extract_comp_group(comp: str) -> tuple[str, str | None]:
-    family, season, _instance = parse_competition_name(comp)
-    grouped = f"{family} Season {season}" if season is not None else family
-    return grouped, str(season) if season is not None else None
-
 
 def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
@@ -148,11 +143,7 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
         df["side"] = df["side"].astype(str).str.title().replace({"Ct": "Blue", "T": "Red"})
     if "competition" in df.columns:
         df["raw_competition_name"] = df["competition"].fillna("").astype(str).str.strip()
-        comp_info = df["raw_competition_name"].map(_extract_comp_group)
-        df["grouped_competition_name"] = comp_info.map(lambda x: x[0])
-        # Backward-compatible aliases used by older pages.
-        df["competition_group"] = df["grouped_competition_name"]
-        df["season"] = comp_info.map(lambda x: x[1])
+        df = normalize_competitions(df, name_col="raw_competition_name", date_col="date")
     elif "raw_competition_name" in df.columns:
         # Ensure legacy callers still have a `competition` column if only raw_* is present.
         df["competition"] = df["raw_competition_name"]
