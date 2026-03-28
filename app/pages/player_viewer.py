@@ -1,8 +1,13 @@
 import streamlit as st
+
 try:
     import plotly.express as px
+    import plotly.graph_objects as go
+    PLOTLY_AVAILABLE = True
 except ModuleNotFoundError:
     px = None
+    go = None
+    PLOTLY_AVAILABLE = False
 
 from app.components import section_header, stat_card
 from app.image_helpers import find_achievement_image, find_player_photo
@@ -58,8 +63,8 @@ def render(ctx):
                 st.markdown(f"**{a.get('achievement_name','Achievement')}** — {a.get('position','')} (Season {a.get('season_name','-')})")
 
     section_header("Performance Trends")
-    if px is None:
-        st.warning("Plotly is unavailable, so the performance trend chart cannot be displayed.")
+    if not PLOTLY_AVAILABLE:
+        st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")
     else:
         fig = px.line(p, x="date", y="grevscore", title="Match-by-match GrevScore", markers=True)
         st.plotly_chart(fig, use_container_width=True)
