@@ -10,7 +10,7 @@ def inject_styles(theme_name: str = "Dark"):
     :root {{
       --bg: {theme['bg']};
       --surface: {theme['surface']};
-      --surface-soft: {theme['surface']};
+      --surface-soft: color-mix(in srgb, {theme['surface']} 88%, #fff 12%);
       --text: {theme['text']};
       --muted: {theme['muted']};
       --accent: {theme['accent']};
@@ -25,37 +25,39 @@ def inject_styles(theme_name: str = "Dark"):
       --space-4: 16px;
       --space-5: 20px;
       --space-6: 24px;
+      --space-7: 32px;
       --radius-s: 10px;
       --radius-m: 14px;
       --radius-l: 18px;
     }}
 
-    .stApp {{ background: var(--bg); color: var(--text); }}
-    .block-container {{ padding-top: 1.1rem; padding-bottom: 1.5rem; max-width: 96%; }}
+    .stApp {{ background: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%), var(--bg); color: var(--text); }}
+    .block-container {{ padding-top: 0.9rem; padding-bottom: 1.4rem; max-width: 98%; }}
 
-    .section-title {{ margin: var(--space-5) 0 var(--space-2) 0; font-size: 1.08rem; font-weight: 700; letter-spacing: 0.02em; }}
+    .page-shell {{ display:flex; flex-direction:column; gap: var(--space-5); }}
+    .section-title {{ margin: 0 0 var(--space-2) 0; font-size: 1.05rem; font-weight: 750; letter-spacing: 0.02em; color: var(--text); }}
+    .section-subtitle {{ color: var(--muted); font-size: 0.82rem; margin-bottom: var(--space-3); }}
 
     .chip {{
       display:inline-flex; align-items:center; gap:6px;
-      padding:3px 10px; border-radius:999px; border:1px solid var(--border);
-      font-size:12px; margin-right:6px; margin-bottom:6px; color: var(--text);
-      background: color-mix(in srgb, var(--surface) 75%, var(--accent) 25%);
+      padding:4px 10px; border-radius:999px; border:1px solid var(--border);
+      font-size:11px; margin-right:6px; margin-bottom:6px; color: var(--text);
+      background: color-mix(in srgb, var(--surface) 72%, var(--accent) 28%);
+      letter-spacing: 0.02em;
     }}
-
-    .chip-good {{ background: color-mix(in srgb, var(--good) 20%, transparent); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }}
+    .chip-good {{ background: color-mix(in srgb, var(--good) 18%, transparent); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }}
     .chip-mid {{ background: color-mix(in srgb, var(--mid) 22%, transparent); border-color: color-mix(in srgb, var(--mid) 45%, var(--border)); }}
     .chip-poor {{ background: color-mix(in srgb, var(--poor) 20%, transparent); border-color: color-mix(in srgb, var(--poor) 45%, var(--border)); }}
     .chip-bad {{ background: color-mix(in srgb, var(--bad) 18%, transparent); border-color: color-mix(in srgb, var(--bad) 50%, var(--border)); }}
 
     .panel {{
-      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, #fff 10%), var(--surface));
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 91%, #fff 9%), var(--surface));
       border: 1px solid var(--border);
       border-radius: var(--radius-m);
       padding: var(--space-4);
-      margin-bottom: var(--space-3);
       box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+      height: 100%;
     }}
-
     .panel-tight {{ padding: var(--space-3); }}
     .accent-good {{ border-top: 3px solid var(--good); }}
     .accent-mid {{ border-top: 3px solid var(--mid); }}
@@ -66,57 +68,77 @@ def inject_styles(theme_name: str = "Dark"):
       padding: var(--space-5);
       border-radius: var(--radius-l);
       border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
-      background: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 40%),
-                  linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, #fff 12%), var(--surface));
-      margin-bottom: var(--space-4);
+      background:
+        radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 35%),
+        linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, #fff 10%), var(--surface));
     }}
 
-    .metric-title {{ color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }}
-    .metric-value {{ font-size: 28px; line-height: 1.2; font-weight: 750; margin-top: 2px; }}
+    .metric-title {{ color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }}
+    .metric-value {{ font-size: 25px; line-height: 1.15; font-weight: 760; margin-top: 3px; }}
 
-    .player-card {{ height: 100%; min-height: 260px; }}
-    .player-name {{ font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }}
-    .identity-line {{ color: var(--muted); font-size: 12px; margin-bottom: 8px; }}
-    .player-desc {{ font-size: 13px; margin-bottom: 10px; }}
-    .stats-grid {{ display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }}
+    .top-nav {{
+      display:flex; align-items:center; gap: 10px; padding: 8px 10px;
+      background: color-mix(in srgb, var(--surface) 94%, #fff 6%);
+      border: 1px solid var(--border); border-radius: 999px;
+      margin-bottom: 12px;
+    }}
+
+    .context-ribbon {{
+      background: color-mix(in srgb, var(--surface) 95%, #fff 5%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-m);
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }}
+
+    .player-card {{ min-height: 290px; display:flex; flex-direction:column; gap: 10px; }}
+    .player-name {{ font-size: 1.03rem; font-weight: 720; margin: 0; }}
+    .identity-line {{ color: var(--muted); font-size: 12px; margin: 0; }}
+    .player-desc {{ font-size: 12px; color: color-mix(in srgb, var(--text) 88%, #fff 12%); margin: 0; min-height: 30px; }}
+    .stats-grid {{ display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }}
     .stat-item {{
       background: color-mix(in srgb, var(--surface) 82%, #fff 18%);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 7px 8px;
+      padding: 8px;
     }}
-    .stat-item .label {{ color: var(--muted); font-size: 11px; }}
-    .stat-item .value {{ font-size: 14px; font-weight: 650; }}
+    .stat-item .label {{ color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }}
+    .stat-item .value {{ font-size: 14px; font-weight: 680; margin-top: 2px; }}
+
+    .toolbar-shell {{
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff 8%), var(--surface));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-m);
+      padding: 10px 12px 4px 12px;
+      margin-bottom: 12px;
+    }}
+
+    .subtle-grid {{ display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:10px; }}
 
     .muted {{ color: var(--muted); font-size:12px; }}
     .stat-good {{ color:var(--good); }} .stat-mid {{ color:var(--mid); }}
     .stat-poor {{ color:var(--poor); }} .stat-bad {{ color:var(--bad); }}
 
-    section[data-testid="stSidebar"] .stMarkdown {{ margin-bottom: 6px; }}
+    section[data-testid="stSidebar"] {{ border-right: 1px solid var(--border); }}
+    section[data-testid="stSidebar"] .stMarkdown {{ margin-bottom: 4px; }}
     .sidebar-card {{
-      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, #fff 10%), var(--surface));
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:10px 12px 6px 12px;
-      margin: 8px 0;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 91%, #fff 9%), var(--surface));
+      border:1px solid var(--border); border-radius:12px;
+      padding:8px 10px; margin: 6px 0;
     }}
     .sidebar-head {{
-      color: var(--text);
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 6px;
+      color: var(--text); font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
     }}
     section[data-testid="stSidebar"] .stSelectbox label,
     section[data-testid="stSidebar"] .stMultiSelect label,
-    section[data-testid="stSidebar"] .stRadio label {{
-      font-size: 0.78rem !important;
-      color: var(--muted) !important;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+    section[data-testid="stSidebar"] .stRadio label,
+    section[data-testid="stSidebar"] .stSlider label {{
+      font-size: 0.74rem !important; color: var(--muted) !important;
+      text-transform: uppercase; letter-spacing: 0.05em;
     }}
-    section[data-testid="stSidebar"] .stRadio > div {{ gap: 4px; }}
+
+    div[data-testid="stHorizontalBlock"] > div {{ align-self: stretch; }}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -124,4 +146,4 @@ def inject_styles(theme_name: str = "Dark"):
 
 def tier_badge(tier: str) -> str:
     color = TIER_COLORS.get(str(tier).strip().upper(), "#8892b0")
-    return f"<span class='chip' style='background:{color}26;border-color:{color};'>{tier}</span>"
+    return f"<span class='chip' style='background:{color}26;border-color:{color};'>Tier {tier}</span>"

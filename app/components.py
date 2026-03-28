@@ -9,7 +9,7 @@ from app.styles import tier_badge
 def section_header(title: str, subtitle: str = ""):
     st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
     if subtitle:
-        st.caption(subtitle)
+        st.markdown(f"<div class='section-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
 
 
 def stat_card(label: str, value, help_text: str = "", quality_override: str | None = None):
@@ -77,12 +77,14 @@ def player_card(row: dict):
 
     card_html = f"""
     <div class='panel player-card accent-{tone}'>
-        <div class='player-name'>{row.get('player', 'Unknown')}</div>
-        <div class='identity-line'>{' • '.join(identity_bits)}</div>
-        <div>{tier_badge(row.get('tier', '-'))} {trend_chip(row.get('trend', 'Flat'))}</div>
-        <div class='player-desc'>{row.get('desc', '')}</div>
+        <div>
+          <p class='player-name'>{row.get('player', 'Unknown')}</p>
+          <p class='identity-line'>{' • '.join(identity_bits)}</p>
+        </div>
+        <div>{tier_badge(row.get('tier', '-'))}{trend_chip(row.get('trend', 'Stable'))}</div>
+        <p class='player-desc'>{row.get('desc', '')}</p>
         <div class='stats-grid'>{stats_html}</div>
-        <div class='muted'>Best map: <strong>{row.get('best_map', 'N/A')}</strong> · Best side: <strong>{row.get('best_side', 'N/A')}</strong></div>
+        <div class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></div>
     </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
