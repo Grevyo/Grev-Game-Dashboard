@@ -2,6 +2,7 @@ import streamlit as st
 
 from app.data_loader import detect_our_team, load_data, validate_columns
 from app.filters import apply_filters, build_global_filters, filter_summary
+from app.image_helpers import find_team_logo, image_data_uri
 from app.pages import overview, player_viewer, tactic_set_recommendations, tactics_breakdown, vs_teams, vs_tournaments
 from app.styles import inject_styles
 from app.transforms import with_player_metrics
@@ -29,7 +30,12 @@ def run_app():
     validate_columns(t_df, ["map", "side", "tactic_name", "wins", "losses", "total_rounds"], "TacticsDataMaster.csv")
 
     inject_styles("Dark")
-    st.markdown("<div class='hero-band' style='margin-bottom:12px;'><div class='section-title' style='margin-top:0;'>Medisports Analytics Dashboard</div><div class='section-subtitle' style='margin-bottom:0;'>Unified command layer with page-native controls and full-width layout.</div></div>", unsafe_allow_html=True)
+    team_logo_uri = image_data_uri(find_team_logo(team_name) or find_team_logo("Medisports"))
+    logo_html = f"<img class='hero-logo' src='{team_logo_uri}' alt='Medisports logo'/>" if team_logo_uri else ""
+    st.markdown(
+        f"<div class='hero-band' style='margin-bottom:12px;'><div style='display:flex;align-items:center;gap:12px;'><div>{logo_html}</div><div><div class='section-title' style='margin-top:0;'>Medisports Analytics Dashboard</div><div class='section-subtitle' style='margin-bottom:0;'>Unified command layer with page-native controls and full-width layout.</div></div></div></div>",
+        unsafe_allow_html=True,
+    )
     st.markdown("<div class='top-nav'></div>", unsafe_allow_html=True)
     page = st.radio("Page", list(PAGES.keys()), horizontal=True, label_visibility="collapsed")
 

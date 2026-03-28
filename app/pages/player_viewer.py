@@ -10,6 +10,14 @@ except ModuleNotFoundError:
 
 from app.components import section_header, stat_card
 from app.data_loader import is_medisports_player, medisports_player_roster
+from app.image_helpers import (
+    find_achievement_image,
+    find_competition_logo,
+    find_map_image,
+    find_player_photo,
+    find_team_logo,
+    image_data_uri,
+)
 from app.transforms import best_contexts
 
 
@@ -94,20 +102,29 @@ def render(ctx):
     trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
     streak = f"{int((p['grevscore'] >= p['grevscore'].mean()).tail(5).sum())}/5 solid"
 
+    player_photo = image_data_uri(find_player_photo(player))
+    team_logo = image_data_uri(find_team_logo(team_name) or find_team_logo("Medisports"))
+    hero_photo = f"<img class='hero-player-photo' src='{player_photo}' alt='Player photo'/>" if player_photo else "<div class='player-avatar fallback-avatar'>No Photo</div>"
+    hero_logo = f"<img class='hero-logo' src='{team_logo}' alt='Medisports logo'/>" if team_logo else ""
+
     st.markdown(
         f"""
         <div class='hero-band'>
           <div style='display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;'>
-            <div style='flex:1;min-width:280px;'>
-              <div class='section-title' style='margin-top:0'>{player}</div>
-              <div class='section-subtitle'>{country + ' • ' if country else ''}{role if role else 'Core Roster'} • {team_name}</div>
-              <span class='chip'>Role: {role if role else 'N/A'}</span>
-              <span class='chip'>Country: {country if country else 'N/A'}</span>
-              <span class='chip chip-good'>Best Map: {best_map_label}</span>
-              <span class='chip chip-mid'>Best Side: {best_side_label}</span>
-              <div class='muted' style='margin-top:8px;'>Current form summary: {player} is {trend.lower()} with a {p['grevscore'].mean():.1f} GrevScore baseline in this scope.</div>
+            <div style='flex:1;min-width:300px;display:flex;align-items:flex-start;gap:14px;'>
+              {hero_photo}
+              <div>
+                <div class='section-title' style='margin-top:0'>{player}</div>
+                <div class='section-subtitle'>{country + ' • ' if country else ''}{role if role else 'Core Roster'} • {team_name}</div>
+                <span class='chip'>Role: {role if role else 'N/A'}</span>
+                <span class='chip'>Country: {country if country else 'N/A'}</span>
+                <span class='chip chip-good'>Best Map: {best_map_label}</span>
+                <span class='chip chip-mid'>Best Side: {best_side_label}</span>
+                <div class='muted' style='margin-top:8px;'>Current form summary: {player} is {trend.lower()} with a {p['grevscore'].mean():.1f} GrevScore baseline in this scope.</div>
+              </div>
             </div>
             <div style='min-width:340px;flex:1;'>
+              <div style='display:flex;justify-content:flex-end;margin-bottom:8px;'>{hero_logo}</div>
               <div class='subtle-grid'>
                 <div class='panel panel-tight accent-mid'><div class='metric-title'>Team Rank</div><div class='metric-value'>{int((df.groupby('player')['grevscore'].mean().rank(ascending=False, method='min').get(player, 0)))}</div></div>
                 <div class='panel panel-tight accent-good'><div class='metric-title'>Record</div><div class='metric-value'>{int((p['grevscore'] >= 60).sum())}-{int((p['grevscore'] < 60).sum())}</div></div>
@@ -121,16 +138,19 @@ def render(ctx):
         unsafe_allow_html=True,
     )
 
-    section_header("Achievements Ribbon", "Compact accolade strip")
+    section_header("Achievements Ribbon", "Compact accolade strip with local images")
     ach = achievements[achievements.get("player_clean", achievements.get("player", "")).astype(str).str.contains(str(player), case=False, regex=False)]
     if ach.empty:
         st.caption("No achievements linked for selected player.")
     else:
         cols = st.columns(min(4, max(1, len(ach))), gap="small")
         for idx, (_, a) in enumerate(ach.head(8).iterrows()):
+            image_path = find_achievement_image(a.get("achievement_link") or a.get("achievement_name"))
+            image_uri = image_data_uri(image_path)
+            img_html = f"<img class='achievement-thumb' src='{image_uri}' alt='Achievement image'/>" if image_uri else ""
             with cols[idx % len(cols)]:
                 st.markdown(
-                    f"<div class='panel panel-tight accent-mid'><strong>{a.get('achievement_name','Achievement')}</strong><br>"
+                    f"<div class='panel panel-tight accent-mid'>{img_html}<strong>{a.get('achievement_name','Achievement')}</strong><br>"
                     f"<span class='muted'>{a.get('position','')} • {a.get('season_name','-')}</span></div>",
                     unsafe_allow_html=True,
                 )
@@ -171,13 +191,25 @@ def render(ctx):
     with c1:
         st.markdown("#### By Map")
         st.dataframe(best_contexts(p, "map").head(8), use_container_width=True, hide_index=True)
+        if best_map_label != "N/A":
+            map_uri = image_data_uri(find_map_image(best_map_label))
+            if map_uri:
+                st.markdown(f"<img class='map-thumb' src='{map_uri}' alt='Map image'/>", unsafe_allow_html=True)
     with c2:
         st.markdown("#### By Side")
         st.dataframe(best_contexts(p, "side").head(8), use_container_width=True, hide_index=True)
     with c3:
         st.markdown("#### By Competition")
-        st.dataframe(
-            best_contexts(p, "competition_group" if "competition_group" in p.columns else "competition").head(8),
-            use_container_width=True,
-            hide_index=True,
-        )
+        by_comp_key = "competition_group" if "competition_group" in p.columns else "competition"
+        by_comp = best_contexts(p, by_comp_key).head(8)
+        st.dataframe(by_comp, use_container_width=True, hide_index=True)
+        if not by_comp.empty:
+            logo_cols = st.columns(min(3, len(by_comp)), gap="small")
+            for idx, (_, comp_row) in enumerate(by_comp.head(3).iterrows()):
+                top_comp = str(comp_row[by_comp_key])
+                comp_uri = image_data_uri(find_competition_logo(top_comp))
+                with logo_cols[idx % len(logo_cols)]:
+                    if comp_uri:
+                        st.markdown(f"<img class='competition-thumb' src='{comp_uri}' alt='Competition logo'/><div class='muted'>{top_comp}</div>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"<div class='panel panel-tight'><div class='muted'>{top_comp}</div></div>", unsafe_allow_html=True)
