@@ -9,9 +9,10 @@ except ModuleNotFoundError:
     PLOTLY_AVAILABLE = False
 
 from app.components import section_header, stat_card
+from app.achievements import achievements_for_player
+from app.competition import competition_cols_for_mode, get_competition_display_col
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.image_helpers import (
-    find_achievement_image,
     find_competition_logo,
     find_map_image,
     find_team_logo,
@@ -36,6 +37,7 @@ def _form_delta(p):
 def render(ctx):
     df = get_medisports_roster_df(ctx["player_matches"], player_col="player")
     achievements = ctx["achievements"]
+    filters = ctx.get("filters", {})
     players = ctx["players"]
     team_name = ctx.get("team_name", "Medisports")
 
@@ -100,9 +102,9 @@ def render(ctx):
     player_photo = image_data_uri(player_photo_match.get("path"))
     team_logo = image_data_uri(find_team_logo(team_name) or find_team_logo("Medisports"))
     hero_photo = (
-        f"<img class='hero-player-photo' src='{player_photo}' alt='Player photo'/>"
+        f"<div class='hero-player-photo-frame'><img class='hero-player-photo' src='{player_photo}' alt='Player photo'/></div>"
         if player_photo
-        else f"<div class='player-avatar fallback-avatar'>No Photo ({player_photo_match.get('reason', 'not found')})</div>"
+        else f"<div class='hero-player-photo-frame'><div class='player-avatar fallback-avatar'>No Photo ({player_photo_match.get('reason', 'not found')})</div></div>"
     )
     hero_logo = f"<img class='hero-logo' src='{team_logo}' alt='Medisports logo'/>" if team_logo else ""
 
@@ -138,21 +140,21 @@ def render(ctx):
     )
 
     section_header("Achievements Ribbon", "Compact accolade strip with local images")
-    ach = achievements[achievements.get("player_clean", achievements.get("player", "")).astype(str).str.contains(str(player), case=False, regex=False)]
-    if ach.empty:
+    ach_items, ach_hidden = achievements_for_player(achievements, player, cap=6)
+    if not ach_items:
         st.caption("No achievements linked for selected player.")
     else:
-        cols = st.columns(min(4, max(1, len(ach))), gap="small")
-        for idx, (_, a) in enumerate(ach.head(8).iterrows()):
-            image_path = find_achievement_image(a.get("achievement_link") or a.get("achievement_name"))
-            image_uri = image_data_uri(image_path)
-            img_html = f"<img class='achievement-thumb' src='{image_uri}' alt='Achievement image'/>" if image_uri else ""
+        cols = st.columns(min(3, max(1, len(ach_items))), gap="small")
+        for idx, a in enumerate(ach_items):
+            img_html = f"<img class='achievement-thumb' src='{a.get('image_uri')}' alt='Achievement image'/>" if a.get("image_uri") else ""
             with cols[idx % len(cols)]:
                 st.markdown(
-                    f"<div class='panel panel-tight accent-mid'>{img_html}<strong>{a.get('achievement_name','Achievement')}</strong><br>"
-                    f"<span class='muted'>{a.get('position','')} • {a.get('season_name','-')}</span></div>",
+                    f"<div class='panel panel-tight accent-mid'>{img_html}<strong>{a.get('name','Achievement')}</strong><br>"
+                    f"<span class='muted'>{a.get('position','')} • Season {a.get('season','-')} • Tier {a.get('tier','-')}</span></div>",
                     unsafe_allow_html=True,
                 )
+        if ach_hidden:
+            st.markdown(f"<div class='muted'>+{ach_hidden} more achievements not shown in ribbon.</div>", unsafe_allow_html=True)
 
     section_header("Performance Core", "GrevScore feature and headline cards")
     left, right = st.columns([1.3, 1], gap="small")
@@ -199,7 +201,11 @@ def render(ctx):
         st.dataframe(best_contexts(p, "side").head(8), use_container_width=True, hide_index=True)
     with c3:
         st.markdown("#### By Competition")
-        by_comp_key = "competition_group" if "competition_group" in p.columns else "competition"
+        by_comp_key = get_competition_display_col(filters.get("competition_mode"))
+        for fallback_col in competition_cols_for_mode(filters.get("competition_mode")):
+            if fallback_col in p.columns:
+                by_comp_key = fallback_col
+                break
         by_comp = best_contexts(p, by_comp_key).head(8)
         st.dataframe(by_comp, use_container_width=True, hide_index=True)
         if not by_comp.empty:

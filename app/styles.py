@@ -91,13 +91,19 @@ def inject_styles(theme_name: str = "Dark"):
       margin-bottom: 14px;
     }}
 
-    .player-card {{ min-height: 290px; display:flex; flex-direction:column; gap: 10px; }}
-    .player-head {{ display:flex; align-items:center; gap:10px; }}
+    .player-card {{ min-height: 390px; display:flex; flex-direction:column; gap: 10px; }}
+    .player-head {{ display:flex; align-items:flex-start; gap:12px; }}
     .player-head-left {{ flex:0 0 auto; }}
     .player-head-meta {{ flex:1; min-width:0; }}
+    .player-avatar-frame {{
+      width: 82px; height: 104px; border-radius: 14px; overflow:hidden;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 72%, #fff 28%);
+      display:flex; align-items:center; justify-content:center;
+    }}
     .player-avatar {{
-      width: 52px; height: 52px; object-fit: cover;
-      border-radius: 12px; border: 1px solid var(--border);
+      width: 100%; height: 100%; object-fit: cover;
+      border-radius: 0;
       background: color-mix(in srgb, var(--surface) 72%, #fff 28%);
     }}
     .fallback-avatar {{ display:flex; align-items:center; justify-content:center; font-size:10px; color: var(--muted); }}
@@ -108,7 +114,12 @@ def inject_styles(theme_name: str = "Dark"):
       background: color-mix(in srgb, var(--surface) 70%, #fff 30%);
     }}
     .hero-logo {{ width: 72px; height: 72px; object-fit: contain; border-radius: 12px; border: 1px solid var(--border); padding: 6px; background: color-mix(in srgb, var(--surface) 72%, #fff 28%); }}
-    .hero-player-photo {{ width: 88px; height: 88px; object-fit: cover; border-radius: 14px; border: 1px solid var(--border); }}
+    .hero-player-photo-frame {{
+      width: 128px; height: 156px; border-radius: 16px; overflow:hidden;
+      border: 1px solid var(--border); flex: 0 0 auto;
+      background: color-mix(in srgb, var(--surface) 72%, #fff 28%);
+    }}
+    .hero-player-photo {{ width: 100%; height: 100%; object-fit: cover; border-radius: 0; border: 0; }}
     .achievement-thumb, .competition-thumb, .map-thumb {{
       width: 42px; height: 42px; object-fit: contain;
       border-radius: 10px; border: 1px solid var(--border);
@@ -119,6 +130,16 @@ def inject_styles(theme_name: str = "Dark"):
     .player-name {{ font-size: 1.03rem; font-weight: 720; margin: 0; }}
     .identity-line {{ color: var(--muted); font-size: 12px; margin: 0; }}
     .player-desc {{ font-size: 12px; color: color-mix(in srgb, var(--text) 88%, #fff 12%); margin: 0; min-height: 30px; }}
+    .achievement-strip {{ display:flex; flex-wrap:wrap; gap: 6px; min-height: 36px; align-items:stretch; }}
+    .achievement-chip {{
+      display:flex; gap:6px; align-items:center;
+      background: color-mix(in srgb, var(--surface) 84%, #fff 16%);
+      border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+      min-width: 0;
+    }}
+    .achievement-chip-thumb {{ width: 26px; height: 26px; object-fit: contain; border-radius: 8px; }}
+    .achievement-chip-name {{ font-size: 11px; font-weight: 680; line-height: 1.1; }}
+    .achievement-chip-meta {{ font-size: 10px; color: var(--muted); }}
     .stats-grid {{ display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }}
     .stat-item {{
       background: color-mix(in srgb, var(--surface) 82%, #fff 18%);

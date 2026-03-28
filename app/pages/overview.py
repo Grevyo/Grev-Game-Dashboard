@@ -1,6 +1,7 @@
 import streamlit as st
 
 from app.components import insight_card, player_card, section_header, stat_card
+from app.achievements import achievements_for_player
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.descriptions import player_description
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
@@ -33,6 +34,7 @@ def render(ctx):
     players_meta = ctx["players"]
     team_name = ctx["team_name"]
     filters = ctx.get("filters", {})
+    achievements_df = ctx.get("achievements")
 
     df = get_medisports_roster_df(full_df, player_col="player")
 
@@ -132,6 +134,9 @@ def render(ctx):
             merged["photo_uri"] = image_data_uri(photo.get("path"))
             merged["team_logo_uri"] = team_logo
             merged["photo_missing_reason"] = photo.get("reason")
+            ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=3)
+            merged["achievements"] = ach_list
+            merged["achievements_hidden"] = ach_hidden
 
             with cols[c_idx]:
                 player_card(merged)

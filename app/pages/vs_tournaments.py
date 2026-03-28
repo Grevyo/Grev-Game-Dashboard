@@ -10,13 +10,18 @@ except ModuleNotFoundError:
     PLOTLY_AVAILABLE = False
 
 from app.components import section_header
+from app.competition import competition_cols_for_mode, get_competition_display_col
 from app.metrics import confidence_from_sample
 
 
 def render(ctx):
     tdf = ctx["tactics"]
     filters = ctx["filters"]
-    col = "competition_group" if filters.get("competition_mode") == "Grouped competitions" else "competition"
+    col = get_competition_display_col(filters.get("competition_mode"))
+    for fallback_col in competition_cols_for_mode(filters.get("competition_mode")):
+        if fallback_col in tdf.columns:
+            col = fallback_col
+            break
 
     st.title("Medisports vs Tournaments")
     if tdf.empty or col not in tdf.columns:

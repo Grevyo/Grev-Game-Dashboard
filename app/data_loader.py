@@ -147,9 +147,15 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
     if "side" in df.columns:
         df["side"] = df["side"].astype(str).str.title().replace({"Ct": "Blue", "T": "Red"})
     if "competition" in df.columns:
-        comp_info = df["competition"].fillna("").map(_extract_comp_group)
-        df["competition_group"] = comp_info.map(lambda x: x[0])
+        df["raw_competition_name"] = df["competition"].fillna("").astype(str).str.strip()
+        comp_info = df["raw_competition_name"].map(_extract_comp_group)
+        df["grouped_competition_name"] = comp_info.map(lambda x: x[0])
+        # Backward-compatible aliases used by older pages.
+        df["competition_group"] = df["grouped_competition_name"]
         df["season"] = comp_info.map(lambda x: x[1])
+    elif "raw_competition_name" in df.columns:
+        # Ensure legacy callers still have a `competition` column if only raw_* is present.
+        df["competition"] = df["raw_competition_name"]
     return df
 
 

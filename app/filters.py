@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 
+from app.competition import competition_cols_for_mode, get_competition_display_col
+
 
 def _sorted_values(df: pd.DataFrame, col: str) -> list:
     if df.empty or col not in df.columns:
@@ -37,12 +39,20 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
             season_options = _int_sorted_values(player_df, "season")
             season_vals = st.multiselect("Season", season_options, default=season_options)
 
-    competitions_col = "competition_group" if comp_mode == "Grouped competitions" else "competition"
+    competitions_col = get_competition_display_col(comp_mode)
+    for fallback_col in competition_cols_for_mode(comp_mode):
+        if fallback_col in player_df.columns:
+            competitions_col = fallback_col
+            break
 
     with map_col:
         f1, f2, f3 = st.columns(3, gap="small")
         with f1:
-            competition_vals = st.multiselect("Competition", _sorted_values(player_df, competitions_col))
+            competition_vals = st.multiselect(
+                "Competition",
+                _sorted_values(player_df, competitions_col),
+                key=f"competition_filter_{'group' if comp_mode == 'Grouped competitions' else 'individual'}",
+            )
         with f2:
             map_vals = st.multiselect("Map", _sorted_values(player_df, "map"))
         with f3:
@@ -82,7 +92,12 @@ def apply_filters(df, filters):
         valid = {str(v) for v in filters["season"]}
         out = out[out["season"].astype(str).isin(valid)]
 
-    comp_col = filters.get("competition_col", "competition")
+    comp_col = filters.get("competition_col") or get_competition_display_col(filters.get("competition_mode"))
+    if comp_col not in out.columns:
+        for fallback_col in competition_cols_for_mode(filters.get("competition_mode")):
+            if fallback_col in out.columns:
+                comp_col = fallback_col
+                break
     if filters.get("competition") and comp_col in out.columns:
         out = out[out[comp_col].isin(filters["competition"])]
 

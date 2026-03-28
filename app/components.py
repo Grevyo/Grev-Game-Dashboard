@@ -67,9 +67,9 @@ def player_card(row: dict):
     logo_uri = row.get("team_logo_uri")
     photo_missing_reason = str(row.get("photo_missing_reason", "not found"))
     profile_visual = (
-        f"<img class='player-avatar' src='{photo_uri}' alt='Player photo'/>"
+        f"<div class='player-avatar-frame'><img class='player-avatar' src='{photo_uri}' alt='Player photo'/></div>"
         if photo_uri
-        else f"<div class='player-avatar fallback-avatar'>No Photo<br><small>{photo_missing_reason}</small></div>"
+        else f"<div class='player-avatar-frame'><div class='player-avatar fallback-avatar'>No Photo<br><small>{photo_missing_reason}</small></div></div>"
     )
     logo_visual = f"<img class='team-mini-logo' src='{logo_uri}' alt='Team logo'/>" if logo_uri else ""
 
@@ -84,6 +84,18 @@ def player_card(row: dict):
     stats_html = "".join(
         f"<div class='stat-item'><div class='label'>{label}</div><div class='value'>{value}</div></div>" for label, value in stat_items
     )
+    ach_items = row.get("achievements", []) or []
+    ach_chunks = []
+    for a in ach_items[:3]:
+        thumb = f"<img class='achievement-chip-thumb' src='{a.get('image_uri')}' alt='Achievement'/>" if a.get("image_uri") else ""
+        season_tag = f"S{a.get('season')}" if a.get("season") else ""
+        ach_chunks.append(
+            f"<div class='achievement-chip'>{thumb}<div><div class='achievement-chip-name'>{a.get('name','Achievement')}</div>"
+            f"<div class='achievement-chip-meta'>{a.get('position','')} {season_tag}</div></div></div>"
+        )
+    ach_html = "".join(ach_chunks)
+    if row.get("achievements_hidden", 0):
+        ach_html += f"<div class='chip'>+{int(row.get('achievements_hidden', 0))} more</div>"
 
     card_html = f"""
     <div class='panel player-card accent-{tone}'>
@@ -98,6 +110,7 @@ def player_card(row: dict):
         <div>{tier_badge(row.get('tier', '-'))}{trend_chip(row.get('trend', 'Stable'))}</div>
         <p class='player-desc'>{row.get('desc', '')}</p>
         <div class='stats-grid'>{stats_html}</div>
+        <div class='achievement-strip'>{ach_html or "<span class='muted'>No achievements recorded</span>"}</div>
         <div class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></div>
     </div>
     """
