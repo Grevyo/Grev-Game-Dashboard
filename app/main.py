@@ -40,6 +40,7 @@ def run_app():
         "filters": filters,
     }
 
+    st.markdown("<div class='top-nav'></div>", unsafe_allow_html=True)
+    page = st.radio("Page", list(PAGES.keys()), horizontal=True, label_visibility="collapsed")
     filter_summary(filters)
-    page = st.sidebar.radio("Page", list(PAGES.keys()), label_visibility="collapsed")
     PAGES[page](filtered)

@@ -20,7 +20,7 @@ def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> 
 
 def _trend_for_player(df, player_name: str) -> str:
     if df.empty or "player" not in df.columns or "grevscore" not in df.columns:
-        return "Flat"
+        return "Stable"
     s = df[df["player"] == player_name].sort_values("date")["grevscore"]
     label = trend_label(s)
     return "Heating Up" if label == "Rising" else "Cooling" if label == "Falling" else "Stable"
@@ -47,11 +47,17 @@ def render(ctx):
     st.markdown(
         f"""
         <div class='hero-band'>
-            <div class='section-title' style='margin-top:0'>🏁 Squad Overview</div>
-            <div class='muted'>Team focus: <strong>{team_name}</strong></div>
-            <div style='margin-top:8px;'>
-              <span class='chip'>Season: {', '.join(map(str, seasons[:2]))}{'…' if len(seasons) > 2 else ''}</span>
-              <span class='chip'>Map scope: {', '.join(map(str, maps[:2]))}{'…' if len(maps) > 2 else ''}</span>
+            <div style='display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;'>
+              <div>
+                <div class='section-title' style='margin-top:0'>Squad Command Hub</div>
+                <div class='section-subtitle' style='margin-bottom:8px;'>Live team pulse for <strong>{team_name}</strong> across map, side, and form context.</div>
+                <span class='chip'>Season: {', '.join(map(str, seasons[:2]))}{'…' if len(seasons) > 2 else ''}</span>
+                <span class='chip'>Map scope: {', '.join(map(str, maps[:2]))}{'…' if len(maps) > 2 else ''}</span>
+              </div>
+              <div>
+                <span class='chip chip-good'>Context: Active</span>
+                <span class='chip'>Roster Tracked: {summary['player'].nunique()}</span>
+              </div>
             </div>
         </div>
         """,
@@ -60,25 +66,30 @@ def render(ctx):
 
     k1, k2, k3, k4 = st.columns(4, gap="small")
     with k1:
-        stat_card("Players", summary["player"].nunique(), "Active in selected context")
+        stat_card("Squad Avg GrevScore", f"{summary['grevscore'].mean():.1f}", "Current output index")
     with k2:
-        stat_card("Avg GrevScore", f"{summary['grevscore'].mean():.1f}", "Squad firepower average")
+        stat_card("Squad Avg Rating", f"{summary['rating'].mean():.2f}", "Form-normalized")
     with k3:
-        stat_card("Avg Rating", f"{summary['rating'].mean():.2f}", "Composite consistency")
+        stat_card("Avg Impact", f"{summary['impact'].mean():.1f}", "Kills + clutch value")
     with k4:
-        stat_card("Matches", int(df["match_id"].nunique()), "Unique matches tracked")
+        stat_card("Tracked Matches", int(df["match_id"].nunique()), "Selected context window")
 
-    section_header("Team Pulse", "Quick strengths and concerns from current filter window")
-    hottest = summary.sort_values("form", ascending=False).head(2)["player"].tolist()
-    cooling = summary.sort_values("form", ascending=True).head(2)["player"].tolist()
-    pulse_a, pulse_b = st.columns(2, gap="small")
-    with pulse_a:
-        insight_card("Strength", f"Current momentum leaders: {', '.join(hottest)}.", "good")
-    with pulse_b:
-        insight_card("Concern", f"Focus rebound prep for: {', '.join(cooling)}.", "warn")
+    top_player = summary.sort_values("grevscore", ascending=False).iloc[0]
+    improved = summary.sort_values("form", ascending=False).iloc[0]
+    coldest = summary.sort_values("form", ascending=True).iloc[0]
 
-    section_header("Player Cards", "Compact performance cards with identity, role context, and key stats")
+    section_header("Team Pulse", "High-signal summary strip")
+    p1, p2, p3, p4 = st.columns(4, gap="small")
+    with p1:
+        insight_card("Strongest Player", f"{top_player['player']} leads at {top_player['grevscore']:.1f} GrevScore.", "good")
+    with p2:
+        insight_card("Hottest Form", f"{improved['player']} currently shows the strongest rolling form.", "info")
+    with p3:
+        insight_card("Biggest Concern", f"{coldest['player']} is in the coldest form window and needs stabilization.", "bad")
+    with p4:
+        insight_card("Avg Team Impact", f"Team baseline is {summary['impact'].mean():.1f} impact per match sample.", "warn")
 
+    section_header("Main Roster Grid", "Compact equal-height profile cards")
     rows = list(summary.iterrows())
     for i in range(0, len(rows), 3):
         cols = st.columns(3, gap="small")
@@ -101,15 +112,11 @@ def render(ctx):
             with cols[c_idx]:
                 player_card(merged)
 
-    section_header("Squad Watchlist")
-    top_player = summary.sort_values("grevscore", ascending=False).iloc[0]
-    improved = summary.sort_values("form", ascending=False).iloc[0]
-    coldest = summary.sort_values("form", ascending=True).iloc[0]
-
+    section_header("Bottom Insights", "Compact coaching cues")
     w1, w2, w3 = st.columns(3, gap="small")
     with w1:
-        insight_card("Top Performer", f"{top_player['player']} leads with {top_player['grevscore']:.1f} GrevScore.", "good")
+        insight_card("Setup Note", "Anchor early rounds around current high-form duo to preserve conversion rate.", "good")
     with w2:
-        insight_card("Hottest Form", f"{improved['player']} is trending up in recent matches.", "info")
+        insight_card("Risk Note", "Review low-yield side starts where entry impact is trending below baseline.", "warn")
     with w3:
-        insight_card("Concern", f"{coldest['player']} is in a colder form window.", "bad")
+        insight_card("Focus Note", "Use map veto prep to prioritize strongest map clusters from current filter scope.", "info")
