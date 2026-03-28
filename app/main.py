@@ -28,6 +28,11 @@ def run_app():
     validate_columns(p_df, ["match_id", "date", "map", "competition", "my_team", "opponent_team", "player"], "PlayerDataMatser.csv")
     validate_columns(t_df, ["map", "side", "tactic_name", "wins", "losses", "total_rounds"], "TacticsDataMaster.csv")
 
+    inject_styles("Dark")
+    st.markdown("<div class='hero-band' style='margin-bottom:12px;'><div class='section-title' style='margin-top:0;'>Medisports Analytics Dashboard</div><div class='section-subtitle' style='margin-bottom:0;'>Unified command layer with page-native controls and full-width layout.</div></div>", unsafe_allow_html=True)
+    st.markdown("<div class='top-nav'></div>", unsafe_allow_html=True)
+    page = st.radio("Page", list(PAGES.keys()), horizontal=True, label_visibility="collapsed")
+
     filters = build_global_filters(p_df, t_df)
     inject_styles(filters.get("theme", "Dark"))
 
@@ -40,7 +45,5 @@ def run_app():
         "filters": filters,
     }
 
-    st.markdown("<div class='top-nav'></div>", unsafe_allow_html=True)
-    page = st.radio("Page", list(PAGES.keys()), horizontal=True, label_visibility="collapsed")
     filter_summary(filters)
     PAGES[page](filtered)
