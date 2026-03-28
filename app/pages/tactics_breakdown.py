@@ -1,5 +1,8 @@
-import plotly.express as px
 import streamlit as st
+try:
+    import plotly.express as px
+except ModuleNotFoundError:
+    px = None
 
 from app.components import insight_card, section_header
 from app.tactics import tactic_bucket, tactic_summary
@@ -25,8 +28,11 @@ def render(ctx):
     section_header("Context-locked tactic buckets", f"Showing exact context: {map_name} + {side}")
     st.dataframe(view.sort_values("score", ascending=False), use_container_width=True, hide_index=True)
 
-    fig = px.bar(view, x="win_rate", y="tactic_name", color="bucket", orientation="h", title="Tactic quality buckets")
-    st.plotly_chart(fig, use_container_width=True)
+    if px is None:
+        st.warning("Plotly is unavailable, so the tactic bucket chart cannot be displayed.")
+    else:
+        fig = px.bar(view, x="win_rate", y="tactic_name", color="bucket", orientation="h", title="Tactic quality buckets")
+        st.plotly_chart(fig, use_container_width=True)
 
     low = view[view["uses"] < 5]
     if not low.empty:
