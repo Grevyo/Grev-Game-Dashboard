@@ -162,13 +162,16 @@ def player_card(row: dict):
           </div>
           <div class='player-head-meta'>
             <div class='player-head-title-row'>
-              <p class='player-name'>{row.get('player', 'Unknown')}</p>
+              <div class='player-name-row'>
+                <p class='player-name'>{row.get('player', 'Unknown')}</p>
+                {trend_chip(row.get('trend', 'Stable'))}
+              </div>
               <div>{logo_visual}</div>
             </div>
             <p class='identity-line'>{identity_line}</p>
             <p class='identity-line'>{role_line}</p>
             {fame_html}
-            <div class='player-meta-row'>{trend_chip(row.get('trend', 'Stable'))}<span class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></span></div>
+            <div class='player-meta-row'><span class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></span></div>
           </div>
         </div>
         <div class='achievement-strip achievement-strip-featured'>{ach_html}</div>

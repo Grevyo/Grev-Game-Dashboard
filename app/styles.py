@@ -92,14 +92,14 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .player-card {{
-      min-height: 480px;
-      height: 480px;
+      min-height: 560px;
+      height: 560px;
       display:flex;
       flex-direction:column;
-      gap: 10px;
+      gap: 8px;
       overflow: hidden;
     }}
-    .player-head {{ display:flex; align-items:flex-start; gap:10px; min-height: 156px; max-height: 156px; }}
+    .player-head {{ display:flex; align-items:flex-start; gap:10px; min-height: 148px; }}
     .player-head-left {{ flex:0 0 92px; display:flex; flex-direction:column; gap:6px; }}
     .player-head-meta {{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; min-height: 0; }}
     .player-avatar-frame {{
@@ -135,6 +135,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .player-head-title-row {{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }}
+    .player-name-row {{ display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap; }}
     .player-name {{ font-size: 0.91rem; font-weight: 720; margin: 0; line-height:1.25; }}
     .identity-line {{ color: var(--muted); font-size: 11px; margin: 0; line-height: 1.3; }}
     .fame-line {{ display:flex; align-items:center; gap:6px; margin-top:1px; }}
@@ -147,8 +148,8 @@ def inject_styles(theme_name: str = "Dark"):
       flex-direction: row;
       flex-wrap: nowrap;
       gap: 4px;
-      min-height: 56px;
-      max-height: 56px;
+      min-height: 52px;
+      max-height: 52px;
       align-items:stretch;
       overflow: hidden;
     }}
@@ -167,7 +168,7 @@ def inject_styles(theme_name: str = "Dark"):
       position: relative;
       flex: 0 0 46px;
       width: 46px;
-      height: 56px;
+      height: 52px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
@@ -212,7 +213,7 @@ def inject_styles(theme_name: str = "Dark"):
     .achievement-overflow {{
       flex: 0 0 46px;
       width: 46px;
-      height: 56px;
+      height: 52px;
       display:flex;
       align-items:center;
       justify-content:center;
