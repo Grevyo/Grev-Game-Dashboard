@@ -115,7 +115,7 @@ def render(ctx):
     auto_current_season = None
     if not selected_seasons:
         auto_current_season = get_current_season(df_base, "resolved_season")
-        season_col = "resolved_season" if "resolved_season" in df_base.columns else "season"
+        season_col = "resolved_season"
         if auto_current_season and season_col in df_base.columns:
             df_base = df_base[df_base[season_col].astype(str) == auto_current_season].copy()
 
@@ -155,7 +155,7 @@ def render(ctx):
         return
 
     full_medisports_matches = get_medisports_roster_df(full_history_df, player_col="player")
-    active_summary, benched_summary, streamer_summary, transferred_summary = split_roster_active_benched_streamer_transferred(
+    active_summary, benched_summary, streamer_summary, transferred_summary, roster_bucket_debug = split_roster_active_benched_streamer_transferred(
         summary=summary,
         player_match_counts=player_match_counts,
         full_medisports_matches=full_medisports_matches,
@@ -260,3 +260,6 @@ def render(ctx):
     section_header("Season Resolution Debug", "Temporary validation table for row-level season assignment")
     debug_df = build_season_resolution_debug_table(full_df)
     st.dataframe(debug_df, use_container_width=True, hide_index=True)
+
+    section_header("Roster Bucket Debug", "Temporary validation table for roster bucket assignments")
+    st.dataframe(roster_bucket_debug, use_container_width=True, hide_index=True)

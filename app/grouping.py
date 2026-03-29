@@ -7,6 +7,11 @@ import pandas as pd
 _SUPERSCRIPT_DIGITS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
 
 SEASON_TOKEN_RE = re.compile(r"(?i)(?:\bseason\s*(\d+)\b|\bs\s*(\d+)(?:\.(\d+))?\b)")
+HARDCODED_SEASON_WINDOWS: tuple[tuple[pd.Timestamp, pd.Timestamp, int], ...] = (
+    (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-02-02"), 8),
+    (pd.Timestamp("2026-02-03"), pd.Timestamp("2026-03-03"), 9),
+    (pd.Timestamp("2026-03-04"), pd.Timestamp("2026-04-12"), 10),
+)
 
 
 @dataclass
@@ -76,6 +81,21 @@ def parse_competition_details(name: str) -> CompetitionParseResult:
         return CompetitionParseResult(raw, "madmen_event", raw, season, instance, False, True)
 
     return CompetitionParseResult(raw, None, raw, season, instance, False, False)
+
+
+def resolve_season_from_date(row_date: pd.Timestamp | None) -> int | None:
+    """Authoritative row-level season resolver using fixed inclusive date windows."""
+    if pd.isna(row_date):
+        return None
+    normalized = pd.to_datetime(row_date, errors="coerce")
+    if pd.isna(normalized):
+        return None
+
+    ts = pd.Timestamp(normalized).normalize()
+    for start_date, end_date, season in HARDCODED_SEASON_WINDOWS:
+        if start_date <= ts <= end_date:
+            return season
+    return None
 
 
 def _infer_nova_prime_season(df: pd.DataFrame) -> pd.Series:
@@ -245,32 +265,13 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
     normalized_dates = pd.to_datetime(out[date_col], errors="coerce") if date_col in out.columns else pd.Series([pd.NaT] * len(out), index=out.index)
     out["date_for_season_inference"] = normalized_dates
 
-    inference_df = out.copy()
-    inference_df["date"] = inference_df["date_for_season_inference"]
-    inferred_family = _infer_nova_prime_season(inference_df)
-    season_spans = build_season_spans(inference_df)
-    season_boundaries = build_season_boundaries(season_spans)
-
     resolved_seasons: list[int | None] = []
     resolve_strategies: list[str] = []
-    for idx, row in out.iterrows():
-        explicit = row.get("parsed_season_number")
-        if pd.notna(explicit):
-            resolved_seasons.append(int(explicit))
-            resolve_strategies.append("explicit")
-            continue
-
-        name = row.get(name_col, "")
+    for _, row in out.iterrows():
         date_value = row.get("date_for_season_inference")
-        season_from_date, strategy = resolve_row_season(name, date_value, season_spans, season_boundaries)
-
-        # Keep legacy Nova Prime heuristic as a conservative fallback.
-        if season_from_date is None and pd.notna(inferred_family.loc[idx]):
-            season_from_date = int(inferred_family.loc[idx])
-            strategy = "date_inferred"
-
+        season_from_date = resolve_season_from_date(date_value)
         resolved_seasons.append(season_from_date)
-        resolve_strategies.append(strategy)
+        resolve_strategies.append("hardcoded_date_window" if season_from_date is not None else "unresolved_no_valid_date")
 
     final_season = pd.Series(resolved_seasons, index=out.index, dtype="object")
 
@@ -301,7 +302,7 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
     out["grouped_competition_name"] = grouped_names
     out["grouping_strategy"] = strategies
     out["explicit_season_from_name"] = pd.to_numeric(out["parsed_season_number"], errors="coerce").astype("Int64")
-    out["resolved_season"] = pd.to_numeric(final_season, errors="coerce").astype("Int64").astype(str).replace("<NA>", None)
+    out["resolved_season"] = pd.to_numeric(final_season, errors="coerce").astype("Int64")
     out["season_resolution_method"] = resolve_strategies
     out["season_resolution_strategy"] = out["season_resolution_method"]
     # Backward-compatible alias.
@@ -325,14 +326,14 @@ def build_season_resolution_debug_table(df: pd.DataFrame) -> pd.DataFrame:
     """Debug table for validating row-level season resolution."""
     table = pd.DataFrame(
         {
+            "player": df.get("player"),
             "competition": df.get("raw_competition_name"),
             "date": df.get("date"),
-            "explicit_season": df.get("explicit_season"),
             "resolved_season": df.get("resolved_season"),
-            "resolution_method": df.get("season_resolution_method"),
+            "season_resolution_method": df.get("season_resolution_method"),
         }
     )
-    table = table.dropna(subset=["competition"], how="all")
+    table = table.dropna(subset=["competition", "player", "date"], how="all")
     if "date" in table.columns:
-        table = table.sort_values("date", na_position="last")
+        table = table.sort_values("date", ascending=False, na_position="last")
     return table.reset_index(drop=True)

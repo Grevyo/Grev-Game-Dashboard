@@ -33,9 +33,47 @@ def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
         return pd.Series(dtype=float)
 
     primary = pd.to_numeric(df.get("resolved_season", pd.Series(index=df.index, dtype=float)), errors="coerce")
-    fallback = pd.to_numeric(df.get("season", pd.Series(index=df.index, dtype=float)), errors="coerce")
-    explicit = pd.to_numeric(df.get("parsed_season_number", pd.Series(index=df.index, dtype=float)), errors="coerce")
-    return primary.fillna(fallback).fillna(explicit)
+    return primary
+
+
+def build_roster_bucket_debug_table(
+    full_medisports_matches: pd.DataFrame,
+    bucket_by_player: dict[str, str],
+) -> pd.DataFrame:
+    if not bucket_by_player:
+        return pd.DataFrame(columns=["player", "total_match_rows", "latest_match_date", "most_recent_resolved_season", "assigned_bucket"])
+
+    usage = full_medisports_matches.copy()
+    if usage.empty:
+        table = pd.DataFrame({"player": list(bucket_by_player.keys())})
+        table["total_match_rows"] = 0
+        table["latest_match_date"] = pd.NaT
+        table["most_recent_resolved_season"] = pd.NA
+        table["assigned_bucket"] = table["player"].map(bucket_by_player)
+        return table.sort_values("latest_match_date", ascending=False, na_position="last").reset_index(drop=True)
+
+    usage = usage.assign(
+        resolved_season=_resolved_season_series(usage),
+        parsed_date=pd.to_datetime(usage.get("date"), errors="coerce"),
+        player_key=usage.get("player", pd.Series(index=usage.index, dtype=object)).map(_player_key),
+    )
+    grouped = (
+        usage.groupby("player_key", dropna=False)
+        .agg(
+            total_match_rows=("player_key", "size"),
+            latest_match_date=("parsed_date", "max"),
+            most_recent_resolved_season=("resolved_season", "max"),
+        )
+        .reset_index()
+    )
+
+    table = pd.DataFrame({"player": list(bucket_by_player.keys())})
+    table["player_key"] = table["player"].map(_player_key)
+    table = table.merge(grouped, on="player_key", how="left")
+    table["total_match_rows"] = table["total_match_rows"].fillna(0).astype(int)
+    table["assigned_bucket"] = table["player"].map(bucket_by_player)
+    table = table.drop(columns=["player_key"])
+    return table.sort_values("latest_match_date", ascending=False, na_position="last").reset_index(drop=True)
 
 
 def get_player_last_played_season(full_medisports_matches: pd.DataFrame) -> dict[str, int]:
@@ -104,7 +142,7 @@ def split_roster_active_benched_streamer_transferred(
     full_medisports_matches: pd.DataFrame,
     players_meta: pd.DataFrame,
     active_threshold: float = 0.10,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     counts = (
         player_match_counts[["player", "appearance_share"]].copy()
         if not player_match_counts.empty and {"player", "appearance_share"}.issubset(player_match_counts.columns)
@@ -135,7 +173,7 @@ def split_roster_active_benched_streamer_transferred(
 
     if not all_known_players:
         empty = pd.DataFrame(columns=merged.columns)
-        return empty.copy(), empty.copy(), empty.copy(), empty.copy()
+        return empty.copy(), empty.copy(), empty.copy(), empty.copy(), pd.DataFrame(columns=["player", "total_match_rows", "latest_match_date", "most_recent_resolved_season", "assigned_bucket"])
 
     season_series = usage.get("resolved_season", pd.Series(dtype=float)).dropna()
     latest_dataset_season = int(season_series.max()) if not season_series.empty else None
@@ -197,4 +235,5 @@ def split_roster_active_benched_streamer_transferred(
 
     streamer_summary = streamer_summary.sort_values(["appearance_share", "grevscore"], ascending=[True, False], na_position="last")
     transferred_summary = transferred_summary.sort_values(["appearance_share", "grevscore"], ascending=[True, False], na_position="last")
-    return active_summary, benched_summary, streamer_summary, transferred_summary
+    bucket_debug = build_roster_bucket_debug_table(full_medisports_matches, classified)
+    return active_summary, benched_summary, streamer_summary, transferred_summary, bucket_debug
