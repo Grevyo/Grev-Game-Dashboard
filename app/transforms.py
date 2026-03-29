@@ -21,15 +21,27 @@ def resolve_season_from_date(value):
     return pd.NA
 
 
-def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
+def with_resolved_season(df: pd.DataFrame, date_col: str = "date") -> pd.DataFrame:
     if df.empty:
         return df
     out = df.copy()
+    if date_col in out.columns:
+        out[date_col] = pd.to_datetime(out[date_col], errors="coerce")
+        out["resolved_season"] = out[date_col].apply(resolve_season_from_date)
+        out["season_resolution_method"] = out["resolved_season"].apply(
+            lambda x: "hardcoded_date_window" if pd.notna(x) else "unresolved"
+        )
+    else:
+        out["resolved_season"] = pd.NA
+        out["season_resolution_method"] = "unresolved"
+    return out
 
-    date_based_season = out.get("date", pd.Series(index=out.index, dtype="datetime64[ns]")).map(resolve_season_from_date)
-    prior_resolved = pd.to_numeric(out.get("resolved_season", pd.Series(index=out.index, dtype="float")), errors="coerce")
-    date_based_numeric = pd.to_numeric(date_based_season, errors="coerce")
-    out["resolved_season"] = date_based_numeric.where(date_based_numeric.notna(), prior_resolved).astype("Int64")
+
+def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = with_resolved_season(df, date_col="date")
+    out["resolved_season"] = pd.to_numeric(out.get("resolved_season"), errors="coerce").astype("Int64")
     out["season"] = out["resolved_season"]
     out["kpr"] = np.where(out.get("rounds_played", 0) > 0, out.get("kills", 0) / out.get("rounds_played", 1), np.nan)
     out["mvp_rate"] = np.where(out.get("rounds_played", 0) > 0, out.get("mvps", 0) / out.get("rounds_played", 1) * 30, np.nan)

@@ -3,6 +3,7 @@ import re
 import pandas as pd
 
 from app.data_loader import is_medisports_player
+from app.transforms import resolve_season_from_date
 
 
 def _player_key(name: str) -> str:
@@ -33,6 +34,9 @@ def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
         return pd.Series(dtype=float)
 
     primary = pd.to_numeric(df.get("resolved_season", pd.Series(index=df.index, dtype=float)), errors="coerce")
+    if "date" in df.columns:
+        date_based = pd.to_numeric(df["date"].map(resolve_season_from_date), errors="coerce")
+        primary = date_based.where(date_based.notna(), primary)
     return primary
 
 

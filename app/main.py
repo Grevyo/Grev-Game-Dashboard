@@ -5,7 +5,7 @@ from app.filters import apply_filters, build_global_filters, filter_summary, glo
 from app.image_helpers import find_team_logo, image_data_uri
 from app.pages import overview, player_viewer, tactic_set_recommendations, tactics_breakdown, vs_teams, vs_tournaments
 from app.styles import inject_styles
-from app.transforms import with_player_metrics
+from app.transforms import with_player_metrics, with_resolved_season
 
 
 PAGES = {
@@ -23,7 +23,7 @@ def run_app():
 
     data = load_data()
     p_df = with_player_metrics(data["player_matches"])
-    t_df = data["tactics"]
+    t_df = with_resolved_season(data["tactics"], date_col="date")
     team_name = detect_our_team(p_df, t_df)
 
     validate_columns(p_df, ["match_id", "date", "map", "competition", "my_team", "opponent_team", "player"], "PlayerDataMatser.csv")
