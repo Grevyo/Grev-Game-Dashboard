@@ -92,8 +92,8 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .player-card {{
-      min-height: 572px;
-      height: 572px;
+      min-height: 590px;
+      height: 590px;
       display:flex;
       flex-direction:column;
       gap: 8px;
@@ -147,9 +147,9 @@ def inject_styles(theme_name: str = "Dark"):
       display:flex;
       flex-direction: row;
       flex-wrap: nowrap;
-      gap: 5px;
-      min-height: 55px;
-      max-height: 55px;
+      gap: 6px;
+      min-height: 58px;
+      max-height: 58px;
       align-items:stretch;
       overflow: hidden;
     }}
@@ -166,9 +166,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-tile {{
       position: relative;
-      flex: 0 0 48px;
-      width: 48px;
-      height: 55px;
+      flex: 0 0 50px;
+      width: 50px;
+      height: 58px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
@@ -211,9 +211,9 @@ def inject_styles(theme_name: str = "Dark"):
       white-space: nowrap;
     }}
     .achievement-overflow {{
-      flex: 0 0 48px;
-      width: 48px;
-      height: 55px;
+      flex: 0 0 50px;
+      width: 50px;
+      height: 58px;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -262,10 +262,10 @@ def inject_styles(theme_name: str = "Dark"):
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
     }}
     .grev-tier-label {{ font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 5px; }}
-    .grev-tier-row {{ display:flex; align-items:stretch; gap: 5px; }}
+    .grev-tier-row { display:flex; align-items:stretch; gap: 5px; }
     .grev-tier-box {{
-      width: 32px;
-      min-height: 30px;
+      width: 40px;
+      min-height: 34px;
       border-radius: 6px;
       border: 1px solid color-mix(in srgb, var(--border) 86%, #fff 14%);
       display:flex;
@@ -278,15 +278,12 @@ def inject_styles(theme_name: str = "Dark"):
       gap: 1px;
       padding: 2px 1px;
     }}
-    .tier-name {{ font-size: 8px; line-height: 1; }}
-    .tier-score {{ font-size: 8px; line-height: 1; font-weight: 680; color: var(--text); }}
-    .grev-tier-box.active {{
-      border-color: color-mix(in srgb, var(--good) 60%, var(--border));
-      color: var(--text);
-      background: color-mix(in srgb, var(--good) 22%, var(--surface));
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--good) 20%, transparent);
-      font-weight: 760;
-    }}
+    .tier-name { font-size: 8px; line-height: 1; font-weight: 700; }
+    .tier-score { font-size: 8px; line-height: 1; font-weight: 700; color: var(--text); }
+    .grev-tier-S { border-color: color-mix(in srgb, #f5c542 65%, var(--border)); background: color-mix(in srgb, #f5c542 18%, var(--surface)); }
+    .grev-tier-A { border-color: color-mix(in srgb, #9c6bff 65%, var(--border)); background: color-mix(in srgb, #9c6bff 18%, var(--surface)); }
+    .grev-tier-B { border-color: color-mix(in srgb, #4f8dff 65%, var(--border)); background: color-mix(in srgb, #4f8dff 18%, var(--surface)); }
+    .grev-tier-C { border-color: color-mix(in srgb, #3db97a 65%, var(--border)); background: color-mix(in srgb, #3db97a 18%, var(--surface)); }
     .grev-tier-score {{
       margin-left: auto;
       font-size: 12px;
@@ -297,33 +294,42 @@ def inject_styles(theme_name: str = "Dark"):
       border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
       background: color-mix(in srgb, var(--accent) 18%, var(--surface));
     }}
-    .player-card-note {{
+    .player-card-bottom { margin-top: auto; }
+    .player-card-note {
       font-size: 10.5px;
       color: color-mix(in srgb, var(--text) 90%, #fff 10%);
       margin: 0;
-      min-height: 44px;
-      max-height: 44px;
+      min-height: 34px;
+      max-height: 34px;
       overflow: hidden;
       display: -webkit-box;
-      -webkit-line-clamp: 3;
+      -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
-      line-clamp: 3;
-    }}
-    .roster-section {{
+      line-clamp: 2;
+    }
+    .roster-section {
       border-radius: var(--radius-l);
       border: 1px solid var(--border);
       padding: 10px 10px 2px 10px;
-      margin-bottom: 10px;
-    }}
+      margin-bottom: 14px;
+    }
     .roster-section-main {{
       background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, #fff 6%), color-mix(in srgb, var(--surface) 99%, #000 1%));
       border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
     }}
-    .roster-section-academy {{
-      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 84%, #111a2a 16%), color-mix(in srgb, var(--surface) 93%, #0a1220 7%));
-      border-color: color-mix(in srgb, var(--poor) 45%, var(--border));
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--poor) 16%, transparent);
-    }}
+    .roster-section-academy {
+      margin-top: 18px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 82%, #111a2a 18%), color-mix(in srgb, var(--surface) 92%, #0a1220 8%));
+      border-color: color-mix(in srgb, var(--poor) 55%, var(--border));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--poor) 22%, transparent);
+    }
+    .roster-section-transferred {
+      margin-top: 14px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 80%, #070b12 20%), color-mix(in srgb, var(--surface) 90%, #03060a 10%));
+      border-color: color-mix(in srgb, var(--bad) 44%, var(--border));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 14%, transparent);
+    }
+    .player-card-subdued { opacity: 0.88; filter: saturate(0.86); }
     .achievement-tile.tier-S {{ border-color: color-mix(in srgb, #f5c542 58%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #f5c542 22%, transparent), 0 8px 18px rgba(0,0,0,0.24); }}
     .achievement-tile.tier-A {{ border-color: color-mix(in srgb, #9c6bff 58%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #9c6bff 22%, transparent), 0 8px 18px rgba(0,0,0,0.24); }}
     .achievement-tile.tier-B {{ border-color: color-mix(in srgb, #4f8dff 58%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #4f8dff 20%, transparent), 0 8px 18px rgba(0,0,0,0.24); }}
