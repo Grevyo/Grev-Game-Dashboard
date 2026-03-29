@@ -144,7 +144,29 @@ def resolve_transferred_logo(new_team: str | None) -> str | None:
     return find_competition_logo("cpl")
 
 
-def find_achievement_image(link_or_name: str | None) -> str | None:
+CPL_OPEN_EVENT_PATTERN = re.compile(r"\bcpl\s+open\s+\d+(?:\.\d+)?\b", flags=re.IGNORECASE)
+CPL_OPEN_PLACEMENT_IMAGE = {
+    "1st": "CPLOpen1.png",
+    "2nd": "CPLOpen2.png",
+    "3rd": "CPLOpen3.png",
+    "4th": "CPLOpen4.png",
+}
+
+
+def find_achievement_image(
+    link_or_name: str | None,
+    achievement_name: str | None = None,
+    placement: str | None = None,
+) -> str | None:
+    event_name = str(achievement_name or link_or_name or "").strip()
+    placement_key = str(placement or "").strip().casefold()
+    if event_name and placement_key and CPL_OPEN_EVENT_PATTERN.search(event_name):
+        cpl_open_image = CPL_OPEN_PLACEMENT_IMAGE.get(placement_key)
+        if cpl_open_image:
+            cpl_open_path = IMAGES["achievements"] / cpl_open_image
+            if cpl_open_path.exists() and cpl_open_path.suffix.lower() in SUPPORTED_EXTENSIONS:
+                return str(cpl_open_path)
+
     if not link_or_name:
         return None
     file_name = Path(str(link_or_name)).name

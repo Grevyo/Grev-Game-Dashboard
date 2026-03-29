@@ -55,7 +55,11 @@ def achievements_for_player(achievements_df: pd.DataFrame, player_name: str, cap
     top = pool.head(cap)
     items = []
     for _, row in top.iterrows():
-        image_path = find_achievement_image(row.get("achievement_link") or row.get("achievement_name"))
+        image_path = find_achievement_image(
+            row.get("achievement_link") or row.get("achievement_name"),
+            achievement_name=row.get("achievement_name"),
+            placement=row.get("position"),
+        )
         items.append(
             {
                 "name": str(row.get("achievement_name", "Achievement")),
