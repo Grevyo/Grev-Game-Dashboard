@@ -1,11 +1,36 @@
 import numpy as np
 import pandas as pd
 
+SEASON_WINDOWS = [
+    (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-02-02"), 8),
+    (pd.Timestamp("2026-02-03"), pd.Timestamp("2026-03-03"), 9),
+    (pd.Timestamp("2026-03-04"), pd.Timestamp("2026-04-12"), 10),
+]
+
+
+def resolve_season_from_date(value):
+    if pd.isna(value):
+        return pd.NA
+    dt = pd.to_datetime(value, errors="coerce")
+    if pd.isna(dt):
+        return pd.NA
+    dt = pd.Timestamp(dt).normalize()
+    for start, end, season in SEASON_WINDOWS:
+        if start <= dt <= end:
+            return season
+    return pd.NA
+
 
 def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
     out = df.copy()
+
+    date_based_season = out.get("date", pd.Series(index=out.index, dtype="datetime64[ns]")).map(resolve_season_from_date)
+    prior_resolved = pd.to_numeric(out.get("resolved_season", pd.Series(index=out.index, dtype="float")), errors="coerce")
+    date_based_numeric = pd.to_numeric(date_based_season, errors="coerce")
+    out["resolved_season"] = date_based_numeric.where(date_based_numeric.notna(), prior_resolved).astype("Int64")
+    out["season"] = out["resolved_season"]
     out["kpr"] = np.where(out.get("rounds_played", 0) > 0, out.get("kills", 0) / out.get("rounds_played", 1), np.nan)
     out["mvp_rate"] = np.where(out.get("rounds_played", 0) > 0, out.get("mvps", 0) / out.get("rounds_played", 1) * 30, np.nan)
 
