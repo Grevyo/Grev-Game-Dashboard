@@ -32,7 +32,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .stApp {{ background: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%), var(--bg); color: var(--text); }}
-    .block-container {{ padding-top: 0.9rem; padding-bottom: 1.4rem; max-width: 98%; }}
+    .block-container {{ padding-top: 1.55rem; padding-bottom: 1.4rem; max-width: 98%; }}
 
     .page-shell {{ display:flex; flex-direction:column; gap: var(--space-5); }}
     .section-title {{ margin: 0 0 var(--space-2) 0; font-size: 1.05rem; font-weight: 750; letter-spacing: 0.02em; color: var(--text); }}
@@ -76,11 +76,64 @@ def inject_styles(theme_name: str = "Dark"):
     .metric-title {{ color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }}
     .metric-value {{ font-size: 25px; line-height: 1.15; font-weight: 760; margin-top: 3px; }}
 
-    .top-nav {{
-      display:flex; align-items:center; gap: 10px; padding: 8px 10px;
-      background: color-mix(in srgb, var(--surface) 94%, #fff 6%);
-      border: 1px solid var(--border); border-radius: 999px;
+    /* Global page navigation: turn the Streamlit radio into premium segmented pills */
+    div[data-testid="stRadio"][role="radiogroup"] {{
+      display:flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px;
       margin-bottom: 12px;
+      background: color-mix(in srgb, var(--surface) 94%, #fff 6%);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+    }}
+    div[data-testid="stRadio"] label[data-baseweb="radio"] {{
+      margin: 0;
+      min-height: 0;
+    }}
+    div[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {{
+      display: none;
+    }}
+    div[data-testid="stRadio"] label[data-baseweb="radio"] > div:last-child {{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--border) 82%, #fff 18%);
+      background: color-mix(in srgb, var(--surface) 82%, #fff 18%);
+      color: var(--muted);
+      font-weight: 620;
+      font-size: 0.84rem;
+      letter-spacing: 0.01em;
+      transition: all .18s ease;
+      cursor: pointer;
+    }}
+    div[data-testid="stRadio"] label[data-baseweb="radio"]:hover > div:last-child {{
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+      background: color-mix(in srgb, var(--surface) 74%, var(--accent) 26%);
+      transform: translateY(-1px);
+    }}
+    div[data-testid="stRadio"] input[type="radio"]:checked + div {{
+      color: #f5f8ff;
+      border-color: color-mix(in srgb, var(--accent) 75%, #ffffff 25%);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 70%, #1d2b45 30%), color-mix(in srgb, var(--accent) 58%, #101829 42%));
+      box-shadow: 0 6px 14px rgba(0,0,0,0.28), inset 0 0 0 1px color-mix(in srgb, #ffffff 18%, transparent);
+      font-weight: 700;
+    }}
+
+    @media (max-width: 768px) {{
+      .block-container {{ padding-top: 1.2rem; }}
+      div[data-testid="stRadio"][role="radiogroup"] {{
+        border-radius: 16px;
+        padding: 8px;
+      }}
+      div[data-testid="stRadio"] label[data-baseweb="radio"] > div:last-child {{
+        padding: 8px 12px;
+        font-size: 0.8rem;
+      }}
     }}
 
     .context-ribbon {{

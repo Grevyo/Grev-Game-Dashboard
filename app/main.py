@@ -36,8 +36,13 @@ def run_app():
         f"<div class='hero-band' style='margin-bottom:12px;'><div style='display:flex;align-items:center;gap:12px;'><div>{logo_html}</div><div><div class='section-title' style='margin-top:0;'>Medisports Analytics Dashboard</div><div class='section-subtitle' style='margin-bottom:0;'>Unified command layer with page-native controls and full-width layout.</div></div></div></div>",
         unsafe_allow_html=True,
     )
-    st.markdown("<div class='top-nav'></div>", unsafe_allow_html=True)
-    page = st.radio("Page", list(PAGES.keys()), horizontal=True, label_visibility="collapsed")
+    page = st.radio(
+        "Page",
+        list(PAGES.keys()),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="page_nav",
+    )
 
     page_scope = page.lower().replace(" ", "_")
     show_filters = filter_panel_toggle(f"global_{page_scope}")
