@@ -103,6 +103,12 @@ def player_card(row: dict):
     nationality = nationality_label(row.get("nationality") or row.get("country"))
     identity_line = nationality or "Nationality N/A"
     role_line = row.get("role") or row.get("team_tag", "Medisports")
+    transfer_destination = str(row.get("transfer_destination", "") or "").strip()
+    transfer_line = (
+        f"<p class='identity-line'><strong>Moved to:</strong> {transfer_destination}</p>"
+        if str(row.get("roster_bucket", "")).strip().lower() == "transferred" and transfer_destination
+        else ""
+    )
 
     photo_uri = row.get("photo_uri")
     logo_uri = row.get("team_logo_uri")
@@ -171,6 +177,7 @@ def player_card(row: dict):
             </div>
             <p class='identity-line'>{identity_line}</p>
             <p class='identity-line'>{role_line}</p>
+            {transfer_line}
             {fame_html}
             <div class='player-meta-row'><span class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></span></div>
           </div>

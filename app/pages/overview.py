@@ -40,6 +40,35 @@ def _player_key(name: str) -> str:
     return text.casefold()
 
 
+def _clean_meta_text(value) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
+def _player_card_meta(players_meta: pd.DataFrame, key: str) -> dict[str, str]:
+    if players_meta.empty:
+        return {}
+    source_col = next((col for col in ["player_clean", "player", "name"] if col in players_meta.columns), None)
+    if source_col is None:
+        return {}
+    meta_source = players_meta[source_col].astype(str).map(_player_key)
+    meta = players_meta[meta_source == key]
+    if meta.empty:
+        return {}
+    m = meta.iloc[0]
+    role_value = _clean_meta_text(m.get("role"))
+    if role_value.casefold() in {"div", "nan", "none", "null"}:
+        role_value = ""
+    return {
+        "country": _clean_meta_text(m.get("country")),
+        "nationality": _clean_meta_text(m.get("nationality")),
+        "role": role_value,
+        "fame": _clean_meta_text(m.get("fame")),
+        "new_team": _clean_meta_text(m.get("new_team")),
+    }
+
+
 def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, float]:
     if df_context.empty or "player" not in df_context.columns or "tier" not in df_context.columns or "grevscore" not in df_context.columns:
         return {}
@@ -59,6 +88,7 @@ def _render_roster_cards(
     team_logo: str | None,
     achievements_df,
     card_variant: str = "default",
+    roster_bucket: str = "active",
 ):
     rows = list(summary.iterrows())
     for i in range(0, len(rows), 5):
@@ -67,23 +97,24 @@ def _render_roster_cards(
             _, row = item
             merged = row.to_dict()
             key = _player_key(str(row["player"]))
-            meta_source = players_meta.get("player_clean", players_meta.get("player", players_meta.get("name", ""))).astype(str).map(_player_key)
-            meta = players_meta[meta_source == key]
-            if not meta.empty:
-                m = meta.iloc[0].to_dict()
-                merged.update(
-                    {
-                        "country": m.get("country", ""),
-                        "nationality": m.get("nationality", ""),
-                        "role": m.get("role", ""),
-                        "fame": m.get("fame", ""),
-                    }
-                )
+            meta = _player_card_meta(players_meta, key)
+            merged.update(
+                {
+                    "country": meta.get("country", ""),
+                    "nationality": meta.get("nationality", ""),
+                    "role": meta.get("role", ""),
+                    "fame": meta.get("fame", ""),
+                }
+            )
             usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
 
             merged["team_tag"] = "Medisports"
             merged["card_variant"] = card_variant
+            merged["roster_bucket"] = roster_bucket
+            if roster_bucket == "transferred":
+                destination = _clean_meta_text(meta.get("new_team", ""))
+                merged["transfer_destination"] = destination if destination else "Sold"
             merged["desc"] = player_description(merged)
             merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map")
             merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side")
@@ -227,7 +258,7 @@ def render(ctx):
         st.info("No players currently qualify for Active Roster in this filter context.")
     else:
         st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
-        _render_roster_cards(active_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
+        _render_roster_cards(active_summary, df, players_meta, player_match_counts, team_logo, achievements_df, roster_bucket="active")
         st.markdown("</div>", unsafe_allow_html=True)
 
     section_header("Benched / Academy", "Secondary squad view — lower-usage players in the current filtered context")
@@ -235,19 +266,19 @@ def render(ctx):
         st.info("No Benched / Academy players in this filtered context.")
     else:
         st.markdown("<div class='roster-section roster-section-academy'>", unsafe_allow_html=True)
-        _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
+        _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df, roster_bucket="benched")
         st.markdown("</div>", unsafe_allow_html=True)
 
     if not streamer_summary.empty:
         section_header("Streamer", "Rostered Medisports members with no historical match data in the dataset")
         st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
-        _render_roster_cards(streamer_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued")
+        _render_roster_cards(streamer_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued", roster_bucket="streamer")
         st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
         section_header("Transferred", "Historical Medisports players absent for more than two seasons")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
-        _render_roster_cards(transferred_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued")
+        _render_roster_cards(transferred_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued", roster_bucket="transferred")
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Temporary debug tables: prove season filter + roster bucket classification.
