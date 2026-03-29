@@ -186,13 +186,21 @@ def split_roster_active_benched_streamer_transferred(
     usage["resolved_season"] = _resolved_season_series(full_medisports_matches) if not usage.empty else pd.Series(dtype=float)
 
     usage_players = set(usage.get("player", pd.Series(dtype=object)).dropna().astype(str).tolist())
-    medisports_roster_names = {
-        p for p in roster_names.union(meta_players).union(usage_players)
-        if is_medisports_player(p)
-    }
-    all_known_players = sorted(medisports_roster_names, key=str.casefold)
 
-    if not all_known_players:
+    # Canonicalize across case/style variants so roster classification uses full
+    # resolved-season history per player key.
+    display_name_by_key: dict[str, str] = {}
+    for source in [usage_players, roster_names, set(meta_players)]:
+        for player_name in source:
+            if not is_medisports_player(player_name):
+                continue
+            key = _player_key(player_name)
+            # Prefer currently selected roster name when available for display.
+            if key not in display_name_by_key or player_name in roster_names:
+                display_name_by_key[key] = player_name
+    all_known_keys = sorted(display_name_by_key.keys())
+
+    if not all_known_keys:
         empty = pd.DataFrame(columns=merged.columns)
         return empty.copy(), empty.copy(), empty.copy(), empty.copy(), pd.DataFrame(columns=["player", "total_rows_full_history", "total_rows_after_selected_season_filter", "seasons_seen_full_history", "most_recent_resolved_season", "assigned_bucket"])
 
@@ -204,12 +212,15 @@ def split_roster_active_benched_streamer_transferred(
     classified: dict[str, str] = {}
     meta_by_key = {_player_key(name): name for name in meta_players}
     counts_by_key = counts.assign(player_key=counts["player"].map(_player_key)) if not counts.empty else counts.copy()
-    for player in all_known_players:
-        # 1) Exclude non-Medisports players entirely.
-        if not is_medisports_player(player):
-            continue
+    selected_by_key = (
+        selected_medisports_matches.assign(player_key=selected_medisports_matches["player"].map(_player_key))
+        if not selected_medisports_matches.empty and "player" in selected_medisports_matches.columns
+        else pd.DataFrame(columns=["player_key"])
+    )
+    selected_presence = set(selected_by_key.get("player_key", pd.Series(dtype=object)).dropna().astype(str).tolist())
 
-        player_key = _player_key(player)
+    for player_key in all_known_keys:
+        player = display_name_by_key[player_key]
         has_any_game_data = player_key in last_season_by_key
         in_metadata = player_key in meta_by_key
 
@@ -218,7 +229,14 @@ def split_roster_active_benched_streamer_transferred(
             classified[player] = "streamer"
             continue
 
-        # 3/4/5) Centralized classification; transferred requires safety guard + resolved seasons.
+        # Never classify as transferred if player appears in currently selected season context.
+        if player_key in selected_presence:
+            appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
+            appearance_share = float(appearance.iloc[0]) if not appearance.empty else 0.0
+            classified[player] = "active" if appearance_share > active_threshold else "benched_academy"
+            continue
+
+        # 3/4/5) Centralized classification; transferred requires safety guard + full-history resolved seasons.
         appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
         appearance_share = float(appearance.iloc[0]) if not appearance.empty else 0.0
         classified[player] = classify_roster_bucket(
@@ -241,7 +259,7 @@ def split_roster_active_benched_streamer_transferred(
     streamer_summary = merged[merged["player"].isin(streamer_players)].copy()
     transferred_summary = merged[merged["player"].isin(transferred_players)].copy()
 
-    missing_from_summary = [p for p in all_known_players if p in (streamer_players | transferred_players) and p not in set(merged.get("player", pd.Series(dtype=object)).astype(str))]
+    missing_from_summary = [p for p in display_name_by_key.values() if p in (streamer_players | transferred_players) and p not in set(merged.get("player", pd.Series(dtype=object)).astype(str))]
     if missing_from_summary:
         filler = pd.DataFrame({"player": missing_from_summary})
         for col in merged.columns:

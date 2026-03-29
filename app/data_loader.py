@@ -9,6 +9,12 @@ import streamlit as st
 from app.config import FILES
 from app.grouping import build_season_resolution_debug_table, normalize_competitions
 
+SEASON_WINDOWS = [
+    (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-02-02"), 8),
+    (pd.Timestamp("2026-02-03"), pd.Timestamp("2026-03-03"), 9),
+    (pd.Timestamp("2026-03-04"), pd.Timestamp("2026-04-12"), 10),
+]
+
 SYNONYMS = {
     "date": ["date", "match_date"],
     "time": ["time", "match_time"],
@@ -28,6 +34,19 @@ MEDISPORTS_ALIASES = {
     "m",
 }
 MEDISPORTS_PLAYER_MARKER = "ⓜ"
+
+
+def resolve_season_from_date(value):
+    if pd.isna(value):
+        return pd.NA
+    dt = pd.to_datetime(value, errors="coerce")
+    if pd.isna(dt):
+        return pd.NA
+    dt = pd.Timestamp(dt).normalize()
+    for start, end, season in SEASON_WINDOWS:
+        if start <= dt <= end:
+            return season
+    return pd.NA
 
 
 def normalize_team_name(team_name: str | None) -> str:
@@ -168,9 +187,25 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _apply_resolved_season_windows(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or "date" not in df.columns:
+        return df
+
+    out = df.copy()
+    out["resolved_season"] = out["date"].map(resolve_season_from_date)
+    out["resolved_season"] = pd.to_numeric(out["resolved_season"], errors="coerce").astype("Int64")
+    out["season"] = out["resolved_season"]
+    out["season_resolution_method"] = out["resolved_season"].map(
+        lambda v: "hardcoded_date_window" if pd.notna(v) else "unresolved_no_valid_date"
+    )
+    out["season_resolution_strategy"] = out["season_resolution_method"]
+    return out
+
+
 @st.cache_data(show_spinner=False)
 def load_data() -> dict[str, pd.DataFrame]:
     player_matches = _derive_core(_read_flexible_csv(FILES["player_matches"]))
+    player_matches = _apply_resolved_season_windows(player_matches)
     tactics = _derive_core(_read_flexible_csv(FILES["tactics"]))
     achievements = _derive_core(_read_flexible_csv(FILES["achievements"]))
     players = _derive_core(_read_flexible_csv(FILES["players"]))
