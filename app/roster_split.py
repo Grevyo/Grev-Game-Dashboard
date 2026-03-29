@@ -2,6 +2,8 @@ import re
 
 import pandas as pd
 
+from app.data_loader import is_medisports_player
+
 
 def _player_key(name: str) -> str:
     text = str(name or "").strip()
@@ -26,6 +28,15 @@ def _extract_metadata_players(players_meta: pd.DataFrame) -> list[str]:
     return sorted(set(medisports_meta.tolist()), key=str.casefold)
 
 
+def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
+    if df.empty:
+        return pd.Series(dtype=float)
+
+    primary = pd.to_numeric(df.get("season", pd.Series(index=df.index, dtype=float)), errors="coerce")
+    fallback = pd.to_numeric(df.get("parsed_season_number", pd.Series(index=df.index, dtype=float)), errors="coerce")
+    return primary.fillna(fallback)
+
+
 def split_roster_active_benched_streamer_transferred(
     summary: pd.DataFrame,
     player_match_counts: pd.DataFrame,
@@ -46,42 +57,65 @@ def split_roster_active_benched_streamer_transferred(
 
     roster_names = set(merged.get("player", pd.Series(dtype=object)).dropna().astype(str).tolist())
     meta_players = _extract_metadata_players(players_meta)
-    all_known_players = sorted(roster_names.union(meta_players), key=str.casefold)
+
+    usage = (
+        full_medisports_matches[["player", "match_id"]].copy()
+        if not full_medisports_matches.empty and {"player", "match_id"}.issubset(full_medisports_matches.columns)
+        else pd.DataFrame(columns=["player", "match_id"])
+    )
+    usage["resolved_season"] = _resolved_season_series(full_medisports_matches) if not usage.empty else pd.Series(dtype=float)
+
+    usage_players = set(usage.get("player", pd.Series(dtype=object)).dropna().astype(str).tolist())
+    medisports_roster_names = {
+        p for p in roster_names.union(meta_players).union(usage_players)
+        if is_medisports_player(p)
+    }
+    all_known_players = sorted(medisports_roster_names, key=str.casefold)
 
     if not all_known_players:
         empty = pd.DataFrame(columns=merged.columns)
         return empty.copy(), empty.copy(), empty.copy(), empty.copy()
 
-    season_series = pd.to_numeric(full_medisports_matches.get("season", pd.Series(dtype=float)), errors="coerce")
+    season_series = usage.get("resolved_season", pd.Series(dtype=float))
     latest_dataset_season = int(season_series.max()) if not season_series.dropna().empty else None
 
-    usage = full_medisports_matches[["player", "match_id", "season"]].copy() if not full_medisports_matches.empty else pd.DataFrame(columns=["player", "match_id", "season"])
+    usage_by_key = usage.assign(player_key=usage["player"].map(_player_key)) if not usage.empty else usage.copy()
+    last_season_by_key = (
+        usage_by_key.groupby("player_key", dropna=False)["resolved_season"].max().to_dict()
+        if not usage_by_key.empty
+        else {}
+    )
 
     classified: dict[str, str] = {}
+    meta_by_key = {_player_key(name): name for name in meta_players}
+    counts_by_key = counts.assign(player_key=counts["player"].map(_player_key)) if not counts.empty else counts.copy()
     for player in all_known_players:
-        player_usage = usage[usage["player"].astype(str) == str(player)] if not usage.empty else pd.DataFrame()
-        has_any_game_data = not player_usage.empty
-        in_metadata = player in meta_players
+        # 1) Exclude non-Medisports players entirely.
+        if not is_medisports_player(player):
+            continue
 
-        # 1) Streamer: exists in roster metadata, but has no game data at all.
+        player_key = _player_key(player)
+        has_any_game_data = player_key in last_season_by_key
+        in_metadata = player_key in meta_by_key
+
+        # 2) Streamer: exists in roster metadata, but has no game data at all.
         if in_metadata and not has_any_game_data:
             classified[player] = "streamer"
             continue
 
-        # 2) Transferred: has historical data, but absent for more than 2 seasons.
+        # 3/4) Transferred: has historical data and last played season <= current_season - 3.
         transferred = False
-        if has_any_game_data and latest_dataset_season is not None and "season" in player_usage.columns:
-            p_seasons = pd.to_numeric(player_usage["season"], errors="coerce").dropna()
-            if not p_seasons.empty:
-                player_latest = int(p_seasons.max())
-                transferred = (latest_dataset_season - player_latest) >= 3
+        if has_any_game_data and latest_dataset_season is not None:
+            player_latest = pd.to_numeric(last_season_by_key.get(player_key), errors="coerce")
+            if pd.notna(player_latest):
+                transferred = int(player_latest) <= int(latest_dataset_season) - 3
 
         if transferred:
             classified[player] = "transferred"
             continue
 
-        # 3/4) Competitive buckets apply only to players with game data.
-        appearance = counts.loc[counts["player"].astype(str) == str(player), "appearance_share"]
+        # 5) Competitive buckets are split by current-context appearance share.
+        appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
         appearance_share = float(appearance.iloc[0]) if not appearance.empty else 0.0
         classified[player] = "active" if appearance_share > active_threshold else "benched_academy"
 
