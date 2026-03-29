@@ -92,8 +92,8 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .player-card {{
-      min-height: 590px;
-      height: 590px;
+      min-height: 640px;
+      height: 640px;
       display:flex;
       flex-direction:column;
       gap: 8px;
@@ -279,7 +279,7 @@ def inject_styles(theme_name: str = "Dark"):
       padding: 2px 1px;
     }}
     .tier-name {{ font-size: 8px; line-height: 1; font-weight: 700; }}
-    .tier-score {{ font-size: 8px; line-height: 1; font-weight: 700; color: var(--text); }}
+    .tier-score {{ font-size: 10px; line-height: 1.05; font-weight: 760; color: var(--text); }}
     .grev-tier-S {{ border-color: color-mix(in srgb, #f5c542 65%, var(--border)); background: color-mix(in srgb, #f5c542 18%, var(--surface)); }}
     .grev-tier-A {{ border-color: color-mix(in srgb, #9c6bff 65%, var(--border)); background: color-mix(in srgb, #9c6bff 18%, var(--surface)); }}
     .grev-tier-B {{ border-color: color-mix(in srgb, #4f8dff 65%, var(--border)); background: color-mix(in srgb, #4f8dff 18%, var(--surface)); }}
@@ -299,13 +299,13 @@ def inject_styles(theme_name: str = "Dark"):
       font-size: 10.5px;
       color: color-mix(in srgb, var(--text) 90%, #fff 10%);
       margin: 0;
-      min-height: 34px;
-      max-height: 34px;
+      min-height: 56px;
+      max-height: 56px;
       overflow: hidden;
       display: -webkit-box;
-      -webkit-line-clamp: 2;
+      -webkit-line-clamp: 4;
       -webkit-box-orient: vertical;
-      line-clamp: 2;
+      line-clamp: 4;
     }}
     .roster-section {{
       border-radius: var(--radius-l);
