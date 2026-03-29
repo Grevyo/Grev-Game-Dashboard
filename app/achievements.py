@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 import pandas as pd
 
@@ -16,6 +17,60 @@ POSITION_PRIORITY = {
 }
 TIER_PRIORITY = {"S": 90, "A": 75, "B": 60, "C": 45, "D": 30}
 _CPL_OPEN_DEBUG_EMITTED = False
+
+
+def _is_present_text(value) -> bool:
+    text = str(value or "").strip()
+    return bool(text and text.casefold() not in {"nan", "none", "null"})
+
+
+def _resolve_achievement_image_for_overview(row: pd.Series) -> tuple[str | None, str | None, str, dict]:
+    """Resolve achievement image with explicit priority for parsed achievement_link.
+
+    Priority order:
+    1) Usable non-empty achievement_link from row
+    2) Existing resolver fallback logic
+    3) Placeholder (no image)
+    """
+    link_value = str(row.get("achievement_link", "") or "").strip()
+    debug: dict = {
+        "achievement_link_raw": link_value,
+        "link_present": _is_present_text(link_value),
+    }
+
+    if _is_present_text(link_value):
+        if link_value.startswith("data:image/"):
+            debug["link_strategy"] = "data_uri_direct"
+            return link_value, None, "achievement_link:data_uri", debug
+        if re.match(r"^https?://", link_value, flags=re.IGNORECASE):
+            debug["link_strategy"] = "http_url_direct"
+            return link_value, None, "achievement_link:url", debug
+
+        link_path = Path(link_value).expanduser()
+        if link_path.exists() and link_path.is_file():
+            image_uri = image_data_uri_thumbnail(str(link_path))
+            debug["link_strategy"] = "filesystem_path"
+            debug["link_exists"] = True
+            debug["link_is_file"] = True
+            debug["link_uri_generated"] = bool(image_uri)
+            if image_uri:
+                return image_uri, str(link_path), "achievement_link:file", debug
+        else:
+            debug["link_strategy"] = "filesystem_path"
+            debug["link_exists"] = False
+            debug["link_is_file"] = False
+
+    image_resolution = resolve_achievement_image(
+        link_value or row.get("achievement_name"),
+        achievement_name=row.get("achievement_name"),
+        placement=row.get("position"),
+    )
+    image_path = image_resolution.get("final_path")
+    image_uri = image_data_uri_thumbnail(image_path)
+    debug["resolver_source"] = image_resolution.get("source")
+    debug["resolver_final_path"] = image_path
+    debug["resolver_uri_generated"] = bool(image_uri)
+    return image_uri, image_path, "resolver", debug
 
 
 def _player_key(player_name: str | None) -> str:
@@ -61,30 +116,33 @@ def achievements_for_player(
     top = pool.head(cap)
     items = []
     for _, row in top.iterrows():
-        image_resolution = resolve_achievement_image(
-            row.get("achievement_link") or row.get("achievement_name"),
-            achievement_name=row.get("achievement_name"),
-            placement=row.get("position"),
-        )
-        image_path = image_resolution.get("final_path")
-        image_uri = image_data_uri_thumbnail(image_path)
+        image_uri, image_path, image_source, image_debug = _resolve_achievement_image_for_overview(row)
         global _CPL_OPEN_DEBUG_EMITTED
-        if image_resolution.get("cpl_open_match") and not _CPL_OPEN_DEBUG_EMITTED:
+        is_cpl_open = "cpl open" in str(row.get("achievement_name", "")).casefold()
+        if is_cpl_open and not _CPL_OPEN_DEBUG_EMITTED:
+            has_image_branch = bool(image_uri)
             print(
                 "[CPL_OPEN_DEBUG]",
                 {
+                    "full_achievement_row": row.to_dict(),
+                    "achievement_name": row.get("achievement_name"),
+                    "achievement_link": row.get("achievement_link"),
+                    "overview_renderer_image_field": "image_uri",
+                    "overview_renderer_image_field_value": image_uri,
+                    "overview_has_image_branch": has_image_branch,
+                    "overview_has_image_branch_not_entered_reason": None
+                    if has_image_branch
+                    else "image_uri is empty after achievement_link + resolver attempts",
+                    "overview_final_img_value_passed": image_uri if has_image_branch else None,
+                    "image_source_selected": image_source,
+                    "image_resolution_debug": image_debug,
                     "raw_achievement_name": row.get("achievement_name"),
-                    "raw_placement": row.get("position"),
-                    "cpl_open_detected": image_resolution.get("cpl_open_match"),
-                    "selected_filename": image_resolution.get("selected_filename"),
-                    "resolved_filesystem_path": image_resolution.get("resolved_path"),
-                    "resolved_file_exists": image_resolution.get("resolved_exists"),
                     "final_render_image_path": image_path,
                     "final_render_image_uri_present": bool(image_uri),
                     "overview_received_image_path": image_path if consumer == "overview" else None,
                     "overview_received_image_uri_present": bool(image_uri) if consumer == "overview" else None,
                     "consumer": consumer,
-                    "resolver_source": image_resolution.get("source"),
+                    "resolver_source": image_source,
                 },
             )
             _CPL_OPEN_DEBUG_EMITTED = True
@@ -97,7 +155,7 @@ def achievements_for_player(
                 "tier": str(row.get("achievement_tier", "")).strip(),
                 "image_uri": image_uri,
                 "image_path": image_path,
-                "image_render_type": "data_uri" if image_uri else "none",
+                "image_render_type": "data_uri" if image_uri and str(image_uri).startswith("data:image/") else "url" if image_uri else "none",
             }
         )
     hidden = max(0, len(pool) - len(items))
