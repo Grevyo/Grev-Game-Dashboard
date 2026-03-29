@@ -44,22 +44,12 @@ def _tone_from_score(score: float) -> str:
     return "bad"
 
 
-def _clean_player_card_meta(value) -> str:
+def _clean_card_meta_value(value) -> str:
     text = str(value or "").strip()
-    return "" if text.casefold() in _HIDDEN_META_VALUES else text
+    if text.casefold() in {"", "nan", "none", "null", "n/a", "na", "div"}:
+        return ""
+    return text
 
-
-def _allowed_player_card_meta(row: dict) -> dict[str, str]:
-    """Explicit metadata allowlist for player-card rendering."""
-    nationality = _clean_player_card_meta(row.get("nationality")) or _clean_player_card_meta(row.get("country"))
-    role = _clean_player_card_meta(row.get("role"))
-    transfer_destination = _clean_player_card_meta(row.get("transfer_destination"))
-    return {
-        "nationality": nationality,
-        "role": role,
-        "transfer_destination": transfer_destination,
-        "fame": _clean_player_card_meta(row.get("fame")),
-    }
 
 
 
@@ -119,11 +109,10 @@ def _tier_box_html(tier: str, score: float | None) -> str:
 def player_card(row: dict):
     grev = float(row.get("grevscore", 0) or 0)
     tone = _tone_from_score(grev)
-    card_meta = _allowed_player_card_meta(row)
-    nationality = nationality_label(card_meta["nationality"])
+    nationality = nationality_label(_clean_card_meta_value(row.get("nationality")) or _clean_card_meta_value(row.get("country")))
     identity_line = nationality or "Nationality N/A"
-    role_line = card_meta["role"] or row.get("team_tag", "Medisports")
-    transfer_destination = card_meta["transfer_destination"]
+    role_line = _clean_card_meta_value(row.get("role")) or row.get("team_tag", "Medisports")
+    transfer_destination = str(row.get("transfer_destination", "") or "").strip()
     transfer_line = (
         f"<p class='identity-line'><strong>Moved to:</strong> {transfer_destination}</p>"
         if str(row.get("roster_bucket", "")).strip().lower() == "transferred" and transfer_destination
