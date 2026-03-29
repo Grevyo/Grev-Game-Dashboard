@@ -44,7 +44,7 @@ def _tone_from_score(score: float) -> str:
 
 def _clean_card_meta_value(value) -> str:
     text = str(value or "").strip()
-    if text.casefold() in {"", "nan", "none", "null", "n/a", "na", "div"}:
+    if text.casefold() in {"", "nan", "none", "null", "n/a", "na", "div", "division"}:
         return ""
     return text
 

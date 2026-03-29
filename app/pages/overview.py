@@ -14,6 +14,7 @@ from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player, with_resolved_season
 
 PLAYER_CARD_META_ALLOWLIST = ("country", "nationality", "role", "fame", "new_team")
+PLAYER_CARD_DISPLAY_FIELDS = ("country", "nationality", "role", "fame")
 
 
 def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> str:
@@ -56,7 +57,7 @@ def _sanitize_player_card_meta(field: str, value) -> str:
     if lowered in {"nan", "none", "null", "n/a", "na"}:
         return ""
     # Guard against raw header/label leakage (e.g., "Div") appearing as metadata values.
-    if field == "role" and lowered == "div":
+    if field == "role" and lowered in {"div", "division"}:
         return ""
     return cleaned
 
@@ -108,7 +109,7 @@ def _render_roster_cards(
             key = _player_key(str(row["player"]))
             meta = _player_card_meta(players_meta, key)
             # Explicit field-level allowlist: only these metadata fields can ever reach player_card().
-            for field in ("country", "nationality", "role", "fame"):
+            for field in PLAYER_CARD_DISPLAY_FIELDS:
                 merged[field] = meta.get(field, "")
             usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
