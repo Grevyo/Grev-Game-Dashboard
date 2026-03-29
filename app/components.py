@@ -109,11 +109,14 @@ def player_card(row: dict):
     tone = _tone_from_score(grev)
     nationality = nationality_label(_clean_card_meta_value(row.get("nationality")) or _clean_card_meta_value(row.get("country")))
     identity_line = nationality or "Nationality N/A"
-    role_line = _clean_card_meta_value(row.get("role")) or row.get("team_tag", "Medisports")
+    role_line = _clean_card_meta_value(row.get("role"))
+    role_html = f"<p class='identity-line'>{role_line}</p>" if role_line else ""
     transfer_destination = str(row.get("transfer_destination", "") or "").strip()
     transfer_line = (
         f"<p class='identity-line'><strong>Moved to:</strong> {transfer_destination}</p>"
         if str(row.get("roster_bucket", "")).strip().lower() == "transferred" and transfer_destination
+        else "<p class='identity-line'><strong>Moved to:</strong> Sold</p>"
+        if str(row.get("roster_bucket", "")).strip().lower() == "transferred"
         else ""
     )
 
@@ -183,7 +186,7 @@ def player_card(row: dict):
               <div>{logo_visual}</div>
             </div>
             <p class='identity-line'>{identity_line}</p>
-            <p class='identity-line'>{role_line}</p>
+            {role_html}
             {transfer_line}
             {fame_html}
             <div class='player-meta-row'><span class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></span></div>
