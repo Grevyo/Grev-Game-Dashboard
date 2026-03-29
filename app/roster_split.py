@@ -37,6 +37,66 @@ def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
     return primary.fillna(fallback)
 
 
+def get_player_last_played_season(full_medisports_matches: pd.DataFrame) -> dict[str, int]:
+    """Most-recent resolved season per player across full historical data."""
+    if full_medisports_matches.empty or "player" not in full_medisports_matches.columns:
+        return {}
+
+    usage = full_medisports_matches[["player"]].copy()
+    usage["resolved_season"] = _resolved_season_series(full_medisports_matches)
+    usage = usage.dropna(subset=["resolved_season"])
+    if usage.empty:
+        return {}
+
+    usage = usage.assign(player_key=usage["player"].map(_player_key))
+    grouped = usage.groupby("player_key", dropna=False)["resolved_season"].max()
+    return {k: int(v) for k, v in grouped.items() if pd.notna(v)}
+
+
+def can_classify_transferred_safely(full_medisports_matches: pd.DataFrame, minimum_span: int = 3) -> bool:
+    """Require enough season history before allowing transferred classification."""
+    seasons = _resolved_season_series(full_medisports_matches).dropna()
+    if seasons.empty:
+        return False
+
+    min_season = int(seasons.min())
+    max_season = int(seasons.max())
+    return (max_season - min_season) >= minimum_span
+
+
+def classify_roster_bucket(
+    *,
+    player: str,
+    in_metadata: bool,
+    last_played_season: int | None,
+    current_season: int | None,
+    can_classify_transferred: bool,
+    appearance_share: float,
+    active_threshold: float,
+) -> str:
+    """Centralized roster bucket rules.
+
+    Order:
+    - streamer (metadata member with no game data)
+    - transferred (only if safety guard passes and last_played <= current - 3)
+    - active / benched_academy by current-context appearance share
+    """
+    _ = player  # explicit argument for readability in call-sites/debugging
+
+    if in_metadata and last_played_season is None:
+        return "streamer"
+
+    if (
+        can_classify_transferred
+        and current_season is not None
+        and last_played_season is not None
+        and int(last_played_season) <= int(current_season) - 3
+    ):
+        return "transferred"
+
+    return "active" if appearance_share > active_threshold else "benched_academy"
+
+
 def split_roster_active_benched_streamer_transferred(
     summary: pd.DataFrame,
     player_match_counts: pd.DataFrame,
@@ -76,15 +136,10 @@ def split_roster_active_benched_streamer_transferred(
         empty = pd.DataFrame(columns=merged.columns)
         return empty.copy(), empty.copy(), empty.copy(), empty.copy()
 
-    season_series = usage.get("resolved_season", pd.Series(dtype=float))
-    latest_dataset_season = int(season_series.max()) if not season_series.dropna().empty else None
-
-    usage_by_key = usage.assign(player_key=usage["player"].map(_player_key)) if not usage.empty else usage.copy()
-    last_season_by_key = (
-        usage_by_key.groupby("player_key", dropna=False)["resolved_season"].max().to_dict()
-        if not usage_by_key.empty
-        else {}
-    )
+    season_series = usage.get("resolved_season", pd.Series(dtype=float)).dropna()
+    latest_dataset_season = int(season_series.max()) if not season_series.empty else None
+    can_transfer_safely = can_classify_transferred_safely(full_medisports_matches, minimum_span=3)
+    last_season_by_key = get_player_last_played_season(full_medisports_matches)
 
     classified: dict[str, str] = {}
     meta_by_key = {_player_key(name): name for name in meta_players}
@@ -103,21 +158,18 @@ def split_roster_active_benched_streamer_transferred(
             classified[player] = "streamer"
             continue
 
-        # 3/4) Transferred: has historical data and last played season <= current_season - 3.
-        transferred = False
-        if has_any_game_data and latest_dataset_season is not None:
-            player_latest = pd.to_numeric(last_season_by_key.get(player_key), errors="coerce")
-            if pd.notna(player_latest):
-                transferred = int(player_latest) <= int(latest_dataset_season) - 3
-
-        if transferred:
-            classified[player] = "transferred"
-            continue
-
-        # 5) Competitive buckets are split by current-context appearance share.
+        # 3/4/5) Centralized classification; transferred requires safety guard + resolved seasons.
         appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
         appearance_share = float(appearance.iloc[0]) if not appearance.empty else 0.0
-        classified[player] = "active" if appearance_share > active_threshold else "benched_academy"
+        classified[player] = classify_roster_bucket(
+            player=player,
+            in_metadata=in_metadata,
+            last_played_season=last_season_by_key.get(player_key) if has_any_game_data else None,
+            current_season=latest_dataset_season,
+            can_classify_transferred=can_transfer_safely,
+            appearance_share=appearance_share,
+            active_threshold=active_threshold,
+        )
 
     active_players = {name for name, bucket in classified.items() if bucket == "active"}
     benched_players = {name for name, bucket in classified.items() if bucket == "benched_academy"}

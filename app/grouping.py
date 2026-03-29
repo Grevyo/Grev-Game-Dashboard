@@ -128,6 +128,11 @@ def _build_season_date_anchors(df: pd.DataFrame) -> pd.DataFrame:
     return windows
 
 
+def build_season_anchors(df: pd.DataFrame) -> pd.DataFrame:
+    """Public helper: season/date anchor windows from explicit season-labeled rows."""
+    return _build_season_date_anchors(df)
+
+
 def _infer_season_from_date(date_value: pd.Timestamp, season_windows: pd.DataFrame) -> int | None:
     if pd.isna(date_value) or season_windows.empty:
         return None
@@ -181,6 +186,19 @@ def infer_season_from_name_or_date(
     return None, "unresolved"
 
 
+def resolve_row_season(
+    raw_competition_name: str,
+    event_date: pd.Timestamp | None,
+    season_anchors: pd.DataFrame,
+) -> tuple[int | None, str]:
+    """Resolve one row season using explicit marker, then anchor-based date inference."""
+    return infer_season_from_name_or_date(
+        raw_competition_name=raw_competition_name,
+        event_date=event_date,
+        season_windows=season_anchors,
+    )
+
+
 def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_name", date_col: str = "date") -> pd.DataFrame:
     if df.empty or name_col not in df.columns:
         return df
@@ -199,7 +217,7 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
     inference_df = out.copy()
     inference_df["date"] = inference_df["date_for_season_inference"]
     inferred_family = _infer_nova_prime_season(inference_df)
-    season_windows = _build_season_date_anchors(inference_df)
+    season_windows = build_season_anchors(inference_df)
 
     resolved_seasons: list[int | None] = []
     resolve_strategies: list[str] = []
@@ -212,7 +230,7 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
 
         name = row.get(name_col, "")
         date_value = row.get("date_for_season_inference")
-        season_from_date, strategy = infer_season_from_name_or_date(name, date_value, season_windows)
+        season_from_date, strategy = resolve_row_season(name, date_value, season_windows)
 
         # Keep legacy Nova Prime heuristic as a conservative fallback.
         if season_from_date is None and pd.notna(inferred_family.loc[idx]):
