@@ -262,14 +262,12 @@ def player_card(row: dict):
                 },
             )
             _OVERVIEW_CARD_DICT_DEBUG_EMITTED = True
-    ach_html = "".join(render_achievement_mini_tile(a) for a in ach_items[:4])
+    ach_html = "".join(render_achievement_mini_tile(a) for a in ach_items)
 
     tier_order = ["S", "A", "B", "C"]
     tier_grevscores = row.get("tier_grevscores", {}) or {}
     tier_boxes = "".join(_tier_box_html(t, tier_grevscores.get(t)) for t in tier_order)
     tier_html = "<div class='grev-tier-strip'><div class='grev-tier-label'>GrevScore vs Tier Bands</div>" f"<div class='grev-tier-row'>{tier_boxes}</div></div>"
-    if int(row.get("achievements_hidden", 0) or 0) > 0:
-        ach_html += f"<div class='achievement-overflow'>+{int(row.get('achievements_hidden', 0))}</div>"
     if not ach_html:
         ach_html = "<div class='achievement-empty'>No achievements recorded</div>"
     achievements_block_html = f"<div class='achievement-strip achievement-strip-featured'>{ach_html}</div>" if ach_html else ""
