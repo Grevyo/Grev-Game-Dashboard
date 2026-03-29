@@ -148,8 +148,8 @@ def inject_styles(theme_name: str = "Dark"):
       flex-direction: row;
       flex-wrap: nowrap;
       gap: 7px;
-      min-height: 66px;
-      max-height: 66px;
+      min-height: 71px;
+      max-height: 71px;
       align-items:stretch;
       overflow: hidden;
     }}
@@ -166,9 +166,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-tile {{
       position: relative;
-      flex: 0 0 58px;
-      width: 58px;
-      height: 66px;
+      flex: 0 0 63px;
+      width: 63px;
+      height: 71px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
@@ -211,9 +211,9 @@ def inject_styles(theme_name: str = "Dark"):
       white-space: nowrap;
     }}
     .achievement-overflow {{
-      flex: 0 0 58px;
-      width: 58px;
-      height: 66px;
+      flex: 0 0 63px;
+      width: 63px;
+      height: 71px;
       display:flex;
       align-items:center;
       justify-content:center;
