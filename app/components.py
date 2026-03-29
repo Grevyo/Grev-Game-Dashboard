@@ -174,6 +174,36 @@ def player_card(row: dict):
         else ""
     )
 
+    safe_player_name = html.escape(str(row.get("player", "Unknown")))
+    safe_identity_line = html.escape(str(identity_line))
+    safe_role_line = html.escape(str(role_line))
+    safe_player_note = html.escape(str(_player_note(row) or ""))
+
+    if is_streamer_card:
+        streamer_card_html = f"""
+        <div class='panel player-card player-card-streamer accent-mid player-card-subdued'>
+            <div class='player-head player-head-streamer'>
+                <div class='player-head-left'>
+                    {profile_visual}
+                </div>
+                <div class='player-head-meta'>
+                    <div class='player-head-title-row'>
+                        <div class='player-name-row'>
+                            <p class='player-name'>{safe_player_name}</p>
+                        </div>
+                        <div>{logo_visual}</div>
+                    </div>
+                    <p class='identity-line'>{safe_identity_line}</p>
+                    <p class='identity-line'>{safe_role_line}</p>
+                    {fame_html}
+                </div>
+            </div>
+            <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
+        </div>
+        """
+        st.markdown(streamer_card_html, unsafe_allow_html=True)
+        return
+
     stat_items = [
         ("GrevScore", grev, f"{grev:.2f}"),
         ("Rating", float(row.get("rating", 0) or 0), f"{float(row.get('rating', 0) or 0):.2f}"),
@@ -200,24 +230,17 @@ def player_card(row: dict):
     tier_html = "<div class='grev-tier-strip'><div class='grev-tier-label'>GrevScore vs Tier Bands</div>" f"<div class='grev-tier-row'>{tier_boxes}</div></div>"
     if int(row.get("achievements_hidden", 0) or 0) > 0:
         ach_html += f"<div class='achievement-overflow'>+{int(row.get('achievements_hidden', 0))}</div>"
-    if not ach_html and not is_streamer_card:
+    if not ach_html:
         ach_html = "<div class='achievement-empty'>No achievements recorded</div>"
     achievements_block_html = f"<div class='achievement-strip achievement-strip-featured'>{ach_html}</div>" if ach_html else ""
 
-    safe_identity_line = html.escape(str(identity_line))
-    safe_role_line = html.escape(str(role_line))
-    safe_player_note = html.escape(str(_player_note(row) or ""))
-    trend_html = "" if is_streamer_card else trend_chip(row.get("trend", "Stable"))
+    trend_html = trend_chip(row.get("trend", "Stable"))
     context_html = (
-        ""
-        if is_streamer_card
-        else (
-            "<div class='player-meta-row'><span class='muted'>Best map <strong>"
-            f"{html.escape(str(row.get('best_map', 'N/A')))}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
-        )
+        "<div class='player-meta-row'><span class='muted'>Best map <strong>"
+        f"{html.escape(str(row.get('best_map', 'N/A')))}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
     )
-    stats_block_html = "" if is_streamer_card else f"<div class='stats-grid'>{stats_html}</div>"
-    tier_block_html = "" if is_streamer_card else tier_html
+    stats_block_html = f"<div class='stats-grid'>{stats_html}</div>"
+    tier_block_html = tier_html
 
     card_html = f"""
     <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') in {'subdued', 'streamer'} else ''}'>
@@ -228,7 +251,7 @@ def player_card(row: dict):
           <div class='player-head-meta'>
             <div class='player-head-title-row'>
               <div class='player-name-row'>
-                <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
+                <p class='player-name'>{safe_player_name}</p>
                 {trend_html}
               </div>
               <div>{logo_visual}</div>
