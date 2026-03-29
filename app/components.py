@@ -262,7 +262,9 @@ def player_card(row: dict):
                 },
             )
             _OVERVIEW_CARD_DICT_DEBUG_EMITTED = True
-    ach_html = "".join(render_achievement_mini_tile(a) for a in ach_items)
+    ach_html = "".join(
+        render_achievement_mini_tile(a) for a in ach_items
+    )
 
     tier_order = ["S", "A", "B", "C"]
     tier_grevscores = row.get("tier_grevscores", {}) or {}
