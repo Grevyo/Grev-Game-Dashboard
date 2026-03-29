@@ -213,13 +213,14 @@ def inject_styles(theme_name: str = "Dark"):
     .fame-value {{ color: var(--muted); font-size: 10px; }}
     .player-meta-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }}
     .achievement-strip {{
-      display:grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      display:flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
       gap: 7px;
-      min-height: 0;
-      max-height: none;
+      min-height: 76px;
+      max-height: 76px;
       align-items:stretch;
-      overflow: visible;
+      overflow: hidden;
     }}
     .achievement-strip-featured {{ margin-top: 0; }}
     .achievement-empty {{
@@ -234,8 +235,8 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-tile {{
       position: relative;
-      width: 100%;
-      min-width: 0;
+      flex: 0 0 68px;
+      width: 68px;
       height: 76px;
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -305,8 +306,8 @@ def inject_styles(theme_name: str = "Dark"):
       text-wrap: balance;
     }}
     .achievement-overflow {{
-      width: 100%;
-      min-width: 0;
+      flex: 0 0 68px;
+      width: 68px;
       height: 76px;
       display:flex;
       align-items:center;
