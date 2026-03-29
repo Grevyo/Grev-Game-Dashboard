@@ -9,7 +9,6 @@ import streamlit as st
 
 from app.config import FILES
 from app.grouping import build_season_resolution_debug_table, normalize_competitions
-from app.transforms import normalize_side_label
 
 SYNONYMS = {
     "date": ["date", "match_date"],
@@ -186,8 +185,7 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
     if "map" in df.columns:
         df["map"] = df["map"].astype(str).str.title().str.strip()
     if "side" in df.columns:
-        # Support mixed side naming systems (CT/T, attack/defence, case variants) across files.
-        df["side"] = df["side"].map(normalize_side_label)
+        df["side"] = df["side"].astype(str).str.title().replace({"Ct": "Blue", "T": "Red"})
     if "competition" in df.columns:
         df["raw_competition_name"] = df["competition"].fillna("").astype(str).str.strip()
     elif "raw_competition_name" in df.columns:

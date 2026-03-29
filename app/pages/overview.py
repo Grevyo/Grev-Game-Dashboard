@@ -50,7 +50,6 @@ def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, fl
 def _render_roster_cards(
     summary: pd.DataFrame,
     df_context: pd.DataFrame,
-    side_context: pd.DataFrame,
     players_meta: pd.DataFrame,
     player_match_counts: pd.DataFrame,
     team_logo: str | None,
@@ -93,8 +92,7 @@ def _render_roster_cards(
                 merged["roster_bucket"] = ""
                 merged["desc"] = player_description(merged)
             merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map") if card_variant != "streamer" else "N/A"
-            # Side context is sourced from match-linked tactic side rounds to avoid all-N/A when player CSV lacks side rows.
-            merged["best_side"] = _context_for_player(side_context, str(row["player"]), "side") if card_variant != "streamer" else "N/A"
+            merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side") if card_variant != "streamer" else "N/A"
             merged["trend"] = _trend_for_player(df_context, str(row["player"])) if card_variant != "streamer" else ""
             merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"])) if card_variant != "streamer" else {}
             photo = resolve_player_photo(str(row["player"]))
@@ -159,7 +157,6 @@ def render(ctx):
     full_df = ctx["player_matches"]
     full_history_df = ctx.get("player_matches_full", full_df)
     players_meta = ctx["players"]
-    side_context = ctx.get("player_side_context", full_df.iloc[0:0])
     team_name = ctx["team_name"]
     filters = ctx.get("filters", {})
     achievements_df = ctx.get("achievements")
@@ -291,7 +288,7 @@ def render(ctx):
         st.info("No players currently qualify for Active Roster in this filter context.")
     else:
         st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
-        _render_roster_cards(active_summary, df, side_context, players_meta, player_match_counts, team_logo, achievements_df)
+        _render_roster_cards(active_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
     section_header("Benched / Academy", "Secondary squad view — lower-usage players in the current filtered context")
@@ -299,7 +296,7 @@ def render(ctx):
         st.info("No Benched / Academy players in this filtered context.")
     else:
         st.markdown("<div class='roster-section roster-section-academy'>", unsafe_allow_html=True)
-        _render_roster_cards(benched_summary, df, side_context, players_meta, player_match_counts, team_logo, achievements_df)
+        _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
     if all_streamer_names:
@@ -324,7 +321,7 @@ def render(ctx):
             st.info("No streamer-only profiles to show after excluding Active, Benched / Academy, and Transferred players.")
         else:
             st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
-            _render_roster_cards(streamer_cards, df, side_context, players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
+            _render_roster_cards(streamer_cards, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
             st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
@@ -333,7 +330,6 @@ def render(ctx):
         _render_roster_cards(
             transferred_summary,
             df,
-            side_context,
             players_meta,
             player_match_counts,
             team_logo,

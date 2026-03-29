@@ -5,7 +5,7 @@ from app.filters import apply_filters, build_global_filters, filter_summary, glo
 from app.image_helpers import find_team_logo, image_data_uri
 from app.pages import overview, player_viewer, tactic_set_recommendations, tactics_breakdown, vs_teams, vs_tournaments
 from app.styles import inject_styles
-from app.transforms import build_player_side_context, with_player_metrics
+from app.transforms import with_player_metrics
 
 
 PAGES = {
@@ -50,13 +50,10 @@ def run_app():
     filters = build_global_filters(p_df, t_df) if (not show_filter_toggle or st.session_state.get("overview_show_filters", True)) else global_filters_from_state(p_df)
     inject_styles(filters.get("theme", "Dark"))
 
-    filtered_player_matches = apply_filters(p_df, filters)
-    filtered_tactics = apply_filters(t_df, filters)
     filtered = {
-        "player_matches": filtered_player_matches,
+        "player_matches": apply_filters(p_df, filters),
         "player_matches_full": p_df,
-        "player_side_context": build_player_side_context(filtered_player_matches, filtered_tactics),
-        "tactics": filtered_tactics,
+        "tactics": apply_filters(t_df, filters),
         "players": data["players"],
         "achievements": data["achievements"],
         "team_name": team_name,
