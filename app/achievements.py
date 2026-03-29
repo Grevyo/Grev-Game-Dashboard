@@ -2,7 +2,7 @@ import re
 
 import pandas as pd
 
-from app.image_helpers import image_data_uri, resolve_achievement_image
+from app.image_helpers import image_data_uri_thumbnail, resolve_achievement_image
 
 POSITION_PRIORITY = {
     "1st": 100,
@@ -67,7 +67,7 @@ def achievements_for_player(
             placement=row.get("position"),
         )
         image_path = image_resolution.get("final_path")
-        image_uri = image_data_uri(image_path)
+        image_uri = image_data_uri_thumbnail(image_path)
         global _CPL_OPEN_DEBUG_EMITTED
         if image_resolution.get("cpl_open_match") and not _CPL_OPEN_DEBUG_EMITTED:
             print(
@@ -96,6 +96,8 @@ def achievements_for_player(
                 "season_label": normalize_season_label(row.get("season_name")),
                 "tier": str(row.get("achievement_tier", "")).strip(),
                 "image_uri": image_uri,
+                "image_path": image_path,
+                "image_render_type": "data_uri" if image_uri else "none",
             }
         )
     hidden = max(0, len(pool) - len(items))
