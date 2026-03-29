@@ -132,14 +132,8 @@ def render_achievement_mini_tile(achievement: dict) -> str:
         if has_image_branch
         else "<div class='achievement-tile-thumb achievement-tile-thumb-fallback'>No Image</div>"
     )
-    season_label = html.escape(str(achievement.get("season_label", "")).strip())
-    event_title = html.escape(str(achievement.get("name", "")).strip())
-    placement = html.escape(str(achievement.get("position", "")).strip())
-    placement_chip = (
-        f"<span class='achievement-placement-chip' title='Placement'>{placement}</span>"
-        if placement
-        else ""
-    )
+    season_label = str(achievement.get("season_label", "")).strip()
+    event_title = str(achievement.get("name", "")).strip()
     card_html = (
         f"<div class='achievement-tile tier-{tier}'>"
         f"{thumb}"
@@ -147,7 +141,6 @@ def render_achievement_mini_tile(achievement: dict) -> str:
         f"<div class='achievement-tile-overlay'>"
         f"{achievement_tier_badge(tier)}"
         f"<span class='achievement-event-title' title='{event_title}'>{event_title}</span>"
-        f"{placement_chip}"
         f"</div></div>"
     )
 
