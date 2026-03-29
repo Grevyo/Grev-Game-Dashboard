@@ -2,10 +2,11 @@ from app.metrics import confidence_from_sample, trend_label
 
 
 def player_description(row):
-    trend = "hot" if row.get("form", 0) >= row.get("grevscore", 0) else "cooling"
+    trend = "up" if row.get("form", 0) >= row.get("grevscore", 0) else "steady"
+    best_map = row.get("best_map") or "current map pool"
     return (
-        f"{row.get('player')} is {trend}; GrevScore {row.get('grevscore', 0):.1f}, "
-        f"K/D {row.get('kpd', 0):.2f}, Accuracy {row.get('accuracy_pct', 0):.1f}%."
+        f"Form is trending {trend} with {row.get('grevscore', 0):.2f} GrevScore and "
+        f"{row.get('kpd', 0):.2f} K/D, strongest on {best_map}."
     )
 
 
