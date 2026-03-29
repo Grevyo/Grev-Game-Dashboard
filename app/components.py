@@ -125,7 +125,7 @@ def _tier_box_html(tier: str, score: float | None) -> str:
 def player_card(row: dict):
     is_streamer_card = row.get("roster_bucket") == "streamer" or row.get("card_variant") == "streamer"
     grev = float(row.get("grevscore", 0) or 0)
-    tone = _tone_from_score(grev)
+    tone = "mid" if is_streamer_card else _tone_from_score(grev)
     nationality = nationality_label(row.get("nationality") or row.get("country"))
     identity_line = nationality or "Nationality N/A"
     role_line = "Streamer" if is_streamer_card else (row.get("role") or "Role N/A")
@@ -174,8 +174,9 @@ def player_card(row: dict):
     tier_html = "<div class='grev-tier-strip'><div class='grev-tier-label'>GrevScore vs Tier Bands</div>" f"<div class='grev-tier-row'>{tier_boxes}</div></div>"
     if int(row.get("achievements_hidden", 0) or 0) > 0:
         ach_html += f"<div class='achievement-overflow'>+{int(row.get('achievements_hidden', 0))}</div>"
-    if not ach_html:
+    if not ach_html and not is_streamer_card:
         ach_html = "<div class='achievement-empty'>No achievements recorded</div>"
+    achievements_block_html = f"<div class='achievement-strip achievement-strip-featured'>{ach_html}</div>" if ach_html else ""
 
     safe_identity_line = html.escape(str(identity_line))
     safe_role_line = html.escape(str(role_line))
@@ -212,7 +213,7 @@ def player_card(row: dict):
             {context_html}
           </div>
         </div>
-        <div class='achievement-strip achievement-strip-featured'>{ach_html}</div>
+        {achievements_block_html}
         {stats_block_html}
         {tier_block_html}
         <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
