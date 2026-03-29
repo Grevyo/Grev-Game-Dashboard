@@ -138,11 +138,9 @@ def render_achievement_mini_tile(achievement: dict) -> str:
         f"<div class='achievement-tile tier-{tier}'>"
         f"{thumb}"
         f"<div class='achievement-season-top'>{season_label}</div>"
-        f"<div class='achievement-event-title-wrap'>"
-        f"<span class='achievement-event-title' title='{event_title}'>{event_title}</span>"
-        f"</div>"
         f"<div class='achievement-tile-overlay'>"
         f"{achievement_tier_badge(tier)}"
+        f"<span class='achievement-event-title' title='{event_title}'>{event_title}</span>"
         f"</div></div>"
     )
 
