@@ -293,6 +293,36 @@ def load_data() -> dict[str, pd.DataFrame]:
         if not debug_table.empty:
             debug_table.to_csv(Path("data/season_resolution_debug.csv"), index=False)
 
+    # Focused debug trace for CPL Open achievement retention.
+    achievement_path = FILES["achievements"]
+    print(f"[ACH_DEBUG] achievements_file_path={achievement_path}")
+    print(f"[ACH_DEBUG] achievements_row_count={len(achievements)}")
+    print(f"[ACH_DEBUG] achievements_columns={list(achievements.columns)}")
+    if "achievement_name" in achievements.columns:
+        cpl_open_mask = achievements["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)
+        cpl_open_rows = achievements[cpl_open_mask]
+        print("[ACH_DEBUG] loaded_rows_where_achievement_name_contains_CPL_Open")
+        if cpl_open_rows.empty:
+            print("[ACH_DEBUG] (none)")
+        else:
+            cols = [c for c in ["player", "achievement_name", "season_name", "position"] if c in cpl_open_rows.columns]
+            print(cpl_open_rows[cols].to_string(index=False))
+    if {"player", "achievement_name"}.issubset(achievements.columns):
+        debug_player = "ⓜ | 8eeR"
+        player_rows = achievements[achievements["player"].astype(str) == debug_player]
+        print(f"[ACH_DEBUG] all_loaded_rows_for_player={debug_player}")
+        if player_rows.empty:
+            print("[ACH_DEBUG] (none)")
+        else:
+            cols = [c for c in ["player", "achievement_name", "season_name", "position"] if c in player_rows.columns]
+            print(player_rows[cols].to_string(index=False))
+            player_cpl_rows = player_rows[player_rows["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
+            print(f"[ACH_DEBUG] loaded_rows_for_player_where_achievement_name_contains_CPL_Open={debug_player}")
+            if player_cpl_rows.empty:
+                print("[ACH_DEBUG] (none)")
+            else:
+                print(player_cpl_rows[cols].to_string(index=False))
+
     return {
         "player_matches": player_matches,
         "tactics": tactics,

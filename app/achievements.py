@@ -17,6 +17,7 @@ POSITION_PRIORITY = {
 }
 TIER_PRIORITY = {"S": 90, "A": 75, "B": 60, "C": 45, "D": 30}
 _CPL_OPEN_DEBUG_EMITTED = False
+_ACHIEVEMENT_PIPELINE_DEBUG_PLAYER = "ⓜ | 8eeR"
 
 
 def _is_present_text(value) -> bool:
@@ -97,14 +98,35 @@ def achievements_for_player(
         return [], 0
 
     key = _player_key(player_name)
+    debug_trace = key == _player_key(_ACHIEVEMENT_PIPELINE_DEBUG_PLAYER)
     pool = achievements_df.copy()
+    raw_player_mask = pool.get("player", pd.Series(index=pool.index, dtype=str)).astype(str).map(_player_key) == key
     if "player_clean" in pool.columns:
-        mask = pool["player_clean"].astype(str).str.strip().str.casefold() == key
+        # Use both normalized raw player names and player_clean to avoid dropping
+        # rows when player_clean is missing/corrupted for a subset of entries.
+        clean_mask = pool["player_clean"].astype(str).str.strip().str.casefold() == key
+        mask = clean_mask | raw_player_mask
     else:
-        mask = pool.get("player", pd.Series(index=pool.index, dtype=str)).astype(str).map(_player_key) == key
+        mask = raw_player_mask
     pool = pool[mask]
+    if debug_trace:
+        stage_cols = [c for c in ["player", "achievement_name", "season_name", "position", "player_clean"] if c in pool.columns]
+        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=1_after_player_name_filter rows={len(pool)}")
+        print(pool[stage_cols].to_string(index=False) if not pool.empty else "[ACH_PIPELINE_DEBUG] (none)")
+        if "achievement_name" in pool.columns:
+            cpl_open_stage = pool[pool["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
+            print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=1_after_player_name_filter cpl_open_rows={len(cpl_open_stage)}")
+            print(cpl_open_stage[stage_cols].to_string(index=False) if not cpl_open_stage.empty else "[ACH_PIPELINE_DEBUG] (none)")
     if pool.empty:
         return [], 0
+
+    if debug_trace:
+        stage_cols = [c for c in ["player", "achievement_name", "season_name", "position", "player_clean"] if c in pool.columns]
+        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=2_after_cleanup_dedup_dropna rows={len(pool)} (no-op cleanup)")
+        print(pool[stage_cols].to_string(index=False))
+        cpl_open_stage = pool[pool["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
+        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=2_after_cleanup_dedup_dropna cpl_open_rows={len(cpl_open_stage)}")
+        print(cpl_open_stage[stage_cols].to_string(index=False) if not cpl_open_stage.empty else "[ACH_PIPELINE_DEBUG] (none)")
 
     season_num = pd.to_numeric(pool.get("season_name"), errors="coerce").fillna(0)
     pos_priority = pool.get("position", "").astype(str).str.strip().map(POSITION_PRIORITY).fillna(10)
@@ -112,11 +134,25 @@ def achievements_for_player(
 
     pool = pool.assign(_season=season_num, _pos=pos_priority, _tier=tier_priority)
     pool = pool.sort_values(["_pos", "_tier", "_season"], ascending=[False, False, False])
+    if debug_trace:
+        stage_cols = [c for c in ["player", "achievement_name", "season_name", "position", "_pos", "_tier", "_season"] if c in pool.columns]
+        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=3_after_sort rows={len(pool)}")
+        print(pool[stage_cols].to_string(index=False))
+        cpl_open_stage = pool[pool["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
+        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=3_after_sort cpl_open_rows={len(cpl_open_stage)}")
+        print(cpl_open_stage[stage_cols].to_string(index=False) if not cpl_open_stage.empty else "[ACH_PIPELINE_DEBUG] (none)")
 
     if cap is None:
         top = pool
     else:
         top = pool.head(cap)
+    if debug_trace:
+        stage_cols = [c for c in ["player", "achievement_name", "season_name", "position", "_pos", "_tier", "_season"] if c in top.columns]
+        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=4_after_trimming cap={cap} rows={len(top)}")
+        print(top[stage_cols].to_string(index=False))
+        cpl_open_stage = top[top["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
+        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=4_after_trimming cpl_open_rows={len(cpl_open_stage)}")
+        print(cpl_open_stage[stage_cols].to_string(index=False) if not cpl_open_stage.empty else "[ACH_PIPELINE_DEBUG] (none)")
     items = []
     for _, row in top.iterrows():
         image_uri, image_path, image_source, image_debug = _resolve_achievement_image_for_overview(row)
@@ -160,4 +196,9 @@ def achievements_for_player(
             }
         )
     hidden = max(0, len(pool) - len(items))
+    if debug_trace:
+        final_names = [str(item.get("name", "")).strip() for item in items]
+        final_cpl_open = [name for name in final_names if "cpl open" in name.casefold()]
+        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=5_final_names names={final_names}")
+        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=5_final_names cpl_open_names={final_cpl_open}")
     return items, hidden
