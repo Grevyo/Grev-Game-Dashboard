@@ -183,7 +183,7 @@ def player_card(row: dict):
     safe_role_line = html.escape(str(role_line))
     safe_best_map = html.escape(str(row.get("best_map", "N/A")))
     safe_best_side = html.escape(str(row.get("best_side", "N/A")))
-    safe_player_note = html.escape(_player_note(row))
+    safe_player_note = html.escape(str(_player_note(row) or ""))
 
     card_html = f"""
     <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') == 'subdued' else ''}'>
