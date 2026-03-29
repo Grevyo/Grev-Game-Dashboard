@@ -1,7 +1,7 @@
 import streamlit as st
 
 from app.data_loader import detect_our_team, load_data, validate_columns
-from app.filters import apply_filters, build_global_filters, filter_summary, global_filters_from_state
+from app.filters import apply_filters, build_global_filters, filter_panel_toggle, filter_summary, global_filters_from_state
 from app.image_helpers import find_team_logo, image_data_uri
 from app.pages import overview, player_viewer, tactic_set_recommendations, tactics_breakdown, vs_teams, vs_tournaments
 from app.styles import inject_styles
@@ -39,15 +39,10 @@ def run_app():
     st.markdown("<div class='top-nav'></div>", unsafe_allow_html=True)
     page = st.radio("Page", list(PAGES.keys()), horizontal=True, label_visibility="collapsed")
 
-    show_filter_toggle = page == "Overview"
-    if show_filter_toggle:
-        if "overview_show_filters" not in st.session_state:
-            st.session_state["overview_show_filters"] = True
-        toggle_label = "Hide filters" if st.session_state["overview_show_filters"] else "Show filters"
-        if st.button(toggle_label, key="overview_filter_toggle"):
-            st.session_state["overview_show_filters"] = not st.session_state["overview_show_filters"]
+    page_scope = page.lower().replace(" ", "_")
+    show_filters = filter_panel_toggle(f"global_{page_scope}")
 
-    filters = build_global_filters(p_df, t_df) if (not show_filter_toggle or st.session_state.get("overview_show_filters", True)) else global_filters_from_state(p_df)
+    filters = build_global_filters(p_df, t_df) if show_filters else global_filters_from_state(p_df)
     inject_styles(filters.get("theme", "Dark"))
 
     filtered = {
