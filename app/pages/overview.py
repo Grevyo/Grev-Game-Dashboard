@@ -213,12 +213,6 @@ def render(ctx):
     streamer_meta_rows = _build_streamer_metadata_rows(players_meta, active_summary, benched_summary, transferred_summary)
     streamer_names = streamer_meta_rows["player"].astype(str).tolist() if not streamer_meta_rows.empty and "player" in streamer_meta_rows.columns else []
     all_streamer_names = all_streamer_meta_rows["player"].astype(str).tolist() if not all_streamer_meta_rows.empty and "player" in all_streamer_meta_rows.columns else []
-    if streamer_names:
-        st.write(
-            "Streamer metadata preview:",
-            streamer_meta_rows[["player", "country", "nationality", "role", "fame"]].to_dict("records"),
-        )
-
     seasons = filters.get("season") or ([f"Season {auto_current_season}"] if auto_current_season else ["All seasons"])
     maps = filters.get("map") or ["All maps"]
 
@@ -306,7 +300,6 @@ def render(ctx):
 
     if all_streamer_names:
         section_header("Streamer", "Rostered Medisports streamer profiles from players metadata")
-        st.write("Streamer names from players.csv:", all_streamer_names)
         streamer_cards = pd.DataFrame(
             {
                 "player": streamer_meta_rows.get("player", pd.Series(dtype=object)).astype(str),
