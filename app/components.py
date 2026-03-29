@@ -98,16 +98,12 @@ def player_card(row: dict):
     )
     ach_items = row.get("achievements", []) or []
     ach_chunks = []
-    for a in ach_items[:3]:
+    for a in ach_items[:5]:
         thumb = f"<img class='achievement-tile-thumb' src='{a.get('image_uri')}' alt='Achievement'/>" if a.get("image_uri") else ""
-        season_tag = a.get("season_label") or ""
         tier = str(a.get("tier", "-")).strip().upper()
-        meta_bits = [x for x in [a.get("position", ""), season_tag] if x]
-        meta_html = " • ".join(meta_bits) if meta_bits else "Season —"
         ach_chunks.append(
             f"<div class='achievement-tile tier-{tier}'>{thumb}"
-            f"<div class='achievement-tile-overlay'><div class='achievement-chip-name'>{a.get('name','Achievement')}</div>"
-            f"<div class='achievement-chip-meta'>{meta_html}</div>{achievement_tier_badge(tier)}</div></div>"
+            f"<div class='achievement-tile-overlay'>{achievement_tier_badge(tier)}</div></div>"
         )
     ach_html = "".join(ach_chunks)
     if row.get("achievements_hidden", 0):
