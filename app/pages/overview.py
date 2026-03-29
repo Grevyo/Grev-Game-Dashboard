@@ -1,9 +1,12 @@
 import streamlit as st
+import pandas as pd
+import re
 
 from app.components import insight_card, player_card, section_header, stat_card
 from app.achievements import achievements_for_player
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.descriptions import player_description
+from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
 from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
@@ -29,6 +32,10 @@ def _trend_for_player(df, player_name: str) -> str:
     return "Heating Up" if label == "Rising" else "Cooling" if label == "Falling" else "Stable"
 
 
+def _player_key(name: str) -> str:
+    return re.sub(r"^ⓜ\s*\|\s*", "", str(name or ""), flags=re.IGNORECASE).strip().casefold()
+
+
 def render(ctx):
     full_df = ctx["player_matches"]
     players_meta = ctx["players"]
@@ -36,7 +43,35 @@ def render(ctx):
     filters = ctx.get("filters", {})
     achievements_df = ctx.get("achievements")
 
-    df = get_medisports_roster_df(full_df, player_col="player")
+    df_base = get_medisports_roster_df(full_df, player_col="player")
+    selected_seasons = filters.get("season") or []
+    auto_current_season = None
+    if not selected_seasons:
+        auto_current_season = get_current_season(df_base, "season")
+        if auto_current_season and "season" in df_base.columns:
+            df_base = df_base[df_base["season"].astype(str) == auto_current_season].copy()
+
+    control_col, meta_col = st.columns([1.3, 2.5], gap="small")
+    with control_col:
+        active_only = st.toggle("Active roster only (>10% usage)", value=True, key="overview_active_roster")
+    with meta_col:
+        if auto_current_season:
+            st.markdown(f"<span class='chip chip-mid'>Defaulted to Season {auto_current_season}</span>", unsafe_allow_html=True)
+
+    total_matches = int(df_base["match_id"].nunique()) if "match_id" in df_base.columns else 0
+    player_match_counts = (
+        df_base.groupby("player", dropna=False)["match_id"].nunique().rename("matches_played").reset_index()
+        if total_matches > 0 and "player" in df_base.columns and "match_id" in df_base.columns
+        else pd.DataFrame(columns=["player", "matches_played"])
+    )
+    if total_matches > 0 and not player_match_counts.empty:
+        player_match_counts["appearance_share"] = player_match_counts["matches_played"] / total_matches
+        active_players = set(player_match_counts.loc[player_match_counts["appearance_share"] > 0.10, "player"].astype(str))
+    else:
+        player_match_counts["appearance_share"] = 0.0
+        active_players = set()
+
+    df = df_base[df_base["player"].astype(str).isin(active_players)].copy() if active_only else df_base.copy()
 
     if df.empty:
         st.warning("No Medisports rows available after filters.")
@@ -57,7 +92,7 @@ def render(ctx):
         st.warning("No Medisports roster available for Overview.")
         return
 
-    seasons = filters.get("season") or ["All seasons"]
+    seasons = filters.get("season") or ([f"Season {auto_current_season}"] if auto_current_season else ["All seasons"])
     maps = filters.get("map") or ["All maps"]
 
     team_logo = image_data_uri(find_team_logo(team_name) or find_team_logo("Medisports"))
@@ -77,7 +112,7 @@ def render(ctx):
                 </div>
               </div>
               <div>
-                <span class='chip chip-good'>Context: Active</span>
+                <span class='chip chip-good'>Roster: {'Active only' if active_only else 'All roster'}</span>
                 <span class='chip'>Medisports Roster: {summary['player'].nunique()}</span>
               </div>
             </div>
@@ -88,7 +123,7 @@ def render(ctx):
 
     k1, k2, k3, k4 = st.columns(4, gap="small")
     with k1:
-        stat_card("Squad Avg GrevScore", f"{summary['grevscore'].mean():.1f}", "Current output index")
+        stat_card("Squad Avg GrevScore", f"{summary['grevscore'].mean():.2f}", "Current output index")
     with k2:
         stat_card("Squad Avg Rating", f"{summary['rating'].mean():.2f}", "Form-normalized")
     with k3:
@@ -103,7 +138,7 @@ def render(ctx):
     section_header("Team Pulse", "High-signal summary strip")
     p1, p2, p3, p4 = st.columns(4, gap="small")
     with p1:
-        insight_card("Strongest Player", f"{top_player['player']} leads at {top_player['grevscore']:.1f} GrevScore.", "good")
+        insight_card("Strongest Player", f"{top_player['player']} leads at {top_player['grevscore']:.2f} GrevScore.", "good")
     with p2:
         insight_card("Hottest Form", f"{improved['player']} currently shows the strongest rolling form.", "info")
     with p3:
@@ -113,17 +148,26 @@ def render(ctx):
 
     section_header("Main Roster Grid", "Compact equal-height profile cards")
     rows = list(summary.iterrows())
-    for i in range(0, len(rows), 3):
-        cols = st.columns(3, gap="small")
-        for c_idx, item in enumerate(rows[i : i + 3]):
+    for i in range(0, len(rows), 5):
+        cols = st.columns(5, gap="small")
+        for c_idx, item in enumerate(rows[i : i + 5]):
             _, row = item
             merged = row.to_dict()
-            meta = players_meta[
-                players_meta.get("player_clean", players_meta.get("name", "")).astype(str).str.contains(str(row["player"]), case=False, regex=False)
-            ]
+            key = _player_key(str(row["player"]))
+            meta_source = players_meta.get("player_clean", players_meta.get("player", players_meta.get("name", ""))).astype(str).map(_player_key)
+            meta = players_meta[meta_source == key]
             if not meta.empty:
                 m = meta.iloc[0].to_dict()
-                merged.update({"country": m.get("country", ""), "role": m.get("role", "")})
+                merged.update(
+                    {
+                        "country": m.get("country", ""),
+                        "nationality": m.get("nationality", ""),
+                        "role": m.get("role", ""),
+                        "fame": m.get("fame", ""),
+                    }
+                )
+            usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
+            merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
 
             merged["team_tag"] = "Medisports"
             merged["desc"] = player_description(row)
@@ -134,7 +178,7 @@ def render(ctx):
             merged["photo_uri"] = image_data_uri(photo.get("path"))
             merged["team_logo_uri"] = team_logo
             merged["photo_missing_reason"] = photo.get("reason")
-            ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=3)
+            ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=4)
             merged["achievements"] = ach_list
             merged["achievements_hidden"] = ach_hidden
 

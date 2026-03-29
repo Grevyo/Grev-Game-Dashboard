@@ -7,13 +7,26 @@ def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
         return df
     out = df.copy()
     out["kpr"] = np.where(out.get("rounds_played", 0) > 0, out.get("kills", 0) / out.get("rounds_played", 1), np.nan)
-    out["grevscore"] = (
-        out.get("kpd", 0).fillna(0) * 40
-        + out.get("accuracy_pct", 0).fillna(0) * 0.2
-        + out.get("hs_pct", 0).fillna(0) * 0.2
-        + out.get("mvps", 0).fillna(0) * 1.5
+    out["mvp_rate"] = np.where(out.get("rounds_played", 0) > 0, out.get("mvps", 0) / out.get("rounds_played", 1) * 30, np.nan)
+
+    baseline_kpd = max(float(out.get("kpd", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
+    baseline_kpr = max(float(out.get("kpr", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
+    baseline_acc = max(float(out.get("accuracy_pct", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
+    baseline_hs = max(float(out.get("hs_pct", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
+    baseline_mvp = max(float(out.get("mvp_rate", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
+
+    normalized = (
+        np.clip(out.get("kpd", 0).fillna(0) / baseline_kpd, 0, 2.0) * 0.40
+        + np.clip(out.get("kpr", 0).fillna(0) / baseline_kpr, 0, 2.0) * 0.25
+        + np.clip(out.get("accuracy_pct", 0).fillna(0) / baseline_acc, 0, 2.0) * 0.15
+        + np.clip(out.get("hs_pct", 0).fillna(0) / baseline_hs, 0, 2.0) * 0.10
+        + np.clip(out.get("mvp_rate", 0).fillna(0) / baseline_mvp, 0, 2.0) * 0.10
     )
-    out["rating"] = out["grevscore"] / 50
+    out["grevscore"] = np.clip(normalized * 1.20, 0, None)
+    out["rating"] = (
+        out.get("kpd", 0).fillna(0) * 0.65
+        + (out.get("kpr", 0).fillna(0) / baseline_kpr) * 0.35
+    )
     out["impact"] = out.get("kills", 0).fillna(0) + out.get("mvps", 0).fillna(0) * 2
     out["form"] = out.groupby("player", dropna=False)["grevscore"].transform(lambda s: s.rolling(5, min_periods=1).mean())
     return out
