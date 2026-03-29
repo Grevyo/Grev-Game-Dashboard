@@ -1,4 +1,6 @@
+import html
 import math
+import re
 
 import streamlit as st
 
@@ -30,6 +32,27 @@ def stat_card(label: str, value, help_text: str = "", quality_override: str | No
         """,
         unsafe_allow_html=True,
     )
+
+
+def _clean_card_meta_value(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    text = re.sub(r"<[^>]+>", "", text)
+    text = text.replace(",", "")
+    match = re.search(r"-?\d+(?:\.\d+)?", text)
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return None
 
 
 def _tone_from_score(score: float) -> str:
@@ -165,7 +188,7 @@ def player_card(row: dict):
           <div class='player-head-meta'>
             <div class='player-head-title-row'>
               <div class='player-name-row'>
-                <p class='player-name'>{row.get('player', 'Unknown')}</p>
+                <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
                 {trend_chip(row.get('trend', 'Stable'))}
               </div>
               <div>{logo_visual}</div>
