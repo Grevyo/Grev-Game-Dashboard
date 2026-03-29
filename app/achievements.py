@@ -32,7 +32,12 @@ def normalize_season_label(season_value: str | int | float | None) -> str:
     return text if text.lower().startswith("season ") else f"Season {text}"
 
 
-def achievements_for_player(achievements_df: pd.DataFrame, player_name: str, cap: int = 3) -> tuple[list[dict], int]:
+def achievements_for_player(
+    achievements_df: pd.DataFrame,
+    player_name: str,
+    cap: int = 3,
+    consumer: str = "unknown",
+) -> tuple[list[dict], int]:
     if achievements_df.empty:
         return [], 0
 
@@ -68,15 +73,17 @@ def achievements_for_player(achievements_df: pd.DataFrame, player_name: str, cap
             print(
                 "[CPL_OPEN_DEBUG]",
                 {
-                    "raw_achievement": row.to_dict(),
-                    "event_title_raw": image_resolution.get("event_name"),
-                    "parsed_placement": image_resolution.get("placement_normalized"),
-                    "cpl_open_regex_matched": image_resolution.get("cpl_open_match"),
+                    "raw_achievement_name": row.get("achievement_name"),
+                    "raw_placement": row.get("position"),
+                    "cpl_open_detected": image_resolution.get("cpl_open_match"),
                     "selected_filename": image_resolution.get("selected_filename"),
                     "resolved_filesystem_path": image_resolution.get("resolved_path"),
                     "resolved_file_exists": image_resolution.get("resolved_exists"),
                     "final_render_image_path": image_path,
                     "final_render_image_uri_present": bool(image_uri),
+                    "overview_received_image_path": image_path if consumer == "overview" else None,
+                    "overview_received_image_uri_present": bool(image_uri) if consumer == "overview" else None,
+                    "consumer": consumer,
                     "resolver_source": image_resolution.get("source"),
                 },
             )

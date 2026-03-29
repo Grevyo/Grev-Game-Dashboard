@@ -144,14 +144,7 @@ def resolve_transferred_logo(new_team: str | None) -> str | None:
     return find_competition_logo("cpl")
 
 
-CPL_OPEN_EVENT_PATTERN = re.compile(
-    r"""
-    \bcpl\s+open\s+            # event family name
-    \d+(?:\.\d+)?              # event number like 3, 9.1, 15.31
-    \b
-    """,
-    flags=re.IGNORECASE | re.VERBOSE,
-)
+CPL_OPEN_EVENT_PATTERN = re.compile(r"cpl\s+open", flags=re.IGNORECASE)
 CPL_OPEN_PLACEMENT_IMAGE = {
     1: "CPLOpen1.png",
     2: "CPLOpen2.png",
@@ -187,7 +180,9 @@ def resolve_achievement_image(
     achievement_name: str | None = None,
     placement: str | int | float | None = None,
 ) -> dict[str, str | bool | int | None]:
-    event_name = str(achievement_name or link_or_name or "").strip()
+    event_name = str(achievement_name or "").strip()
+    if event_name.casefold() in {"", "nan", "none", "null"}:
+        event_name = str(link_or_name or "").strip()
     placement_normalized = normalize_placement_value(placement)
     cpl_open_matched = bool(event_name and CPL_OPEN_EVENT_PATTERN.search(event_name))
 
