@@ -13,6 +13,8 @@ from app.image_helpers import find_team_logo, image_data_uri, resolve_player_pho
 from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player, with_resolved_season
 
+PLAYER_CARD_META_ALLOWLIST = ("country", "nationality", "role", "fame", "new_team")
+
 
 def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> str:
     if df.empty or by not in df.columns or "player" not in df.columns:
@@ -46,6 +48,19 @@ def _clean_meta_text(value) -> str:
     return str(value).strip()
 
 
+def _sanitize_player_card_meta(field: str, value) -> str:
+    cleaned = _clean_meta_text(value)
+    if not cleaned:
+        return ""
+    lowered = cleaned.casefold()
+    if lowered in {"nan", "none", "null", "n/a", "na"}:
+        return ""
+    # Guard against raw header/label leakage (e.g., "Div") appearing as metadata values.
+    if field == "role" and lowered == "div":
+        return ""
+    return cleaned
+
+
 def _player_card_meta(players_meta: pd.DataFrame, key: str) -> dict[str, str]:
     if players_meta.empty:
         return {}
@@ -57,16 +72,10 @@ def _player_card_meta(players_meta: pd.DataFrame, key: str) -> dict[str, str]:
     if meta.empty:
         return {}
     m = meta.iloc[0]
-    role_value = _clean_meta_text(m.get("role"))
-    if role_value.casefold() in {"div", "nan", "none", "null"}:
-        role_value = ""
-    return {
-        "country": _clean_meta_text(m.get("country")),
-        "nationality": _clean_meta_text(m.get("nationality")),
-        "role": role_value,
-        "fame": _clean_meta_text(m.get("fame")),
-        "new_team": _clean_meta_text(m.get("new_team")),
-    }
+    sanitized_meta: dict[str, str] = {}
+    for field in PLAYER_CARD_META_ALLOWLIST:
+        sanitized_meta[field] = _sanitize_player_card_meta(field, m.get(field))
+    return sanitized_meta
 
 
 def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, float]:
@@ -98,14 +107,9 @@ def _render_roster_cards(
             merged = row.to_dict()
             key = _player_key(str(row["player"]))
             meta = _player_card_meta(players_meta, key)
-            merged.update(
-                {
-                    "country": meta.get("country", ""),
-                    "nationality": meta.get("nationality", ""),
-                    "role": meta.get("role", ""),
-                    "fame": meta.get("fame", ""),
-                }
-            )
+            # Explicit field-level allowlist: only these metadata fields can ever reach player_card().
+            for field in ("country", "nationality", "role", "fame"):
+                merged[field] = meta.get(field, "")
             usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
 
