@@ -1,4 +1,5 @@
 import re
+import shlex
 import unicodedata
 from pathlib import Path
 from typing import Iterable
@@ -111,6 +112,44 @@ def _read_flexible_csv(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def _read_players_csv_safe(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+
+    parsed_rows: list[list[str]] = []
+    expected_cols = 0
+
+    try:
+        with path.open("r", encoding="utf-8-sig") as handle:
+            for raw_line in handle:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                tokens = shlex.split(line)
+                if not tokens:
+                    continue
+                if not parsed_rows:
+                    parsed_rows.append(tokens)
+                    expected_cols = len(tokens)
+                    continue
+                if len(tokens) < expected_cols:
+                    tokens = tokens + [""] * (expected_cols - len(tokens))
+                elif len(tokens) > expected_cols:
+                    tokens = tokens[:expected_cols]
+                parsed_rows.append(tokens)
+    except Exception:
+        return pd.DataFrame()
+
+    if not parsed_rows:
+        return pd.DataFrame()
+
+    header = parsed_rows[0]
+    rows = parsed_rows[1:]
+    if not rows:
+        return _normalize_columns(pd.DataFrame(columns=header))
+    return _normalize_columns(pd.DataFrame(rows, columns=header))
+
+
 def _best_col(df: pd.DataFrame, names: Iterable[str]) -> str | None:
     for n in names:
         if n in df.columns:
@@ -179,7 +218,7 @@ def load_data() -> dict[str, pd.DataFrame]:
     player_matches = _derive_core(_read_flexible_csv(FILES["player_matches"]))
     tactics = _derive_core(_read_flexible_csv(FILES["tactics"]))
     achievements = _derive_core(_read_flexible_csv(FILES["achievements"]))
-    players = _derive_core(_read_flexible_csv(FILES["players"]))
+    players = _derive_core(_read_players_csv_safe(FILES["players"]))
 
     tactics = tactics.rename(columns={"": "tier"})
     tactics = _safe_numeric(tactics, ["wins", "losses", "total_rounds", "win_rate_pct"])
@@ -201,6 +240,9 @@ def load_data() -> dict[str, pd.DataFrame]:
         players["player_clean"] = players["player"].map(normalize_player_key)
     elif "name" in players.columns:
         players["player_clean"] = players["name"].map(normalize_player_key)
+
+    if "country" in players.columns and "nationality" not in players.columns:
+        players["nationality"] = players["country"]
 
     for df in [player_matches, achievements]:
         if "player" in df.columns:
