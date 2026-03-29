@@ -18,6 +18,40 @@ PAGES = {
 }
 
 
+def _render_page_navigation() -> str:
+    options = list(PAGES.keys())
+    current = st.session_state.get("page_nav", options[0])
+    if current not in options:
+        current = options[0]
+        st.session_state["page_nav"] = current
+
+    if hasattr(st, "pills"):
+        return st.pills(
+            "Page",
+            options,
+            selection_mode="single",
+            default=current,
+            label_visibility="collapsed",
+            key="page_nav",
+        )
+    if hasattr(st, "segmented_control"):
+        return st.segmented_control(
+            "Page",
+            options,
+            default=current,
+            selection_mode="single",
+            label_visibility="collapsed",
+            key="page_nav",
+        )
+    return st.radio(
+        "Page",
+        options,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="page_nav",
+    )
+
+
 def run_app():
     st.set_page_config(page_title="Medisports Analytics", page_icon="🎮", layout="wide")
 
@@ -36,13 +70,7 @@ def run_app():
         f"<div class='hero-band' style='margin-bottom:12px;'><div style='display:flex;align-items:center;gap:12px;'><div>{logo_html}</div><div><div class='section-title' style='margin-top:0;'>Medisports Analytics Dashboard</div><div class='section-subtitle' style='margin-bottom:0;'>Unified command layer with page-native controls and full-width layout.</div></div></div></div>",
         unsafe_allow_html=True,
     )
-    page = st.radio(
-        "Page",
-        list(PAGES.keys()),
-        horizontal=True,
-        label_visibility="collapsed",
-        key="page_nav",
-    )
+    page = _render_page_navigation()
 
     page_scope = page.lower().replace(" ", "_")
     show_filters = filter_panel_toggle(f"global_{page_scope}")

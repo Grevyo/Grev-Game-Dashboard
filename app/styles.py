@@ -76,7 +76,9 @@ def inject_styles(theme_name: str = "Dark"):
     .metric-title {{ color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }}
     .metric-value {{ font-size: 25px; line-height: 1.15; font-weight: 760; margin-top: 3px; }}
 
-    /* Global page navigation: turn the Streamlit radio into premium segmented pills */
+    /* Global page navigation: premium horizontal control (pills / segmented / radio fallback). */
+    div[data-testid="stPills"],
+    div[data-testid="stSegmentedControl"],
     div[data-testid="stRadio"][role="radiogroup"] {{
       display:flex;
       flex-wrap: wrap;
@@ -88,13 +90,19 @@ def inject_styles(theme_name: str = "Dark"):
       border-radius: 999px;
       box-shadow: 0 8px 18px rgba(0,0,0,0.18);
     }}
+    div[data-testid="stPills"] label[data-baseweb="checkbox"],
+    div[data-testid="stSegmentedControl"] label[data-baseweb="radio"],
     div[data-testid="stRadio"] label[data-baseweb="radio"] {{
       margin: 0;
       min-height: 0;
     }}
+    div[data-testid="stPills"] label[data-baseweb="checkbox"] > div:first-child,
+    div[data-testid="stSegmentedControl"] label[data-baseweb="radio"] > div:first-child,
     div[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {{
       display: none;
     }}
+    div[data-testid="stPills"] label[data-baseweb="checkbox"] > div:last-child,
+    div[data-testid="stSegmentedControl"] label[data-baseweb="radio"] > div:last-child,
     div[data-testid="stRadio"] label[data-baseweb="radio"] > div:last-child {{
       display:inline-flex;
       align-items:center;
@@ -110,12 +118,16 @@ def inject_styles(theme_name: str = "Dark"):
       transition: all .18s ease;
       cursor: pointer;
     }}
+    div[data-testid="stPills"] label[data-baseweb="checkbox"]:hover > div:last-child,
+    div[data-testid="stSegmentedControl"] label[data-baseweb="radio"]:hover > div:last-child,
     div[data-testid="stRadio"] label[data-baseweb="radio"]:hover > div:last-child {{
       color: var(--text);
       border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
       background: color-mix(in srgb, var(--surface) 74%, var(--accent) 26%);
       transform: translateY(-1px);
     }}
+    div[data-testid="stPills"] input[type="checkbox"]:checked + div,
+    div[data-testid="stSegmentedControl"] input[type="radio"]:checked + div,
     div[data-testid="stRadio"] input[type="radio"]:checked + div {{
       color: #f5f8ff;
       border-color: color-mix(in srgb, var(--accent) 75%, #ffffff 25%);
@@ -126,10 +138,14 @@ def inject_styles(theme_name: str = "Dark"):
 
     @media (max-width: 768px) {{
       .block-container {{ padding-top: 1.2rem; }}
+      div[data-testid="stPills"],
+      div[data-testid="stSegmentedControl"],
       div[data-testid="stRadio"][role="radiogroup"] {{
         border-radius: 16px;
         padding: 8px;
       }}
+      div[data-testid="stPills"] label[data-baseweb="checkbox"] > div:last-child,
+      div[data-testid="stSegmentedControl"] label[data-baseweb="radio"] > div:last-child,
       div[data-testid="stRadio"] label[data-baseweb="radio"] > div:last-child {{
         padding: 8px 12px;
         font-size: 0.8rem;
