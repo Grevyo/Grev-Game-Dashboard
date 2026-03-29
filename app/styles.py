@@ -99,11 +99,6 @@ def inject_styles(theme_name: str = "Dark"):
       gap: 8px;
       overflow: hidden;
     }}
-    .player-card-streamer {
-      min-height: 260px;
-      height: 260px;
-      justify-content: space-between;
-    }
     .player-head {{ display:flex; align-items:flex-start; gap:10px; min-height: 148px; }}
     .player-head-left {{ flex:0 0 92px; display:flex; flex-direction:column; gap:6px; }}
     .player-head-meta {{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; min-height: 0; }}
@@ -147,25 +142,6 @@ def inject_styles(theme_name: str = "Dark"):
     .fame-label {{ color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }}
     .fame-stars {{ font-size: 13px; letter-spacing: 0.08em; color: color-mix(in srgb, var(--mid) 70%, #fff 30%); }}
     .fame-value {{ color: var(--muted); font-size: 10px; }}
-    .streamer-meta-stack {
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-      min-height: 0;
-    }
-    .streamer-status-chip {
-      display:inline-flex;
-      align-items:center;
-      width: fit-content;
-      max-width: 100%;
-      padding: 4px 8px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--mid) 48%, var(--border));
-      background: color-mix(in srgb, var(--surface) 84%, var(--mid) 16%);
-      color: color-mix(in srgb, var(--text) 88%, #fff 12%);
-      font-size: 10px;
-      line-height: 1.2;
-    }
     .player-meta-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }}
     .achievement-strip {{
       display:flex;
