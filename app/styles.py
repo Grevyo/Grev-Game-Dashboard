@@ -162,11 +162,11 @@ def inject_styles(theme_name: str = "Dark"):
 
     .player-card {{
       min-height: 690px;
-      height: 690px;
+      height: auto;
       display:flex;
       flex-direction:column;
       gap: 8px;
-      overflow: hidden;
+      overflow: visible;
     }}
     .player-head {{ display:flex; align-items:flex-start; gap:10px; min-height: 148px; }}
     .player-head-left {{ flex:0 0 92px; display:flex; flex-direction:column; gap:6px; }}
@@ -218,6 +218,7 @@ def inject_styles(theme_name: str = "Dark"):
       flex-wrap: wrap;
       gap: 7px;
       min-height: 76px;
+      max-height: none;
       align-items:stretch;
       overflow: visible;
     }}
