@@ -3,7 +3,7 @@ import pandas as pd
 
 from app.components import insight_card, player_card, section_header, stat_card
 from app.achievements import achievements_for_player
-from app.data_loader import get_medisports_player_names, get_medisports_roster_df, normalize_player_key
+from app.data_loader import get_medisports_player_names, get_medisports_roster_df, normalize_player_key, normalize_side_label
 from app.descriptions import player_description
 from app.roster_split import split_roster_active_benched_streamer_transferred
 from app.filters import get_current_season
@@ -102,6 +102,54 @@ def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> 
     return str(best.iloc[0][by])
 
 
+def _best_side_for_player(df_context: pd.DataFrame, player_name: str, default: str = "N/A") -> str:
+    """
+    Compute best side from the same filtered context used for overview cards.
+    Returns N/A only when usable side-split data is genuinely unavailable.
+    """
+    if df_context.empty or "player" not in df_context.columns:
+        return default
+
+    # Resolve side from common schema variants to avoid hard-coding one input column.
+    side_col = next((c for c in ["side", "team_side", "player_side", "starting_side"] if c in df_context.columns), None)
+    if side_col is None:
+        return default
+
+    subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
+    if subset.empty:
+        return default
+
+    subset["side_norm"] = subset[side_col].map(normalize_side_label)
+    subset = subset[subset["side_norm"].isin(["Red", "Blue"])]
+    if subset.empty:
+        return default
+
+    metric_priority = ["grevscore", "rating", "impact", "kpd", "kpr"]
+    metric_col = next((col for col in metric_priority if col in subset.columns), None)
+    if metric_col is None:
+        return default
+
+    sample_col = "match_id" if "match_id" in subset.columns else None
+    if sample_col is None:
+        fallback_candidates = ["date", "opponent_team", "competition", "raw_competition_name"]
+        sample_col = next((col for col in fallback_candidates if col in subset.columns), None)
+    sample_agg = (sample_col, "nunique") if sample_col else ("side_norm", "size")
+
+    grouped = (
+        subset.groupby("side_norm", dropna=False)
+        .agg(score=(metric_col, "mean"), samples=sample_agg)
+        .query("samples > 0")
+        .reset_index()
+    )
+    if grouped.empty:
+        return default
+
+    best = grouped.sort_values(["score", "samples"], ascending=[False, False]).head(1)
+    if best.empty:
+        return default
+    return str(best.iloc[0]["side_norm"])
+
+
 def _trend_for_player(df, player_name: str) -> str:
     if df.empty or "player" not in df.columns or "grevscore" not in df.columns:
         return "Stable"
@@ -171,7 +219,7 @@ def _render_roster_cards(
                 merged["roster_bucket"] = ""
                 merged["desc"] = player_description(merged)
             merged["best_map"] = _best_map_for_player(df_context, str(row["player"]))
-            merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side") if card_variant != "streamer" else "N/A"
+            merged["best_side"] = _best_side_for_player(df_context, str(row["player"])) if card_variant != "streamer" else "N/A"
             merged["trend"] = _trend_for_player(df_context, str(row["player"])) if card_variant != "streamer" else ""
             merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"])) if card_variant != "streamer" else {}
             photo = resolve_player_photo(str(row["player"]))
