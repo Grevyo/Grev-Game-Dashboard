@@ -15,12 +15,13 @@ from app.competition import get_active_competition_col, is_grouped_mode
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.image_helpers import (
     find_competition_logo,
+    find_map_image,
     find_team_logo,
     image_data_uri,
     resolve_player_photo,
 )
 from app.styles import achievement_tier_badge
-from app.transforms import best_contexts, normalize_side_label
+from app.transforms import best_contexts
 
 
 def _player_key(name: str) -> str:
@@ -39,56 +40,9 @@ def _form_delta(p):
     return float(recent - early)
 
 
-def _score_col(df):
-    for col in ["grevscore", "rating", "form"]:
-        if col in df.columns:
-            return col
-    return None
-
-
-def _achievement_gallery_html(ach_items: list[dict]) -> str:
-    cards = []
-    for a in ach_items:
-        tier = str(a.get("tier", "")).strip().upper()
-        tier = tier if tier in {"S", "A", "B", "C"} else "C"
-        img = (
-            f"<img class='achievement-gallery-thumb' src='{a.get('image_uri')}' alt='{a.get('name','Achievement')}'/>"
-            if a.get("image_uri")
-            else "<div class='achievement-gallery-thumb achievement-gallery-thumb-fallback'>No Image</div>"
-        )
-        cards.append(
-            "<div class='achievement-gallery-card panel panel-tight accent-mid'>"
-            f"<div class='achievement-gallery-media tier-{tier}'>{img}<div class='achievement-gallery-overlay'>{achievement_tier_badge(tier)}</div></div>"
-            "<div class='achievement-gallery-body'>"
-            f"<div class='achievement-gallery-title'>{a.get('name','Achievement')}</div>"
-            f"<div class='achievement-gallery-meta'>{a.get('season_label') or normalize_season_label(a.get('season','-'))}</div>"
-            f"<div class='achievement-gallery-meta achievement-gallery-pos'>{a.get('position','-')}</div>"
-            "</div></div>"
-        )
-    return "<div class='achievement-gallery-row'>" + "".join(cards) + "</div>"
-
-
-def _render_bar_chart(df_plot, x_col: str, y_col: str, title: str, color: str, hover_cols: dict | None = None):
-    if not PLOTLY_AVAILABLE:
-        st.dataframe(df_plot, use_container_width=True, hide_index=True)
-        return
-    fig = px.bar(df_plot, x=x_col, y=y_col, title=title, color_discrete_sequence=[color], hover_data=hover_cols or {})
-    fig.update_traces(marker_line_width=0, opacity=0.92)
-    fig.update_layout(
-        height=300,
-        margin=dict(l=8, r=8, t=46, b=8),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        xaxis_title=None,
-        yaxis_title=None,
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-
 def render(ctx):
     df = get_medisports_roster_df(ctx["player_matches"], player_col="player")
     achievements = ctx["achievements"]
-    side_context = ctx.get("player_side_context", df.iloc[0:0])
     filters = ctx.get("filters", {})
     players = ctx["players"]
     team_name = ctx.get("team_name", "Medisports")
@@ -118,8 +72,7 @@ def render(ctx):
             with f1:
                 map_focus = st.multiselect("Map focus", sorted(df["map"].dropna().unique().tolist()) if "map" in df.columns else [])
             with f2:
-                side_options = sorted(side_context["side"].dropna().unique().tolist()) if "side" in side_context.columns else []
-                side_focus = st.multiselect("Side focus", side_options)
+                side_focus = st.multiselect("Side focus", sorted(df["side"].dropna().unique().tolist()) if "side" in df.columns else [])
         else:
             map_focus, side_focus = [], []
         st.markdown("</div>", unsafe_allow_html=True)
@@ -130,6 +83,9 @@ def render(ctx):
         mask &= df["date"] >= cutoff
     if map_focus and "map" in df.columns:
         mask &= df["map"].isin(map_focus)
+    if side_focus and "side" in df.columns:
+        mask &= df["side"].isin(side_focus)
+
     p = df[mask].sort_values("date")
     if p.empty:
         st.warning("Selected player has no rows in current profile scope.")
@@ -141,10 +97,7 @@ def render(ctx):
     role = str(meta.iloc[0].get("role", "")).strip() if not meta.empty else ""
 
     best_map = best_contexts(p, "map").head(1)
-    player_side_scope = side_context[side_context["player"].astype(str) == str(player)] if (not side_context.empty and "player" in side_context.columns) else side_context.iloc[0:0]
-    if side_focus and "side" in player_side_scope.columns:
-        player_side_scope = player_side_scope[player_side_scope["side"].isin(side_focus)]
-    best_side = best_contexts(player_side_scope, "side").head(1)
+    best_side = best_contexts(p, "side").head(1)
     best_map_label = str(best_map.iloc[0]["map"]) if not best_map.empty else "N/A"
     best_side_label = str(best_side.iloc[0]["side"]) if not best_side.empty else "N/A"
 
@@ -193,12 +146,20 @@ def render(ctx):
         unsafe_allow_html=True,
     )
 
-    section_header("Achievements Ribbon", "Compact accolade strip aligned with Overview card language")
+    section_header("Achievements Ribbon", "Compact accolade strip with local images")
     ach_items, ach_hidden = achievements_for_player(achievements, player, cap=6)
     if not ach_items:
         st.caption("No achievements linked for selected player.")
     else:
-        st.markdown(_achievement_gallery_html(ach_items), unsafe_allow_html=True)
+        cols = st.columns(min(3, max(1, len(ach_items))), gap="small")
+        for idx, a in enumerate(ach_items):
+            img_html = f"<img class='achievement-thumb' src='{a.get('image_uri')}' alt='Achievement image'/>" if a.get("image_uri") else ""
+            with cols[idx % len(cols)]:
+                st.markdown(
+                    f"<div class='panel panel-tight accent-mid'>{img_html}<strong>{a.get('name','Achievement')}</strong><br>"
+                    f"<span class='muted'>{a.get('position','')} • {a.get('season_label') or normalize_season_label(a.get('season','-'))}</span><br>{achievement_tier_badge(a.get('tier','-'))}</div>",
+                    unsafe_allow_html=True,
+                )
         if ach_hidden:
             st.markdown(f"<div class='muted'>+{ach_hidden} more achievements not shown in ribbon.</div>", unsafe_allow_html=True)
 
@@ -208,8 +169,8 @@ def render(ctx):
         stat_card("Signature GrevScore", f"{p['grevscore'].mean():.1f}", "Primary contribution signal", "good")
         if PLOTLY_AVAILABLE:
             fig = px.line(p, x="date", y="grevscore", title="GrevScore Trend", markers=True)
-            fig.update_traces(line_color="#21c77a", line_width=3, marker_size=7)
-            fig.update_layout(margin=dict(l=8, r=8, t=44, b=8), height=290, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+            fig.update_traces(line_color="#21c77a")
+            fig.update_layout(margin=dict(l=10, r=10, t=44, b=10), height=280)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")
@@ -235,37 +196,16 @@ def render(ctx):
 
     section_header("Lower Analytics", "Map, side, and competition context")
     c1, c2, c3 = st.columns(3, gap="small")
-    score_col = _score_col(p)
-
     with c1:
-        st.markdown("#### Score by Map")
-        if score_col and "map" in p.columns:
-            by_map = (
-                p.groupby("map", dropna=False)
-                .agg(score=(score_col, "mean"), matches=("match_id", "nunique"), rounds=("rounds_played", "sum"))
-                .reset_index()
-                .sort_values(["score", "matches"], ascending=[False, False])
-            )
-            _render_bar_chart(by_map, "map", "score", f"{score_col.title()} by Map", "#4f8dff", {"matches": True, "rounds": True, "score": ':.2f'})
-            st.dataframe(by_map.rename(columns={"score": score_col}), use_container_width=True, hide_index=True)
-        else:
-            st.caption("Map score split unavailable for this scope.")
-
+        st.markdown("#### By Map")
+        st.dataframe(best_contexts(p, "map").head(8), use_container_width=True, hide_index=True)
+        if best_map_label != "N/A":
+            map_uri = image_data_uri(find_map_image(best_map_label))
+            if map_uri:
+                st.markdown(f"<img class='map-thumb' src='{map_uri}' alt='Map image'/>", unsafe_allow_html=True)
     with c2:
-        st.markdown("#### Score by Side")
-        if not player_side_scope.empty and score_col:
-            side_plot = (
-                player_side_scope.assign(side=player_side_scope["side"].map(normalize_side_label).fillna(player_side_scope["side"]))
-                .groupby("side", dropna=False)
-                .agg(score=("grevscore", "mean"), matches=("match_id", "nunique"), side_rounds=("side_rounds", "sum"))
-                .reset_index()
-                .sort_values("score", ascending=False)
-            )
-            _render_bar_chart(side_plot, "side", "score", "GrevScore by Side", "#f5c542", {"matches": True, "side_rounds": True, "score": ':.2f'})
-            st.dataframe(side_plot, use_container_width=True, hide_index=True)
-        else:
-            st.caption("No usable side-split rows in current profile scope.")
-
+        st.markdown("#### By Side")
+        st.dataframe(best_contexts(p, "side").head(8), use_container_width=True, hide_index=True)
     with c3:
         st.markdown("#### By Competition")
         by_comp_key = get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))
