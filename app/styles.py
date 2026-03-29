@@ -198,17 +198,43 @@ def inject_styles(theme_name: str = "Dark"):
       gap: 1px;
       background: linear-gradient(180deg, transparent 0%, rgba(8,12,20,0.58) 100%);
     }}
+    .achievement-season-top {{
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: calc(100% - 10px);
+      padding: 1px 6px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
+      background: color-mix(in srgb, rgba(7,12,24,0.9) 86%, #9fb8ff 14%);
+      color: #f5f8ff;
+      font-size: 8px;
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+      z-index: 2;
+    }}
     .achievement-tier {{
       padding: 0 4px; border-radius: 999px; font-size: 8px; font-weight: 750; letter-spacing: 0.03em;
       border: 1px solid currentColor; align-self: flex-start;
     }}
-    .achievement-season {{
+    .achievement-event-title {{
       color: #eef2ff;
       font-size: 8px;
-      line-height: 1.1;
+      line-height: 1.15;
       font-weight: 600;
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-      white-space: nowrap;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      word-break: break-word;
+      text-wrap: balance;
     }}
     .achievement-overflow {{
       flex: 0 0 68px;
