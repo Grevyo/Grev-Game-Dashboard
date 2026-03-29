@@ -138,12 +138,21 @@ def apply_filters(df, filters):
 
     season_col = "resolved_season"
     if filters.get("season") and season_col in out.columns:
-        selected_seasons = {str(v) for v in filters["season"]}
-        valid = {s for s in selected_seasons if s != "Unspecified"}
+        selected_seasons = [str(v) for v in filters["season"]]
         include_unspecified = "Unspecified" in selected_seasons
-        season_mask = out[season_col].astype(str).isin(valid)
+        selected_ints = []
+        for season in selected_seasons:
+            if season == "Unspecified":
+                continue
+            try:
+                selected_ints.append(int(season))
+            except (TypeError, ValueError):
+                continue
+
+        resolved_numeric = pd.to_numeric(out[season_col], errors="coerce")
+        season_mask = resolved_numeric.isin(selected_ints)
         if include_unspecified:
-            season_mask = season_mask | out[season_col].isna()
+            season_mask = season_mask | resolved_numeric.isna()
         out = out[season_mask]
 
     comp_col = filters.get("competition_col") or get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))

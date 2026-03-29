@@ -12,7 +12,6 @@ from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
 from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
-from app.grouping import build_season_resolution_debug_table
 
 
 def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> str:
@@ -155,9 +154,11 @@ def render(ctx):
         return
 
     full_medisports_matches = get_medisports_roster_df(full_history_df, player_col="player")
+    selected_medisports_matches = get_medisports_roster_df(df, player_col="player")
     active_summary, benched_summary, streamer_summary, transferred_summary, roster_bucket_debug = split_roster_active_benched_streamer_transferred(
         summary=summary,
         player_match_counts=player_match_counts,
+        selected_medisports_matches=selected_medisports_matches,
         full_medisports_matches=full_medisports_matches,
         players_meta=players_meta,
         active_threshold=0.10,
@@ -257,9 +258,32 @@ def render(ctx):
     with w3:
         insight_card("Focus Note", "Use map veto prep to prioritize strongest map clusters from current filter scope.", "info")
 
-    section_header("Season Resolution Debug", "Temporary validation table for row-level season assignment")
-    debug_df = build_season_resolution_debug_table(full_df)
-    st.dataframe(debug_df, use_container_width=True, hide_index=True)
+    section_header("Season Filter Debug", "Temporary validation table for selected-season row visibility")
+    selected_seasons = filters.get("season") or []
+    selected_label = ",".join(map(str, selected_seasons)) if selected_seasons else "All"
+    selected_ints = []
+    for value in selected_seasons:
+        try:
+            selected_ints.append(int(str(value)))
+        except (TypeError, ValueError):
+            continue
+    resolved_numeric = pd.to_numeric(full_history_df.get("resolved_season"), errors="coerce")
+    if selected_ints:
+        visibility_mask = resolved_numeric.isin(selected_ints)
+    else:
+        visibility_mask = pd.Series([True] * len(full_history_df), index=full_history_df.index)
+
+    season_filter_debug = pd.DataFrame(
+        {
+            "competition": full_history_df.get("raw_competition_name", full_history_df.get("competition")),
+            "date": full_history_df.get("date"),
+            "resolved_season": full_history_df.get("resolved_season"),
+            "selected_season": selected_label,
+            "row_visible_after_season_filter": visibility_mask,
+        }
+    )
+    season_filter_debug = season_filter_debug.sort_values("date", ascending=False, na_position="last").reset_index(drop=True)
+    st.dataframe(season_filter_debug, use_container_width=True, hide_index=True)
 
     section_header("Roster Bucket Debug", "Temporary validation table for roster bucket assignments")
     st.dataframe(roster_bucket_debug, use_container_width=True, hide_index=True)
