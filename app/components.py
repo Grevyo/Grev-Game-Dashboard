@@ -6,6 +6,8 @@ from app.metrics import classify_quality, stat_tone
 from app.presentation_helpers import fame_to_stars, nationality_label
 from app.styles import achievement_tier_badge
 
+_HIDDEN_META_VALUES = {"", "nan", "none", "null", "div"}
+
 
 def section_header(title: str, subtitle: str = ""):
     st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
@@ -127,7 +129,7 @@ def player_card(row: dict):
     )
     logo_visual = f"<img class='team-mini-logo' src='{logo_uri}' alt='Team logo'/>" if logo_uri else ""
 
-    fame_stars, fame_numeric = fame_to_stars(row.get("fame"))
+    fame_stars, fame_numeric = fame_to_stars(card_meta["fame"])
     fame_html = (
         f"<div class='fame-line'><span class='fame-label'>Fame</span><span class='fame-stars'>{fame_stars}</span><span class='fame-value'>{fame_numeric}</span></div>"
         if fame_stars
