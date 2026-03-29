@@ -8,10 +8,6 @@ from app.metrics import classify_quality, stat_tone
 from app.presentation_helpers import fame_to_stars, nationality_label
 from app.styles import achievement_tier_badge
 
-_OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED = False
-_OVERVIEW_CARD_DICT_DEBUG_EMITTED = False
-
-
 def section_header(title: str, subtitle: str = ""):
     st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
     if subtitle:
@@ -121,8 +117,7 @@ def trend_chip(trend: str) -> str:
     return f"<span class='chip chip-{tone}'>{icon} {trend}</span>"
 
 
-def render_achievement_mini_tile(achievement: dict) -> str:
-    global _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED
+def render_achievement_mini_tile(achievement: dict, debug_prefix: str = "", debug_name: str = "") -> str:
     tier = str(achievement.get("tier", "")).strip().upper()
     tier = tier if tier in {"S", "A", "B", "C"} else "C"
     image_value = achievement.get("image_uri")
@@ -134,28 +129,19 @@ def render_achievement_mini_tile(achievement: dict) -> str:
     )
     season_label = str(achievement.get("season_label", "")).strip()
     event_title = str(achievement.get("name", "")).strip()
+    debug_label_html = f"<div>{html.escape(debug_prefix)}</div>" if debug_prefix else ""
+    debug_name_html = f"<div>{html.escape(debug_name)}</div>" if debug_name else ""
     card_html = (
         f"<div class='achievement-tile tier-{tier}'>"
         f"{thumb}"
+        f"{debug_label_html}"
+        f"{debug_name_html}"
         f"<div class='achievement-season-top'>{season_label}</div>"
         f"<div class='achievement-tile-overlay'>"
         f"{achievement_tier_badge(tier)}"
         f"<span class='achievement-event-title' title='{event_title}'>{event_title}</span>"
         f"</div></div>"
     )
-
-    if "cpl open" in event_title.casefold() and not _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED:
-        print(
-            "[OVERVIEW_ACHIEVEMENT_RENDER_DEBUG]",
-            {
-                "achievement_name": achievement.get("name"),
-                "image_uri_truthy": has_image_branch,
-                "render_branch": "image" if has_image_branch else "fallback",
-                "image_src_preview": str(image_value or "")[:72],
-                "image_src_length": len(image_value) if isinstance(image_value, str) else 0,
-            },
-        )
-        _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED = True
     return card_html
 
 
@@ -247,23 +233,30 @@ def player_card(row: dict):
         for label, val, formatted in stat_items
     )
     ach_items = row.get("achievements", []) or []
-    global _OVERVIEW_CARD_DICT_DEBUG_EMITTED
-    if not _OVERVIEW_CARD_DICT_DEBUG_EMITTED:
-        cpl_open_item = next((a for a in ach_items if "cpl open" in str(a.get("name", "")).casefold()), None)
-        if cpl_open_item:
-            print(
-                "[OVERVIEW_CARD_ACHIEVEMENT_DICT_DEBUG]",
-                {
-                    "achievement_dict": cpl_open_item,
-                    "name": cpl_open_item.get("name"),
-                    "season": cpl_open_item.get("season"),
-                    "tier": cpl_open_item.get("tier"),
-                    "image_uri_present": bool(cpl_open_item.get("image_uri")),
-                },
-            )
-            _OVERVIEW_CARD_DICT_DEBUG_EMITTED = True
+    player_name_exact = str(row.get("player", "")).strip()
+    is_debug_player = player_name_exact == "ⓜ | 8eeR"
+    debug_block_html = ""
+    if is_debug_player:
+        debug_names = [str(item.get("name", "")).strip() for item in ach_items[:4]]
+        debug_names_lines = "".join(
+            f"<div>{idx}. {html.escape(name)}</div>"
+            for idx, name in enumerate(debug_names, start=1)
+        )
+        debug_block_html = (
+            "<div>"
+            f"<div>DEBUG PLAYER: {html.escape(player_name_exact)}</div>"
+            f"<div>DEBUG ACH COUNT: {len(ach_items)}</div>"
+            "<div>DEBUG ACH NAMES:</div>"
+            f"{debug_names_lines}"
+            "</div>"
+        )
     ach_html = "".join(
-        render_achievement_mini_tile(a) for a in ach_items
+        render_achievement_mini_tile(
+            a,
+            debug_prefix=(f"TILE {idx}" if is_debug_player else ""),
+            debug_name=(str(a.get("name", "")).strip() if is_debug_player else ""),
+        )
+        for idx, a in enumerate(ach_items, start=1)
     )
 
     tier_order = ["S", "A", "B", "C"]
@@ -272,7 +265,11 @@ def player_card(row: dict):
     tier_html = "<div class='grev-tier-strip'><div class='grev-tier-label'>GrevScore vs Tier Bands</div>" f"<div class='grev-tier-row'>{tier_boxes}</div></div>"
     if not ach_html:
         ach_html = "<div class='achievement-empty'>No achievements recorded</div>"
-    achievements_block_html = f"<div class='achievement-strip achievement-strip-featured'>{ach_html}</div>" if ach_html else ""
+    achievements_block_html = (
+        f"<div class='achievement-strip achievement-strip-featured'>{debug_block_html}{ach_html}</div>"
+        if ach_html
+        else ""
+    )
 
     trend_html = trend_chip(row.get("trend", "Stable"))
     context_html = (
