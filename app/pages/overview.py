@@ -7,6 +7,7 @@ from app.components import insight_card, player_card, section_header, stat_card
 from app.achievements import achievements_for_player
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.descriptions import player_description
+from app.roster_split import split_roster_active_benched_transferred
 from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
 from app.metrics import trend_label
@@ -39,17 +40,6 @@ def _player_key(name: str) -> str:
     return text.casefold()
 
 
-def split_roster_active_vs_benched(summary: pd.DataFrame, player_match_counts: pd.DataFrame, threshold: float = 0.10):
-    if summary.empty:
-        return summary.copy(), summary.copy()
-    counts = player_match_counts[["player", "appearance_share"]].copy() if not player_match_counts.empty else pd.DataFrame(columns=["player", "appearance_share"])
-    merged = summary.merge(counts, on="player", how="left")
-    merged["appearance_share"] = merged["appearance_share"].fillna(0.0)
-    active_summary = merged[merged["appearance_share"] > threshold].copy()
-    benched_summary = merged[merged["appearance_share"] <= threshold].copy()
-    return active_summary, benched_summary
-
-
 def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, float]:
     if df_context.empty or "player" not in df_context.columns or "tier" not in df_context.columns or "grevscore" not in df_context.columns:
         return {}
@@ -68,6 +58,7 @@ def _render_roster_cards(
     player_match_counts: pd.DataFrame,
     team_logo: str | None,
     achievements_df,
+    card_variant: str = "default",
 ):
     rows = list(summary.iterrows())
     for i in range(0, len(rows), 5):
@@ -92,7 +83,8 @@ def _render_roster_cards(
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
 
             merged["team_tag"] = "Medisports"
-            merged["desc"] = player_description(row)
+            merged["card_variant"] = card_variant
+            merged["desc"] = player_description(merged)
             merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map")
             merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side")
             merged["trend"] = _trend_for_player(df_context, str(row["player"]))
@@ -124,12 +116,8 @@ def render(ctx):
         if auto_current_season and "season" in df_base.columns:
             df_base = df_base[df_base["season"].astype(str) == auto_current_season].copy()
 
-    control_col, meta_col = st.columns([1.3, 2.5], gap="small")
-    with control_col:
-        active_only = st.toggle("Active roster only (>10% usage)", value=True, key="overview_active_roster")
-    with meta_col:
-        if auto_current_season:
-            st.markdown(f"<span class='chip chip-mid'>Defaulted to Season {auto_current_season}</span>", unsafe_allow_html=True)
+    if auto_current_season:
+        st.markdown(f"<span class='chip chip-mid'>Defaulted to Season {auto_current_season}</span>", unsafe_allow_html=True)
 
     total_matches = int(df_base["match_id"].nunique()) if "match_id" in df_base.columns else 0
     player_match_counts = (
@@ -142,7 +130,6 @@ def render(ctx):
     else:
         player_match_counts["appearance_share"] = 0.0
 
-    active_players = set(player_match_counts.loc[player_match_counts["appearance_share"] > 0.10, "player"].astype(str))
     df = df_base.copy()
 
     if df.empty:
@@ -164,8 +151,14 @@ def render(ctx):
         st.warning("No Medisports roster available for Overview.")
         return
 
-    active_summary, benched_summary = split_roster_active_vs_benched(summary, player_match_counts)
-    display_summary = active_summary if active_only else summary
+    full_medisports_matches = get_medisports_roster_df(full_df, player_col="player")
+    active_summary, benched_summary, transferred_summary = split_roster_active_benched_transferred(
+        summary=summary,
+        player_match_counts=player_match_counts,
+        full_medisports_matches=full_medisports_matches,
+        players_meta=players_meta,
+        active_threshold=0.10,
+    )
 
     seasons = filters.get("season") or ([f"Season {auto_current_season}"] if auto_current_season else ["All seasons"])
     maps = filters.get("map") or ["All maps"]
@@ -187,8 +180,9 @@ def render(ctx):
                 </div>
               </div>
               <div>
-                <span class='chip chip-good'>Roster: {'Active only' if active_only else 'All roster'}</span>
-                <span class='chip'>Medisports Roster: {display_summary['player'].nunique()}</span>
+                <span class='chip chip-good'>Active: {active_summary['player'].nunique()}</span>
+                <span class='chip chip-poor'>Benched/Academy: {benched_summary['player'].nunique()}</span>
+                <span class='chip chip-bad'>Transferred: {transferred_summary['player'].nunique()}</span>
               </div>
             </div>
         </div>
@@ -198,17 +192,18 @@ def render(ctx):
 
     k1, k2, k3, k4 = st.columns(4, gap="small")
     with k1:
-        stat_card("Squad Avg GrevScore", f"{display_summary['grevscore'].mean():.2f}", "Current output index")
+        stat_card("Squad Avg GrevScore", f"{summary['grevscore'].mean():.2f}", "Current output index")
     with k2:
-        stat_card("Squad Avg Rating", f"{display_summary['rating'].mean():.2f}", "Form-normalized")
+        stat_card("Squad Avg Rating", f"{summary['rating'].mean():.2f}", "Form-normalized")
     with k3:
-        stat_card("Avg Impact", f"{display_summary['impact'].mean():.1f}", "Kills + clutch value")
+        stat_card("Avg Impact", f"{summary['impact'].mean():.1f}", "Kills + clutch value")
     with k4:
         stat_card("Tracked Matches", int(df["match_id"].nunique()), "Selected context window")
 
-    top_player = display_summary.sort_values("grevscore", ascending=False).iloc[0]
-    improved = display_summary.sort_values("form", ascending=False).iloc[0]
-    coldest = display_summary.sort_values("form", ascending=True).iloc[0]
+    insight_pool = active_summary if not active_summary.empty else summary
+    top_player = insight_pool.sort_values("grevscore", ascending=False).iloc[0]
+    improved = insight_pool.sort_values("form", ascending=False).iloc[0]
+    coldest = insight_pool.sort_values("form", ascending=True).iloc[0]
 
     section_header("Team Pulse", "High-signal summary strip")
     p1, p2, p3, p4 = st.columns(4, gap="small")
@@ -221,24 +216,27 @@ def render(ctx):
     with p4:
         insight_card("Avg Team Impact", f"Team baseline is {summary['impact'].mean():.1f} impact per match sample.", "warn")
 
-    active_title = "Active Roster" if active_only else "Main Roster"
-    active_subtitle = "Players appearing in more than 10% of matches" if active_only else "Compact equal-height profile cards"
-    section_header(active_title, active_subtitle)
-    if display_summary.empty:
-        st.info("No players qualify for the current roster mode.")
+    section_header("Active Roster", "Primary five-man usage core (>10% match appearance share in current context)")
+    if active_summary.empty:
+        st.info("No players currently qualify for Active Roster in this filter context.")
     else:
         st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
-        _render_roster_cards(display_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
+        _render_roster_cards(active_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if active_only:
-        section_header("Benched / Academy Unit", "Separated development bench: players at or below 10% appearance share")
-        if benched_summary.empty:
-            st.info("No Benched / Academy players in this filtered context.")
-        else:
-            st.markdown("<div class='roster-section roster-section-academy'>", unsafe_allow_html=True)
-            _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
-            st.markdown("</div>", unsafe_allow_html=True)
+    section_header("Benched / Academy", "Secondary squad view — lower-usage players in the current filtered context")
+    if benched_summary.empty:
+        st.info("No Benched / Academy players in this filtered context.")
+    else:
+        st.markdown("<div class='roster-section roster-section-academy'>", unsafe_allow_html=True)
+        _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    if not transferred_summary.empty:
+        section_header("Transferred", "Legacy/archive squad profiles with no current competitive usage signal")
+        st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
+        _render_roster_cards(transferred_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     section_header("Bottom Insights", "Compact coaching cues")
     w1, w2, w3 = st.columns(3, gap="small")

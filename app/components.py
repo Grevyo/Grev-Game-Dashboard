@@ -44,15 +44,6 @@ def _tone_from_score(score: float) -> str:
 
 
 
-def grevscore_tier(score: float) -> str:
-    if score >= 1.4:
-        return "S"
-    if score >= 1.1:
-        return "A"
-    if score >= 0.9:
-        return "B"
-    return "C"
-
 
 def _player_note(row: dict) -> str:
     custom_desc = str(row.get("desc", "")).strip()
@@ -93,6 +84,16 @@ def render_achievement_mini_tile(achievement: dict) -> str:
         f"{achievement_tier_badge(tier)}"
         f"<span class='achievement-season'>{season_label}</span>"
         f"</div></div>"
+    )
+
+
+def _tier_box_html(tier: str, score: float | None) -> str:
+    display = f"{score:.2f}" if isinstance(score, (int, float)) else "n/a"
+    return (
+        f"<div class='grev-tier-box grev-tier-{tier}'>"
+        f"<span class='tier-name'>vs {tier}</span>"
+        f"<span class='tier-score'>{display}</span>"
+        "</div>"
     )
 
 
@@ -142,17 +143,10 @@ def player_card(row: dict):
 
     tier_order = ["S", "A", "B", "C"]
     tier_grevscores = row.get("tier_grevscores", {}) or {}
-    current_tier = grevscore_tier(grev)
-    tier_boxes = "".join(
-        f"<div class='grev-tier-box{' active' if t == current_tier else ''}'>"
-        f"<span class='tier-name'>{t}</span>"
-        f"<span class='tier-score'>{f'{tier_grevscores[t]:.2f}' if t in tier_grevscores else '--'}</span>"
-        f"</div>"
-        for t in tier_order
-    )
+    tier_boxes = "".join(_tier_box_html(t, tier_grevscores.get(t)) for t in tier_order)
     tier_html = (
         "<div class='grev-tier-strip'>"
-        "<div class='grev-tier-label'>GrevScore by Tier</div>"
+        "<div class='grev-tier-label'>GrevScore vs Tier Bands</div>"
         f"<div class='grev-tier-row'>{tier_boxes}<div class='grev-tier-score'>Overall {grev:.2f}</div></div>"
         "</div>"
     )
@@ -162,7 +156,7 @@ def player_card(row: dict):
         ach_html = "<div class='achievement-empty'>No achievements recorded</div>"
 
     card_html = f"""
-    <div class='panel player-card accent-{tone}'>
+    <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') == 'subdued' else ''}'>
         <div class='player-head'>
           <div class='player-head-left'>
             {profile_visual}
@@ -184,7 +178,7 @@ def player_card(row: dict):
         <div class='achievement-strip achievement-strip-featured'>{ach_html}</div>
         <div class='stats-grid'>{stats_html}</div>
         {tier_html}
-        <p class='player-card-note'>{_player_note(row)}</p>
+        <div class='player-card-bottom'><p class='player-card-note'>{_player_note(row)}</p></div>
     </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
