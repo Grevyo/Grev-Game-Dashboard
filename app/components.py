@@ -134,9 +134,22 @@ def render_achievement_mini_tile(achievement: dict) -> str:
     )
     season_label = str(achievement.get("season_label", "")).strip()
     event_title = str(achievement.get("name", "")).strip()
+    is_cpl_open = "cpl open" in event_title.casefold()
+    tile_classes = f"achievement-tile tier-{tier}"
+    if is_cpl_open:
+        tile_classes += " cpl-open-debug"
+    position_label = str(achievement.get("position", "")).strip()
+    cpl_debug_chrome = (
+        "<div class='cpl-open-debug-top-badge'>CPL OPEN</div>"
+        f"<div class='cpl-open-debug-bottom-badge' title='{html.escape(event_title)}'>{html.escape(event_title)}</div>"
+        f"<div class='cpl-open-debug-position'>{html.escape(position_label or 'N/A')}</div>"
+        if is_cpl_open
+        else ""
+    )
     card_html = (
-        f"<div class='achievement-tile tier-{tier}'>"
+        f"<div class='{tile_classes}'>"
         f"{thumb}"
+        f"{cpl_debug_chrome}"
         f"<div class='achievement-season-top'>{season_label}</div>"
         f"<div class='achievement-tile-overlay'>"
         f"{achievement_tier_badge(tier)}"
@@ -144,7 +157,7 @@ def render_achievement_mini_tile(achievement: dict) -> str:
         f"</div></div>"
     )
 
-    if "cpl open" in event_title.casefold() and not _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED:
+    if is_cpl_open and not _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED:
         print(
             "[OVERVIEW_ACHIEVEMENT_RENDER_DEBUG]",
             {
