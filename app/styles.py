@@ -214,7 +214,7 @@ def inject_styles(theme_name: str = "Dark"):
     .player-meta-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }}
     .achievement-strip {{
       display:grid;
-      grid-template-columns: repeat(2, minmax(84px, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 7px;
       min-height: 0;
       max-height: none;
@@ -236,7 +236,7 @@ def inject_styles(theme_name: str = "Dark"):
       position: relative;
       width: 100%;
       min-width: 0;
-      height: 96px;
+      height: 76px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
@@ -262,9 +262,9 @@ def inject_styles(theme_name: str = "Dark"):
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      padding: 6px 6px 5px;
-      gap: 3px;
-      background: linear-gradient(180deg, rgba(8,12,20,0.06) 0%, rgba(8,12,20,0.84) 100%);
+      padding: 4px 4px 3px;
+      gap: 1px;
+      background: linear-gradient(180deg, transparent 0%, rgba(8,12,20,0.58) 100%);
     }}
     .achievement-season-top {{
       position: absolute;
@@ -277,7 +277,7 @@ def inject_styles(theme_name: str = "Dark"):
       border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
       background: color-mix(in srgb, rgba(7,12,24,0.9) 86%, #9fb8ff 14%);
       color: #f5f8ff;
-      font-size: 9px;
+      font-size: 8px;
       line-height: 1.1;
       font-weight: 700;
       letter-spacing: 0.02em;
@@ -293,9 +293,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-event-title {{
       color: #eef2ff;
-      font-size: 10.5px;
-      line-height: 1.18;
-      font-weight: 700;
+      font-size: 8px;
+      line-height: 1.15;
+      font-weight: 600;
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
       overflow: hidden;
       display: -webkit-box;
@@ -304,27 +304,10 @@ def inject_styles(theme_name: str = "Dark"):
       word-break: break-word;
       text-wrap: balance;
     }}
-    .achievement-placement-chip {{
-      align-self: flex-start;
-      padding: 1px 6px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, #ffffff 36%, transparent);
-      background: color-mix(in srgb, rgba(6,10,18,0.9) 78%, #d6e0ff 22%);
-      color: #f4f8ff;
-      font-size: 9px;
-      line-height: 1.15;
-      font-weight: 760;
-      letter-spacing: 0.02em;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.55);
-      max-width: 100%;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }}
     .achievement-overflow {{
       width: 100%;
       min-width: 0;
-      height: 96px;
+      height: 76px;
       display:flex;
       align-items:center;
       justify-content:center;
