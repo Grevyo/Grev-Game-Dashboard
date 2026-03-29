@@ -146,19 +146,92 @@ def resolve_transferred_logo(new_team: str | None) -> str | None:
 
 CPL_OPEN_EVENT_PATTERN = re.compile(
     r"""
-    \bcpl\s*open\b            # event family name
-    (?:\s+tournament\b)?       # optional legacy token
-    [^\d]{0,8}                    # optional separators before the number (space, -, :, etc.)
-    \d+(?:\.\d+)+\b          # event instance number like 9.1 or 15.31
+    \bcpl\s+open\s+            # event family name
+    \d+(?:\.\d+)?              # event number like 3, 9.1, 15.31
+    \b
     """,
     flags=re.IGNORECASE | re.VERBOSE,
 )
 CPL_OPEN_PLACEMENT_IMAGE = {
-    "1st": "CPLOpen1.png",
-    "2nd": "CPLOpen2.png",
-    "3rd": "CPLOpen3.png",
-    "4th": "CPLOpen4.png",
+    1: "CPLOpen1.png",
+    2: "CPLOpen2.png",
+    3: "CPLOpen3.png",
+    4: "CPLOpen4.png",
 }
+
+
+def normalize_placement_value(placement: str | int | float | None) -> int | None:
+    text = str(placement or "").strip().casefold()
+    if not text:
+        return None
+
+    text = text.replace(" ", "")
+    text = re.sub(r"^[#]+", "", text)
+
+    digit_match = re.search(r"\d+", text)
+    if digit_match:
+        value = int(digit_match.group(0))
+        return value if value > 0 else None
+
+    word_map = {
+        "first": 1,
+        "second": 2,
+        "third": 3,
+        "fourth": 4,
+    }
+    return word_map.get(text)
+
+
+def resolve_achievement_image(
+    link_or_name: str | None,
+    achievement_name: str | None = None,
+    placement: str | int | float | None = None,
+) -> dict[str, str | bool | int | None]:
+    event_name = str(achievement_name or link_or_name or "").strip()
+    placement_normalized = normalize_placement_value(placement)
+    cpl_open_matched = bool(event_name and CPL_OPEN_EVENT_PATTERN.search(event_name))
+
+    selected_filename = None
+    resolved_path = None
+    exists = False
+    if cpl_open_matched and placement_normalized in CPL_OPEN_PLACEMENT_IMAGE:
+        selected_filename = CPL_OPEN_PLACEMENT_IMAGE[placement_normalized]
+        candidate_path = IMAGES["achievements"] / selected_filename
+        resolved_path = str(candidate_path)
+        exists = candidate_path.exists() and candidate_path.suffix.lower() in SUPPORTED_EXTENSIONS
+        if exists:
+            return {
+                "final_path": resolved_path,
+                "event_name": event_name,
+                "placement_raw": None if placement is None else str(placement),
+                "placement_normalized": placement_normalized,
+                "cpl_open_match": cpl_open_matched,
+                "selected_filename": selected_filename,
+                "resolved_path": resolved_path,
+                "resolved_exists": exists,
+                "source": "cpl_open_position_map",
+            }
+
+    fallback_path = None
+    if link_or_name:
+        file_name = Path(str(link_or_name)).name
+        direct = IMAGES["achievements"] / file_name
+        if direct.exists() and direct.suffix.lower() in SUPPORTED_EXTENSIONS:
+            fallback_path = str(direct)
+        else:
+            fallback_path = _lookup_asset("achievements", file_name or link_or_name)
+
+    return {
+        "final_path": fallback_path,
+        "event_name": event_name,
+        "placement_raw": None if placement is None else str(placement),
+        "placement_normalized": placement_normalized,
+        "cpl_open_match": cpl_open_matched,
+        "selected_filename": selected_filename,
+        "resolved_path": resolved_path,
+        "resolved_exists": exists,
+        "source": "fallback",
+    }
 
 
 def find_achievement_image(
@@ -166,22 +239,11 @@ def find_achievement_image(
     achievement_name: str | None = None,
     placement: str | None = None,
 ) -> str | None:
-    event_name = str(achievement_name or link_or_name or "").strip()
-    placement_key = str(placement or "").strip().casefold()
-    if event_name and placement_key and CPL_OPEN_EVENT_PATTERN.search(event_name):
-        cpl_open_image = CPL_OPEN_PLACEMENT_IMAGE.get(placement_key)
-        if cpl_open_image:
-            cpl_open_path = IMAGES["achievements"] / cpl_open_image
-            if cpl_open_path.exists() and cpl_open_path.suffix.lower() in SUPPORTED_EXTENSIONS:
-                return str(cpl_open_path)
-
-    if not link_or_name:
-        return None
-    file_name = Path(str(link_or_name)).name
-    direct = IMAGES["achievements"] / file_name
-    if direct.exists() and direct.suffix.lower() in SUPPORTED_EXTENSIONS:
-        return str(direct)
-    return _lookup_asset("achievements", file_name or link_or_name)
+    return resolve_achievement_image(
+        link_or_name=link_or_name,
+        achievement_name=achievement_name,
+        placement=placement,
+    ).get("final_path")
 
 
 def find_map_image(map_name: str | None) -> str | None:
