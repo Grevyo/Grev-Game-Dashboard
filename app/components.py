@@ -114,10 +114,11 @@ def player_card(row: dict):
     )
     logo_visual = f"<img class='team-mini-logo' src='{logo_uri}' alt='Team logo'/>" if logo_uri else ""
 
-    fame_stars, fame_numeric = fame_to_stars(row.get("fame"))
+    fame_value = _clean_card_meta_value(row.get("fame"))
+    fame_stars, fame_numeric = fame_to_stars(fame_value)
     fame_html = (
         f"<div class='fame-line'><span class='fame-label'>Fame</span><span class='fame-stars'>{fame_stars}</span><span class='fame-value'>{fame_numeric}</span></div>"
-        if fame_stars
+        if fame_stars and fame_numeric
         else ""
     )
 
