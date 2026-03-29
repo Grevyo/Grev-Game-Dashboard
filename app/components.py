@@ -179,6 +179,12 @@ def player_card(row: dict):
     if not ach_html:
         ach_html = "<div class='achievement-empty'>No achievements recorded</div>"
 
+    safe_identity_line = html.escape(str(identity_line))
+    safe_role_line = html.escape(str(role_line))
+    safe_best_map = html.escape(str(row.get("best_map", "N/A")))
+    safe_best_side = html.escape(str(row.get("best_side", "N/A")))
+    safe_player_note = html.escape(_player_note(row))
+
     card_html = f"""
     <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') == 'subdued' else ''}'>
         <div class='player-head'>
@@ -193,16 +199,16 @@ def player_card(row: dict):
               </div>
               <div>{logo_visual}</div>
             </div>
-            <p class='identity-line'>{identity_line}</p>
-            <p class='identity-line'>{role_line}</p>
+            <p class='identity-line'>{safe_identity_line}</p>
+            <p class='identity-line'>{safe_role_line}</p>
             {fame_html}
-            <div class='player-meta-row'><span class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></span></div>
+            <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Best side <strong>{safe_best_side}</strong></span></div>
           </div>
         </div>
         <div class='achievement-strip achievement-strip-featured'>{ach_html}</div>
         <div class='stats-grid'>{stats_html}</div>
         {tier_html}
-        <div class='player-card-bottom'><p class='player-card-note'>{_player_note(row)}</p></div>
+        <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
     </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
