@@ -85,7 +85,9 @@ def _identity_line_text(row: dict, is_streamer_card: bool) -> str:
         return text
 
     primary = _clean_identity_source(row.get("nationality"))
-    fallback = "" if is_streamer_card else _clean_identity_source(row.get("country"))
+    fallback = _clean_identity_source(row.get("country"))
+    if is_streamer_card:
+        return primary or fallback or "Nationality N/A"
     safe_identity = nationality_label(primary or fallback)
     return _strip_tags_to_text(safe_identity) or "Nationality N/A"
 
