@@ -50,7 +50,25 @@ def split_roster_active_vs_benched(summary: pd.DataFrame, player_match_counts: p
     return active_summary, benched_summary
 
 
-def _render_roster_cards(summary: pd.DataFrame, df_context: pd.DataFrame, players_meta: pd.DataFrame, player_match_counts: pd.DataFrame, team_logo: str | None, achievements_df):
+def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, float]:
+    if df_context.empty or "player" not in df_context.columns or "tier" not in df_context.columns or "grevscore" not in df_context.columns:
+        return {}
+    tier_summary = (
+        df_context[df_context["player"].astype(str) == str(player_name)]
+        .groupby("tier", dropna=False)["grevscore"]
+        .mean()
+    )
+    return {str(tier).upper(): float(score) for tier, score in tier_summary.items()}
+
+
+def _render_roster_cards(
+    summary: pd.DataFrame,
+    df_context: pd.DataFrame,
+    players_meta: pd.DataFrame,
+    player_match_counts: pd.DataFrame,
+    team_logo: str | None,
+    achievements_df,
+):
     rows = list(summary.iterrows())
     for i in range(0, len(rows), 5):
         cols = st.columns(5, gap="small")
@@ -78,6 +96,7 @@ def _render_roster_cards(summary: pd.DataFrame, df_context: pd.DataFrame, player
             merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map")
             merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side")
             merged["trend"] = _trend_for_player(df_context, str(row["player"]))
+            merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"]))
             photo = resolve_player_photo(str(row["player"]))
             merged["photo_uri"] = image_data_uri(photo.get("path"))
             merged["team_logo_uri"] = team_logo
@@ -202,20 +221,24 @@ def render(ctx):
     with p4:
         insight_card("Avg Team Impact", f"Team baseline is {summary['impact'].mean():.1f} impact per match sample.", "warn")
 
-    active_title = "Active Roster" if active_only else "Main Roster Grid"
+    active_title = "Active Roster" if active_only else "Main Roster"
     active_subtitle = "Players appearing in more than 10% of matches" if active_only else "Compact equal-height profile cards"
     section_header(active_title, active_subtitle)
     if display_summary.empty:
         st.info("No players qualify for the current roster mode.")
     else:
+        st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
         _render_roster_cards(display_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if active_only:
-        section_header("Benched / Academy", "Medisports players at or below 10% appearance share")
+        section_header("Benched / Academy Unit", "Separated development bench: players at or below 10% appearance share")
         if benched_summary.empty:
             st.info("No Benched / Academy players in this filtered context.")
         else:
+            st.markdown("<div class='roster-section roster-section-academy'>", unsafe_allow_html=True)
             _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
+            st.markdown("</div>", unsafe_allow_html=True)
 
     section_header("Bottom Insights", "Compact coaching cues")
     w1, w2, w3 = st.columns(3, gap="small")

@@ -55,6 +55,9 @@ def grevscore_tier(score: float) -> str:
 
 
 def _player_note(row: dict) -> str:
+    custom_desc = str(row.get("desc", "")).strip()
+    if custom_desc:
+        return custom_desc
     grev = float(row.get("grevscore", 0) or 0)
     kpd = float(row.get("kpd", 0) or 0)
     trend = str(row.get("trend", "Stable") or "Stable")
@@ -137,16 +140,20 @@ def player_card(row: dict):
     ach_items = row.get("achievements", []) or []
     ach_html = "".join(render_achievement_mini_tile(a) for a in ach_items[:4])
 
-    current_tier = grevscore_tier(grev)
     tier_order = ["S", "A", "B", "C"]
+    tier_grevscores = row.get("tier_grevscores", {}) or {}
+    current_tier = grevscore_tier(grev)
     tier_boxes = "".join(
-        f"<div class='grev-tier-box{' active' if t == current_tier else ''}'><span class='tier-name'>{t}</span></div>"
+        f"<div class='grev-tier-box{' active' if t == current_tier else ''}'>"
+        f"<span class='tier-name'>{t}</span>"
+        f"<span class='tier-score'>{f'{tier_grevscores[t]:.2f}' if t in tier_grevscores else '--'}</span>"
+        f"</div>"
         for t in tier_order
     )
     tier_html = (
         "<div class='grev-tier-strip'>"
-        "<div class='grev-tier-label'>GrevScore vs Tier</div>"
-        f"<div class='grev-tier-row'>{tier_boxes}<div class='grev-tier-score'>{grev:.2f}</div></div>"
+        "<div class='grev-tier-label'>GrevScore by Tier</div>"
+        f"<div class='grev-tier-row'>{tier_boxes}<div class='grev-tier-score'>Overall {grev:.2f}</div></div>"
         "</div>"
     )
     if int(row.get("achievements_hidden", 0) or 0) > 0:
