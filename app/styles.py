@@ -91,10 +91,10 @@ def inject_styles(theme_name: str = "Dark"):
       margin-bottom: 14px;
     }}
 
-    .player-card {{ min-height: 364px; display:flex; flex-direction:column; gap: 8px; }}
-    .player-head {{ display:flex; align-items:flex-start; gap:8px; }}
+    .player-card {{ min-height: 364px; display:flex; flex-direction:column; gap: 10px; }}
+    .player-head {{ display:flex; align-items:flex-start; gap:10px; }}
     .player-head-left {{ flex:0 0 auto; }}
-    .player-head-meta {{ flex:1; min-width:0; }}
+    .player-head-meta {{ flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }}
     .player-avatar-frame {{
       width: 82px; height: 108px; border-radius: 12px; overflow:hidden;
       border: 1px solid var(--border);
@@ -127,15 +127,22 @@ def inject_styles(theme_name: str = "Dark"):
       margin-bottom: 8px;
     }}
 
-    .player-name {{ font-size: 0.95rem; font-weight: 720; margin: 0; }}
-    .identity-line {{ color: var(--muted); font-size: 11px; margin: 0; }}
+    .player-head-title-row {{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }}
+    .player-name {{ font-size: 0.95rem; font-weight: 720; margin: 0; line-height:1.25; }}
+    .identity-line {{ color: var(--muted); font-size: 11px; margin: 0; line-height: 1.3; }}
+    .fame-line {{ display:flex; align-items:center; gap:6px; margin-top:1px; }}
+    .fame-label {{ color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }}
+    .fame-stars {{ font-size: 13px; letter-spacing: 0.08em; color: color-mix(in srgb, var(--mid) 70%, #fff 30%); }}
+    .fame-value {{ color: var(--muted); font-size: 10px; }}
+    .player-meta-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }}
     .player-desc {{ font-size: 11px; color: color-mix(in srgb, var(--text) 88%, #fff 12%); margin: 0; min-height: 24px; }}
     .achievement-strip {{ display:flex; flex-wrap:wrap; gap: 4px; min-height: 32px; align-items:stretch; }}
+    .achievement-strip-featured {{ margin-top: 2px; }}
     .achievement-chip {{
       display:flex; gap:6px; align-items:center;
       background: color-mix(in srgb, var(--surface) 84%, #fff 16%);
       border: 1px solid var(--border); border-radius: 9px; padding: 4px 5px;
-      min-width: 0;
+      min-width: 0; max-width: 100%;
     }}
     .achievement-chip-thumb {{ width: 22px; height: 22px; object-fit: contain; border-radius: 7px; }}
     .achievement-chip-name {{ font-size: 10px; font-weight: 680; line-height: 1.1; }}
@@ -149,14 +156,17 @@ def inject_styles(theme_name: str = "Dark"):
       background: color-mix(in srgb, var(--surface) 82%, #fff 18%);
       border: 1px solid var(--border);
       border-radius: 9px;
-      padding: 6px 7px;
+      padding: 7px 8px;
+      position: relative;
+      overflow: hidden;
     }}
     .stat-item .label {{ color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; }}
     .stat-item .value {{ font-size: 13px; font-weight: 680; margin-top: 1px; }}
-    .tone-good {{ border-color: color-mix(in srgb, var(--good) 60%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--good) 14%, transparent); }}
-    .tone-mid {{ border-color: color-mix(in srgb, var(--mid) 60%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mid) 14%, transparent); }}
-    .tone-poor {{ border-color: color-mix(in srgb, var(--poor) 64%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--poor) 16%, transparent); }}
-    .tone-bad {{ border-color: color-mix(in srgb, var(--bad) 70%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 15%, transparent); }}
+    .tone-good {{ background: linear-gradient(180deg, color-mix(in srgb, var(--good) 11%, var(--surface)) 0 4px, color-mix(in srgb, var(--surface) 82%, #fff 18%) 4px 100%); border-color: color-mix(in srgb, var(--good) 58%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--good) 18%, transparent); }}
+    .tone-mid {{ background: linear-gradient(180deg, color-mix(in srgb, var(--mid) 12%, var(--surface)) 0 4px, color-mix(in srgb, var(--surface) 82%, #fff 18%) 4px 100%); border-color: color-mix(in srgb, var(--mid) 56%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mid) 16%, transparent); }}
+    .tone-poor {{ background: linear-gradient(180deg, color-mix(in srgb, var(--poor) 13%, var(--surface)) 0 4px, color-mix(in srgb, var(--surface) 82%, #fff 18%) 4px 100%); border-color: color-mix(in srgb, var(--poor) 58%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--poor) 20%, transparent); }}
+    .tone-bad {{ background: linear-gradient(180deg, color-mix(in srgb, var(--bad) 12%, var(--surface)) 0 4px, color-mix(in srgb, var(--surface) 82%, #fff 18%) 4px 100%); border-color: color-mix(in srgb, var(--bad) 62%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 18%, transparent); }}
+    .achievement-more {{ font-size: 10px; padding: 3px 8px; align-self: center; }}
 
     .toolbar-shell {{
       background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff 8%), var(--surface));
