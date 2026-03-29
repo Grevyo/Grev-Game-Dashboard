@@ -113,8 +113,9 @@ def achievements_for_player(
     pool = pool.assign(_season=season_num, _pos=pos_priority, _tier=tier_priority)
     pool = pool.sort_values(["_pos", "_tier", "_season"], ascending=[False, False, False])
 
-    top = pool
-    if cap is not None:
+    if cap is None:
+        top = pool
+    else:
         top = pool.head(cap)
     items = []
     for _, row in top.iterrows():

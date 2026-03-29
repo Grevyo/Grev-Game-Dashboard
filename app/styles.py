@@ -219,7 +219,7 @@ def inject_styles(theme_name: str = "Dark"):
       gap: 7px;
       min-height: 76px;
       max-height: none;
-      align-items:stretch;
+      align-items: stretch;
       overflow: visible;
     }}
     .achievement-strip-featured {{ margin-top: 0; }}
