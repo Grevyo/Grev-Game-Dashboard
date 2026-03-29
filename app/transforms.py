@@ -16,13 +16,13 @@ def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
     baseline_mvp = max(float(out.get("mvp_rate", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
 
     normalized = (
-        np.clip(out.get("kpd", 0).fillna(0) / baseline_kpd, 0, 2.0) * 0.40
-        + np.clip(out.get("kpr", 0).fillna(0) / baseline_kpr, 0, 2.0) * 0.25
-        + np.clip(out.get("accuracy_pct", 0).fillna(0) / baseline_acc, 0, 2.0) * 0.15
-        + np.clip(out.get("hs_pct", 0).fillna(0) / baseline_hs, 0, 2.0) * 0.10
-        + np.clip(out.get("mvp_rate", 0).fillna(0) / baseline_mvp, 0, 2.0) * 0.10
+        np.clip(out.get("kpd", 0).fillna(0) / baseline_kpd, 0, 2.5) * 0.38
+        + np.clip(out.get("kpr", 0).fillna(0) / baseline_kpr, 0, 2.5) * 0.24
+        + np.clip(out.get("accuracy_pct", 0).fillna(0) / baseline_acc, 0, 2.2) * 0.16
+        + np.clip(out.get("hs_pct", 0).fillna(0) / baseline_hs, 0, 2.5) * 0.12
+        + np.clip(out.get("mvp_rate", 0).fillna(0) / baseline_mvp, 0, 2.5) * 0.10
     )
-    out["grevscore"] = np.clip(normalized * 1.20, 0, None)
+    out["grevscore"] = np.clip(np.power(np.clip(normalized, 0, None), 1.08) * 1.12, 0, None)
     out["rating"] = (
         out.get("kpd", 0).fillna(0) * 0.65
         + (out.get("kpr", 0).fillna(0) / baseline_kpr) * 0.35

@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import re
 
 from app.components import insight_card, player_card, section_header, stat_card
 from app.achievements import achievements_for_player
@@ -71,7 +70,7 @@ def render(ctx):
         player_match_counts["appearance_share"] = 0.0
         active_players = set()
 
-    df = df_base[df_base["player"].astype(str).isin(active_players)].copy() if active_only else df_base.copy()
+    df = df_base[df_base["player"].astype(str).isin(active_players)].copy() if active_only and active_players else df_base.copy()
 
     if df.empty:
         st.warning("No Medisports rows available after filters.")
