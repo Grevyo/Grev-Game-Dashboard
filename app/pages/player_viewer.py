@@ -1,4 +1,5 @@
 import streamlit as st
+import re
 
 try:
     import plotly.express as px
@@ -21,6 +22,10 @@ from app.image_helpers import (
 )
 from app.styles import achievement_tier_badge
 from app.transforms import best_contexts
+
+
+def _player_key(name: str) -> str:
+    return re.sub(r"^ⓜ\s*\|\s*", "", str(name or ""), flags=re.IGNORECASE).strip().casefold()
 
 
 def _form_delta(p):
@@ -86,7 +91,8 @@ def render(ctx):
         st.warning("Selected player has no rows in current profile scope.")
         return
 
-    meta = players[players.get("player_clean", players.get("name", "")).astype(str).str.contains(str(player), case=False, regex=False)]
+    meta_source = players.get("player_clean", players.get("player", players.get("name", ""))).astype(str).map(_player_key)
+    meta = players[meta_source == _player_key(player)]
     country = str(meta.iloc[0].get("country", "")).strip() if not meta.empty else ""
     role = str(meta.iloc[0].get("role", "")).strip() if not meta.empty else ""
 

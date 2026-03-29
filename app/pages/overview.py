@@ -31,6 +31,10 @@ def _trend_for_player(df, player_name: str) -> str:
     return "Heating Up" if label == "Rising" else "Cooling" if label == "Falling" else "Stable"
 
 
+def _player_key(name: str) -> str:
+    return re.sub(r"^ⓜ\s*\|\s*", "", str(name or ""), flags=re.IGNORECASE).strip().casefold()
+
+
 def render(ctx):
     full_df = ctx["player_matches"]
     players_meta = ctx["players"]
@@ -148,9 +152,9 @@ def render(ctx):
         for c_idx, item in enumerate(rows[i : i + 5]):
             _, row = item
             merged = row.to_dict()
-            meta = players_meta[
-                players_meta.get("player_clean", players_meta.get("name", "")).astype(str).str.contains(str(row["player"]), case=False, regex=False)
-            ]
+            key = _player_key(str(row["player"]))
+            meta_source = players_meta.get("player_clean", players_meta.get("player", players_meta.get("name", ""))).astype(str).map(_player_key)
+            meta = players_meta[meta_source == key]
             if not meta.empty:
                 m = meta.iloc[0].to_dict()
                 merged.update(
