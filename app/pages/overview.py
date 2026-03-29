@@ -36,8 +36,10 @@ def _trend_for_player(df, player_name: str) -> str:
 
 def _player_key(name: str) -> str:
     text = str(name or "").strip()
-    text = re.sub(r"^ⓜ\s*\|\s*", "", text, flags=re.IGNORECASE)
-    return text.casefold()
+    text = re.sub(r"ⓜ\s*\|\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"[^0-9a-z]+", "", text.casefold())
+    return text
 
 
 def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, float]:
@@ -68,8 +70,11 @@ def _render_roster_cards(
             _, row = item
             merged = row.to_dict()
             key = _player_key(str(row["player"]))
-            meta_source = players_meta.get("player_clean", players_meta.get("player", players_meta.get("name", ""))).astype(str).map(_player_key)
-            meta = players_meta[meta_source == key]
+            meta_name_col = "player_clean" if "player_clean" in players_meta.columns else "player" if "player" in players_meta.columns else "name" if "name" in players_meta.columns else None
+            meta = players_meta.iloc[0:0]
+            if meta_name_col:
+                meta_source = players_meta[meta_name_col].astype(str).map(_player_key)
+                meta = players_meta[meta_source == key]
             if not meta.empty:
                 m = meta.iloc[0].to_dict()
                 merged.update(
@@ -84,7 +89,6 @@ def _render_roster_cards(
             usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
 
-            merged["team_tag"] = "Medisports"
             merged["card_variant"] = card_variant
             merged["desc"] = player_description(merged)
             merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map")
@@ -104,9 +108,6 @@ def _render_roster_cards(
             merged["achievements_hidden"] = ach_hidden
 
             with cols[c_idx]:
-                if "Hunglow" in str(merged.get("player", "")):
-                    with st.expander("DEBUG — Hunglow merged card payload", expanded=True):
-                        st.json({k: str(v) for k, v in merged.items()})
                 player_card(merged)
 
 
