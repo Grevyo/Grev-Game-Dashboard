@@ -136,7 +136,7 @@ def apply_filters(df, filters):
         return df
     out = df.copy()
 
-    season_col = "resolved_season" if "resolved_season" in out.columns else "season"
+    season_col = "resolved_season"
     if filters.get("season") and season_col in out.columns:
         selected_seasons = {str(v) for v in filters["season"]}
         valid = {s for s in selected_seasons if s != "Unspecified"}
