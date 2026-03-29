@@ -7,7 +7,7 @@ from app.components import insight_card, player_card, section_header, stat_card
 from app.achievements import achievements_for_player
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.descriptions import player_description
-from app.roster_split import split_roster_active_benched_transferred
+from app.roster_split import split_roster_active_benched_streamer_transferred
 from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
 from app.metrics import trend_label
@@ -152,7 +152,7 @@ def render(ctx):
         return
 
     full_medisports_matches = get_medisports_roster_df(full_df, player_col="player")
-    active_summary, benched_summary, transferred_summary = split_roster_active_benched_transferred(
+    active_summary, benched_summary, streamer_summary, transferred_summary = split_roster_active_benched_streamer_transferred(
         summary=summary,
         player_match_counts=player_match_counts,
         full_medisports_matches=full_medisports_matches,
@@ -182,6 +182,7 @@ def render(ctx):
               <div>
                 <span class='chip chip-good'>Active: {active_summary['player'].nunique()}</span>
                 <span class='chip chip-poor'>Benched/Academy: {benched_summary['player'].nunique()}</span>
+                <span class='chip chip-mid'>Streamer: {streamer_summary['player'].nunique()}</span>
                 <span class='chip chip-bad'>Transferred: {transferred_summary['player'].nunique()}</span>
               </div>
             </div>
@@ -232,8 +233,14 @@ def render(ctx):
         _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
+    if not streamer_summary.empty:
+        section_header("Streamer", "Rostered Medisports members with no historical match data in the dataset")
+        st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
+        _render_roster_cards(streamer_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued")
+        st.markdown("</div>", unsafe_allow_html=True)
+
     if not transferred_summary.empty:
-        section_header("Transferred", "Legacy/archive squad profiles with no current competitive usage signal")
+        section_header("Transferred", "Historical Medisports players absent for more than two seasons")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
         _render_roster_cards(transferred_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued")
         st.markdown("</div>", unsafe_allow_html=True)

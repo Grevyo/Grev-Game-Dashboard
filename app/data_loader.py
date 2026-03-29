@@ -163,6 +163,8 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
         df["raw_competition_name"] = df["grouped_competition_name"]
     if "competition_group" not in df.columns and "grouped_competition_name" in df.columns:
         df["competition_group"] = df["grouped_competition_name"]
+    if "player" in df.columns and "player_has_game_data" not in df.columns:
+        df["player_has_game_data"] = True
     return df
 
 
