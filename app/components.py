@@ -65,6 +65,15 @@ def _tone_from_score(score: float) -> str:
     return "bad"
 
 
+def _strip_tags_to_text(value) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
 
 
 
@@ -128,7 +137,7 @@ def player_card(row: dict):
     is_streamer_card = roster_bucket == "streamer" or card_variant == "streamer"
     grev = float(row.get("grevscore", 0) or 0)
     tone = "mid" if is_streamer_card else _tone_from_score(grev)
-    nationality = nationality_label(row.get("nationality") or row.get("country"))
+    nationality = _strip_tags_to_text(nationality_label(row.get("nationality") or row.get("country")))
     identity_line = nationality or "Nationality N/A"
     role_line = "Streamer" if is_streamer_card else (row.get("role") or "Role N/A")
 
