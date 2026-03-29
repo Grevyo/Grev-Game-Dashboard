@@ -109,110 +109,73 @@ def _best_side_for_player(
     default: str = "N/A",
     debug: bool = False,
 ) -> str:
-    """
-    Compute best side from the same filtered context used for overview cards.
-    Preference order:
-    1) direct player-side rows (if available in player match data)
-    2) side-level match performance from tactics data (joined by match_id)
-    """
-    if df_context.empty or "player" not in df_context.columns:
+    """Return the side with the highest aggregate GrevScore for a player."""
+    if df_context.empty or "player" not in df_context.columns or "grevscore" not in df_context.columns:
         return default
 
     player_subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
     if player_subset.empty:
         return default
 
-    metric_priority = ["grevscore", "rating", "impact", "kpd", "kpr"]
-    side_metric_col = "side_perf_metric"
+    side_candidates = ["side", "team_side", "player_side", "starting_side"]
+    player_side_col = next((c for c in side_candidates if c in player_subset.columns), None)
 
-    # Path A: direct side on player rows (not present in current dataset, but keep for schema compatibility)
-    side_col = next((c for c in ["side", "team_side", "player_side", "starting_side"] if c in player_subset.columns), None)
-    if side_col is not None:
-        subset = player_subset.copy()
-        subset["side_raw"] = subset[side_col]
-        subset["side_norm"] = subset["side_raw"].map(normalize_side_label)
-        metric_col = next((col for col in metric_priority if col in subset.columns), None)
-        if metric_col is None:
-            return default
-        subset[side_metric_col] = pd.to_numeric(subset[metric_col], errors="coerce")
+    if player_side_col:
+        side_rows = player_subset[["grevscore", player_side_col]].rename(columns={player_side_col: "side_raw"}).copy()
     else:
-        # Path B: derive side from tactics rows using same filtered match_ids
-        if tactics_context.empty or "match_id" not in tactics_context.columns:
+        if tactics_context.empty or "match_id" not in tactics_context.columns or "match_id" not in player_subset.columns:
             return default
-        if "match_id" not in player_subset.columns:
-            return default
-
-        tactic_side_col = next((c for c in ["side", "team_side", "starting_side"] if c in tactics_context.columns), None)
+        tactic_side_col = next((c for c in side_candidates if c in tactics_context.columns), None)
         if tactic_side_col is None:
             return default
 
-        player_match_ids = player_subset["match_id"].dropna().astype(str).unique().tolist()
-        if not player_match_ids:
-            return default
+        player_rows = player_subset[["match_id", "grevscore"]].copy()
+        player_rows["match_id"] = player_rows["match_id"].astype(str)
 
-        t_subset = tactics_context[tactics_context["match_id"].astype(str).isin(player_match_ids)].copy()
-        if t_subset.empty:
-            return default
+        tactic_rows = tactics_context[["match_id", tactic_side_col]].copy()
+        tactic_rows["match_id"] = tactic_rows["match_id"].astype(str)
+        tactic_rows = tactic_rows.rename(columns={tactic_side_col: "side_raw"})
 
-        t_subset["side_raw"] = t_subset[tactic_side_col]
-        t_subset["side_norm"] = t_subset["side_raw"].map(normalize_side_label)
-        t_subset = t_subset[t_subset["side_norm"].isin(["Red", "Blue"])]
-        if t_subset.empty:
-            return default
+        side_rows = player_rows.merge(tactic_rows, on="match_id", how="inner")
 
-        if "win_rate_pct" in t_subset.columns:
-            t_subset[side_metric_col] = pd.to_numeric(t_subset["win_rate_pct"], errors="coerce")
-        elif all(col in t_subset.columns for col in ["wins", "total_rounds"]):
-            wins = pd.to_numeric(t_subset["wins"], errors="coerce")
-            rounds = pd.to_numeric(t_subset["total_rounds"], errors="coerce")
-            t_subset[side_metric_col] = (wins / rounds.replace(0, pd.NA)) * 100.0
-        elif "wins" in t_subset.columns:
-            t_subset[side_metric_col] = pd.to_numeric(t_subset["wins"], errors="coerce")
-        else:
-            return default
-
-        # Collapse tactics noise into one side metric per match+side, then join to player match rows.
-        side_by_match = (
-            t_subset.groupby(["match_id", "side_norm"], dropna=False)[side_metric_col]
-            .mean()
-            .reset_index()
-        )
-        side_by_match = side_by_match.dropna(subset=[side_metric_col])
-        if side_by_match.empty:
-            return default
-
-        subset = player_subset[[c for c in player_subset.columns if c in {"match_id", "date", "player", *metric_priority}]].copy()
-        subset = subset.merge(side_by_match, on="match_id", how="inner")
-        subset["side_raw"] = subset["side_norm"]
-
-    subset = subset[subset["side_norm"].isin(["Red", "Blue"])].copy()
-    subset[side_metric_col] = pd.to_numeric(subset[side_metric_col], errors="coerce")
-    subset = subset.dropna(subset=[side_metric_col])
-    if subset.empty:
+    if side_rows.empty:
         return default
 
-    sample_agg = ("match_id", "nunique") if "match_id" in subset.columns else ("side_norm", "size")
+    side_rows["grevscore"] = pd.to_numeric(side_rows["grevscore"], errors="coerce")
+    side_rows["side_raw"] = side_rows["side_raw"].astype(str).str.strip()
+    side_rows = side_rows[(side_rows["side_raw"] != "") & side_rows["grevscore"].notna()].copy()
+    if side_rows.empty:
+        return default
+
+    side_rows["side_norm"] = side_rows["side_raw"].map(normalize_side_label)
+    side_rows = side_rows[side_rows["side_norm"].astype(str).str.strip() != ""].copy()
+    if side_rows.empty:
+        return default
+
+    playable_sides = side_rows["side_norm"].value_counts().index.tolist()
+    if len(playable_sides) < 2:
+        return default
+    playable_sides = playable_sides[:2]
+
+    usable = side_rows[side_rows["side_norm"].isin(playable_sides)].copy()
     grouped = (
-        subset.groupby("side_norm", dropna=False)
-        .agg(score=(side_metric_col, "mean"), samples=sample_agg)
-        .query("samples > 0")
+        usable.groupby("side_norm", dropna=False)
+        .agg(grevscore=("grevscore", "mean"), rows=("side_norm", "size"))
         .reset_index()
     )
-    if grouped.empty:
+    if grouped.empty or grouped["side_norm"].nunique() < 2:
         return default
 
-    best = grouped.sort_values(["score", "samples"], ascending=[False, False]).head(1)
+    best = grouped.sort_values(["grevscore", "rows"], ascending=[False, False]).head(1)
     if best.empty:
         return default
 
     chosen = str(best.iloc[0]["side_norm"])
     if debug:
-        raw_sides = sorted({str(v).strip() for v in subset.get("side_raw", pd.Series(dtype=object)).dropna().astype(str).tolist()})
-        norm_sides = sorted(subset["side_norm"].dropna().astype(str).unique().tolist())
-        side_summary = grouped.sort_values("side_norm").to_dict(orient="records")
+        side_scores = {str(r["side_norm"]): float(r["grevscore"]) for _, r in grouped.iterrows()}
         print(
-            f"[BestSideDebug] player={player_name} rows={len(subset)} raw_sides={raw_sides} "
-            f"normalized_sides={norm_sides} side_metric_summary={side_summary} chosen={chosen}"
+            f"[BestSideDebug] player={player_name} usable_rows={len(usable)} "
+            f"sides_found={playable_sides} grevscore_by_side={side_scores} chosen={chosen}"
         )
     return chosen
 
