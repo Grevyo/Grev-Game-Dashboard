@@ -1,4 +1,5 @@
 import base64
+import io
 import mimetypes
 import re
 import unicodedata
@@ -258,3 +259,34 @@ def image_data_uri(image_path: str | None) -> str | None:
     except OSError:
         return None
     return f"data:{mime_type};base64,{encoded}"
+
+
+def image_data_uri_thumbnail(
+    image_path: str | None,
+    max_width: int = 136,
+    max_height: int = 152,
+) -> str | None:
+    """Encode an image as a compact PNG data URI for HTML thumbnail use."""
+    if not image_path:
+        return None
+    path = Path(image_path)
+    if not path.exists() or not path.is_file():
+        return None
+
+    try:
+        from PIL import Image
+    except Exception:
+        return image_data_uri(image_path)
+
+    try:
+        with Image.open(path) as img:
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGBA")
+            img.thumbnail((max_width, max_height))
+            output = io.BytesIO()
+            img.save(output, format="PNG", optimize=True)
+            encoded = base64.b64encode(output.getvalue()).decode("ascii")
+    except OSError:
+        return image_data_uri(image_path)
+
+    return f"data:image/png;base64,{encoded}"

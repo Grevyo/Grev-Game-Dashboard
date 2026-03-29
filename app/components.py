@@ -8,6 +8,8 @@ from app.metrics import classify_quality, stat_tone
 from app.presentation_helpers import fame_to_stars, nationality_label
 from app.styles import achievement_tier_badge
 
+_OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED = False
+
 
 def section_header(title: str, subtitle: str = ""):
     st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
@@ -119,16 +121,19 @@ def trend_chip(trend: str) -> str:
 
 
 def render_achievement_mini_tile(achievement: dict) -> str:
+    global _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED
     tier = str(achievement.get("tier", "")).strip().upper()
     tier = tier if tier in {"S", "A", "B", "C"} else "C"
+    image_value = achievement.get("image_uri")
+    has_image_branch = bool(image_value)
     thumb = (
-        f"<img class='achievement-tile-thumb' src='{achievement.get('image_uri')}' alt='{achievement.get('name', 'Achievement')}'/>"
-        if achievement.get("image_uri")
+        f"<img class='achievement-tile-thumb' src='{image_value}' alt='{achievement.get('name', 'Achievement')}'/>"
+        if has_image_branch
         else "<div class='achievement-tile-thumb achievement-tile-thumb-fallback'>No Image</div>"
     )
     season_label = str(achievement.get("season_label", "")).strip()
     event_title = str(achievement.get("name", "")).strip()
-    return (
+    card_html = (
         f"<div class='achievement-tile tier-{tier}'>"
         f"{thumb}"
         f"<div class='achievement-season-top'>{season_label}</div>"
@@ -137,6 +142,24 @@ def render_achievement_mini_tile(achievement: dict) -> str:
         f"<span class='achievement-event-title' title='{event_title}'>{event_title}</span>"
         f"</div></div>"
     )
+
+    if "cpl open" in event_title.casefold() and not _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED:
+        print(
+            "[OVERVIEW_ACHIEVEMENT_RENDER_DEBUG]",
+            {
+                "achievement_dict": achievement,
+                "ui_image_field": "image_uri",
+                "ui_image_field_value": image_value,
+                "ui_image_value_type": achievement.get("image_render_type", "data_uri" if has_image_branch else "none"),
+                "has_image_branch_entered": has_image_branch,
+                "generated_img_src": image_value if has_image_branch else None,
+                "image_src_preview": str(image_value or "")[:72],
+                "image_src_length": len(image_value) if isinstance(image_value, str) else 0,
+                "render_container_selector": ".achievement-strip .achievement-tile .achievement-tile-thumb",
+            },
+        )
+        _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED = True
+    return card_html
 
 
 def _tier_box_html(tier: str, score: float | None) -> str:
