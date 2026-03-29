@@ -74,6 +74,22 @@ def _strip_tags_to_text(value) -> str:
     return text
 
 
+def _identity_line_text(row: dict, is_streamer_card: bool) -> str:
+    def _clean_identity_source(value) -> str:
+        text = _strip_tags_to_text(value)
+        if not text:
+            return ""
+        lowered = text.casefold()
+        if lowered in {"streamer", "n/a", "na", "none", "null", "unknown", "-", "--"}:
+            return ""
+        return text
+
+    primary = _clean_identity_source(row.get("nationality"))
+    fallback = "" if is_streamer_card else _clean_identity_source(row.get("country"))
+    safe_identity = nationality_label(primary or fallback)
+    return _strip_tags_to_text(safe_identity) or "Nationality N/A"
+
+
 
 
 
@@ -137,8 +153,7 @@ def player_card(row: dict):
     is_streamer_card = roster_bucket == "streamer" or card_variant == "streamer"
     grev = float(row.get("grevscore", 0) or 0)
     tone = "mid" if is_streamer_card else _tone_from_score(grev)
-    nationality = _strip_tags_to_text(nationality_label(row.get("nationality") or row.get("country")))
-    identity_line = nationality or "Nationality N/A"
+    identity_line = _identity_line_text(row, is_streamer_card)
     role_line = "Streamer" if is_streamer_card else (row.get("role") or "Role N/A")
 
     photo_uri = row.get("photo_uri")
