@@ -123,7 +123,9 @@ def _tier_box_html(tier: str, score: float | None) -> str:
 
 
 def player_card(row: dict):
-    is_streamer_card = row.get("roster_bucket") == "streamer" or row.get("card_variant") == "streamer"
+    roster_bucket = str(row.get("roster_bucket", "") or "").strip().casefold()
+    card_variant = str(row.get("card_variant", "") or "").strip().casefold()
+    is_streamer_card = roster_bucket == "streamer" or card_variant == "streamer"
     grev = float(row.get("grevscore", 0) or 0)
     tone = "mid" if is_streamer_card else _tone_from_score(grev)
     nationality = nationality_label(row.get("nationality") or row.get("country"))
