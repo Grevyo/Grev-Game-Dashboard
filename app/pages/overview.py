@@ -11,10 +11,7 @@ from app.roster_split import split_roster_active_benched_streamer_transferred
 from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
 from app.metrics import trend_label
-from app.transforms import best_contexts, summarize_player, with_resolved_season
-
-PLAYER_CARD_META_ALLOWLIST = ("country", "nationality", "role", "fame", "new_team")
-PLAYER_CARD_DISPLAY_FIELDS = ("country", "nationality", "role", "fame")
+from app.transforms import best_contexts, summarize_player
 
 
 def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> str:
@@ -43,42 +40,6 @@ def _player_key(name: str) -> str:
     return text.casefold()
 
 
-def _clean_meta_text(value) -> str:
-    if value is None or pd.isna(value):
-        return ""
-    return str(value).strip()
-
-
-def _sanitize_player_card_meta(field: str, value) -> str:
-    cleaned = _clean_meta_text(value)
-    if not cleaned:
-        return ""
-    lowered = cleaned.casefold()
-    if lowered in {"nan", "none", "null", "n/a", "na"}:
-        return ""
-    # Guard against raw header/label leakage (e.g., "Div") appearing as metadata values.
-    if field == "role" and lowered in {"div", "division"}:
-        return ""
-    return cleaned
-
-
-def _player_card_meta(players_meta: pd.DataFrame, key: str) -> dict[str, str]:
-    if players_meta.empty:
-        return {}
-    source_col = next((col for col in ["player_clean", "player", "name"] if col in players_meta.columns), None)
-    if source_col is None:
-        return {}
-    meta_source = players_meta[source_col].astype(str).map(_player_key)
-    meta = players_meta[meta_source == key]
-    if meta.empty:
-        return {}
-    m = meta.iloc[0]
-    sanitized_meta: dict[str, str] = {}
-    for field in PLAYER_CARD_META_ALLOWLIST:
-        sanitized_meta[field] = _sanitize_player_card_meta(field, m.get(field))
-    return sanitized_meta
-
-
 def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, float]:
     if df_context.empty or "player" not in df_context.columns or "tier" not in df_context.columns or "grevscore" not in df_context.columns:
         return {}
@@ -98,7 +59,6 @@ def _render_roster_cards(
     team_logo: str | None,
     achievements_df,
     card_variant: str = "default",
-    roster_bucket: str = "active",
 ):
     rows = list(summary.iterrows())
     for i in range(0, len(rows), 5):
@@ -107,19 +67,23 @@ def _render_roster_cards(
             _, row = item
             merged = row.to_dict()
             key = _player_key(str(row["player"]))
-            meta = _player_card_meta(players_meta, key)
-            # Explicit field-level allowlist: only these metadata fields can ever reach player_card().
-            for field in PLAYER_CARD_DISPLAY_FIELDS:
-                merged[field] = meta.get(field, "")
+            meta_source = players_meta.get("player_clean", players_meta.get("player", players_meta.get("name", ""))).astype(str).map(_player_key)
+            meta = players_meta[meta_source == key]
+            if not meta.empty:
+                m = meta.iloc[0].to_dict()
+                merged.update(
+                    {
+                        "country": m.get("country", ""),
+                        "nationality": m.get("nationality", ""),
+                        "role": m.get("role", ""),
+                        "fame": m.get("fame", ""),
+                    }
+                )
             usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
 
             merged["team_tag"] = "Medisports"
             merged["card_variant"] = card_variant
-            merged["roster_bucket"] = roster_bucket
-            if roster_bucket == "transferred":
-                destination = _clean_meta_text(meta.get("new_team", ""))
-                merged["transfer_destination"] = destination if destination else "Sold"
             merged["desc"] = player_description(merged)
             merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map")
             merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side")
@@ -138,14 +102,13 @@ def _render_roster_cards(
 
 
 def render(ctx):
-    full_df = with_resolved_season(ctx["player_matches"], date_col="date")
-    full_history_df = with_resolved_season(ctx.get("player_matches_full", full_df), date_col="date")
+    full_df = ctx["player_matches"]
+    full_history_df = ctx.get("player_matches_full", full_df)
     players_meta = ctx["players"]
     team_name = ctx["team_name"]
     filters = ctx.get("filters", {})
     achievements_df = ctx.get("achievements")
 
-    # IMPORTANT: Overview must render from the already-filtered dataframe passed in ctx.
     df_base = get_medisports_roster_df(full_df, player_col="player")
     selected_seasons = filters.get("season") or []
     auto_current_season = None
@@ -263,7 +226,7 @@ def render(ctx):
         st.info("No players currently qualify for Active Roster in this filter context.")
     else:
         st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
-        _render_roster_cards(active_summary, df, players_meta, player_match_counts, team_logo, achievements_df, roster_bucket="active")
+        _render_roster_cards(active_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
     section_header("Benched / Academy", "Secondary squad view — lower-usage players in the current filtered context")
@@ -271,34 +234,20 @@ def render(ctx):
         st.info("No Benched / Academy players in this filtered context.")
     else:
         st.markdown("<div class='roster-section roster-section-academy'>", unsafe_allow_html=True)
-        _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df, roster_bucket="benched")
+        _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
     if not streamer_summary.empty:
         section_header("Streamer", "Rostered Medisports members with no historical match data in the dataset")
         st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
-        _render_roster_cards(streamer_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued", roster_bucket="streamer")
+        _render_roster_cards(streamer_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued")
         st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
         section_header("Transferred", "Historical Medisports players absent for more than two seasons")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
-        _render_roster_cards(transferred_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued", roster_bucket="transferred")
+        _render_roster_cards(transferred_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued")
         st.markdown("</div>", unsafe_allow_html=True)
-
-    # Temporary debug tables: prove season filter + roster bucket classification.
-    with st.expander("Temporary Debug — Season + Roster Pipeline", expanded=False):
-        season_debug = (
-            df[["player", "date", "raw_competition_name", "resolved_season"]]
-            .sort_values("date", ascending=False)
-            .head(50)
-            if {"player", "date", "raw_competition_name", "resolved_season"}.issubset(df.columns)
-            else pd.DataFrame()
-        )
-        st.caption("Selected-context rows (top 50) with resolved_season from date windows.")
-        st.dataframe(season_debug, use_container_width=True, hide_index=True)
-        st.caption("Roster bucket debug built from full-history resolved seasons + selected-season presence.")
-        st.dataframe(roster_bucket_debug, use_container_width=True, hide_index=True)
 
     section_header("Bottom Insights", "Compact coaching cues")
     w1, w2, w3 = st.columns(3, gap="small")
@@ -308,3 +257,33 @@ def render(ctx):
         insight_card("Risk Note", "Review low-yield side starts where entry impact is trending below baseline.", "warn")
     with w3:
         insight_card("Focus Note", "Use map veto prep to prioritize strongest map clusters from current filter scope.", "info")
+
+    section_header("Season Filter Debug", "Temporary validation table for selected-season row visibility")
+    selected_seasons = filters.get("season") or []
+    selected_label = ",".join(map(str, selected_seasons)) if selected_seasons else "All"
+    selected_ints = []
+    for value in selected_seasons:
+        try:
+            selected_ints.append(int(str(value)))
+        except (TypeError, ValueError):
+            continue
+    resolved_numeric = pd.to_numeric(full_history_df.get("resolved_season"), errors="coerce")
+    if selected_ints:
+        visibility_mask = resolved_numeric.isin(selected_ints)
+    else:
+        visibility_mask = pd.Series([True] * len(full_history_df), index=full_history_df.index)
+
+    season_filter_debug = pd.DataFrame(
+        {
+            "competition": full_history_df.get("raw_competition_name", full_history_df.get("competition")),
+            "date": full_history_df.get("date"),
+            "resolved_season": full_history_df.get("resolved_season"),
+            "selected_season": selected_label,
+            "row_visible_after_season_filter": visibility_mask,
+        }
+    )
+    season_filter_debug = season_filter_debug.sort_values("date", ascending=False, na_position="last").reset_index(drop=True)
+    st.dataframe(season_filter_debug, use_container_width=True, hide_index=True)
+
+    section_header("Roster Bucket Debug", "Temporary validation table for roster bucket assignments")
+    st.dataframe(roster_bucket_debug, use_container_width=True, hide_index=True)
