@@ -103,6 +103,7 @@ def _render_roster_cards(
 
 def render(ctx):
     full_df = ctx["player_matches"]
+    full_history_df = ctx.get("player_matches_full", full_df)
     players_meta = ctx["players"]
     team_name = ctx["team_name"]
     filters = ctx.get("filters", {})
@@ -151,7 +152,7 @@ def render(ctx):
         st.warning("No Medisports roster available for Overview.")
         return
 
-    full_medisports_matches = get_medisports_roster_df(full_df, player_col="player")
+    full_medisports_matches = get_medisports_roster_df(full_history_df, player_col="player")
     active_summary, benched_summary, streamer_summary, transferred_summary = split_roster_active_benched_streamer_transferred(
         summary=summary,
         player_match_counts=player_match_counts,

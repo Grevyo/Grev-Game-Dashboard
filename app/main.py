@@ -52,6 +52,7 @@ def run_app():
 
     filtered = {
         "player_matches": apply_filters(p_df, filters),
+        "player_matches_full": p_df,
         "tactics": apply_filters(t_df, filters),
         "players": data["players"],
         "achievements": data["achievements"],
