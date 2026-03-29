@@ -127,26 +127,24 @@ def render_achievement_mini_tile(achievement: dict) -> str:
     tier = tier if tier in {"S", "A", "B", "C"} else "C"
     image_value = achievement.get("image_uri")
     has_image_branch = bool(image_value)
-    safe_alt = html.escape(str(achievement.get("name", "Achievement")))
     thumb = (
-        f"<img class='achievement-tile-thumb' src='{image_value}' alt='{safe_alt}'/>"
+        f"<img class='achievement-tile-thumb' src='{image_value}' alt='{achievement.get('name', 'Achievement')}'/>"
         if has_image_branch
         else "<div class='achievement-tile-thumb achievement-tile-thumb-fallback'>No Image</div>"
     )
-    season_label = html.escape(str(achievement.get("season_label", "")).strip())
-    event_title_raw = str(achievement.get("name", "")).strip()
-    event_title = html.escape(event_title_raw) if event_title_raw else "Untitled Achievement"
+    season_label = str(achievement.get("season_label", "")).strip()
+    event_title = str(achievement.get("name", "")).strip()
     card_html = (
         f"<div class='achievement-tile tier-{tier}'>"
         f"{thumb}"
         f"<div class='achievement-season-top'>{season_label}</div>"
         f"<div class='achievement-tile-overlay'>"
-        f"<div class='achievement-overlay-top'>{achievement_tier_badge(tier)}</div>"
-        f"<div class='achievement-event-chip'><span class='achievement-event-title' title='{event_title}'>{event_title}</span></div>"
+        f"{achievement_tier_badge(tier)}"
+        f"<span class='achievement-event-title' title='{event_title}'>{event_title}</span>"
         f"</div></div>"
     )
 
-    if "cpl open" in event_title_raw.casefold() and not _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED:
+    if "cpl open" in event_title.casefold() and not _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED:
         print(
             "[OVERVIEW_ACHIEVEMENT_RENDER_DEBUG]",
             {
