@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.image_helpers import image_data_uri_thumbnail, resolve_achievement_image
+from app.image_helpers import image_data_uri, image_data_uri_thumbnail, resolve_achievement_image
 
 POSITION_PRIORITY = {
     "1st": 100,
@@ -117,32 +117,30 @@ def achievements_for_player(
     items = []
     for _, row in top.iterrows():
         image_uri, image_path, image_source, image_debug = _resolve_achievement_image_for_overview(row)
+        if not image_uri and image_path and Path(str(image_path)).exists():
+            # Hard fallback: if local file exists but thumbnail encoding failed, still force a data URI.
+            image_uri = image_data_uri(str(image_path))
         global _CPL_OPEN_DEBUG_EMITTED
         is_cpl_open = "cpl open" in str(row.get("achievement_name", "")).casefold()
         if is_cpl_open and not _CPL_OPEN_DEBUG_EMITTED:
+            image_path_exists = bool(image_path and Path(str(image_path)).exists())
+            image_uri_is_none = image_uri is None
+            image_uri_len = len(image_uri) if isinstance(image_uri, str) else 0
             has_image_branch = bool(image_uri)
             print(
                 "[CPL_OPEN_DEBUG]",
                 {
-                    "full_achievement_row": row.to_dict(),
+                    "player_name": player_name,
                     "achievement_name": row.get("achievement_name"),
                     "achievement_link": row.get("achievement_link"),
-                    "overview_renderer_image_field": "image_uri",
-                    "overview_renderer_image_field_value": image_uri,
-                    "overview_has_image_branch": has_image_branch,
-                    "overview_has_image_branch_not_entered_reason": None
-                    if has_image_branch
-                    else "image_uri is empty after achievement_link + resolver attempts",
-                    "overview_final_img_value_passed": image_uri if has_image_branch else None,
+                    "resolved_image_path": image_path,
+                    "resolved_image_path_exists": image_path_exists,
+                    "image_uri_is_none": image_uri_is_none,
+                    "image_uri_len": image_uri_len,
+                    "image_uri_prefix": str(image_uri or "")[:48],
                     "image_source_selected": image_source,
                     "image_resolution_debug": image_debug,
-                    "raw_achievement_name": row.get("achievement_name"),
-                    "final_render_image_path": image_path,
-                    "final_render_image_uri_present": bool(image_uri),
-                    "overview_received_image_path": image_path if consumer == "overview" else None,
-                    "overview_received_image_uri_present": bool(image_uri) if consumer == "overview" else None,
                     "consumer": consumer,
-                    "resolver_source": image_source,
                 },
             )
             _CPL_OPEN_DEBUG_EMITTED = True

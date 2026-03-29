@@ -9,6 +9,7 @@ from app.presentation_helpers import fame_to_stars, nationality_label
 from app.styles import achievement_tier_badge
 
 _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED = False
+_OVERVIEW_CARD_DICT_DEBUG_EMITTED = False
 
 
 def section_header(title: str, subtitle: str = ""):
@@ -147,15 +148,11 @@ def render_achievement_mini_tile(achievement: dict) -> str:
         print(
             "[OVERVIEW_ACHIEVEMENT_RENDER_DEBUG]",
             {
-                "achievement_dict": achievement,
-                "ui_image_field": "image_uri",
-                "ui_image_field_value": image_value,
-                "ui_image_value_type": achievement.get("image_render_type", "data_uri" if has_image_branch else "none"),
-                "has_image_branch_entered": has_image_branch,
-                "generated_img_src": image_value if has_image_branch else None,
+                "achievement_name": achievement.get("name"),
+                "image_uri_truthy": has_image_branch,
+                "render_branch": "image" if has_image_branch else "fallback",
                 "image_src_preview": str(image_value or "")[:72],
                 "image_src_length": len(image_value) if isinstance(image_value, str) else 0,
-                "render_container_selector": ".achievement-strip .achievement-tile .achievement-tile-thumb",
             },
         )
         _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED = True
@@ -250,6 +247,21 @@ def player_card(row: dict):
         for label, val, formatted in stat_items
     )
     ach_items = row.get("achievements", []) or []
+    global _OVERVIEW_CARD_DICT_DEBUG_EMITTED
+    if not _OVERVIEW_CARD_DICT_DEBUG_EMITTED:
+        cpl_open_item = next((a for a in ach_items if "cpl open" in str(a.get("name", "")).casefold()), None)
+        if cpl_open_item:
+            print(
+                "[OVERVIEW_CARD_ACHIEVEMENT_DICT_DEBUG]",
+                {
+                    "achievement_dict": cpl_open_item,
+                    "name": cpl_open_item.get("name"),
+                    "season": cpl_open_item.get("season"),
+                    "tier": cpl_open_item.get("tier"),
+                    "image_uri_present": bool(cpl_open_item.get("image_uri")),
+                },
+            )
+            _OVERVIEW_CARD_DICT_DEBUG_EMITTED = True
     ach_html = "".join(render_achievement_mini_tile(a) for a in ach_items[:4])
 
     tier_order = ["S", "A", "B", "C"]
