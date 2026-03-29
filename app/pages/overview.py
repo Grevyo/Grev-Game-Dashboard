@@ -16,6 +16,7 @@ def _resolve_favourite_map(meta: pd.DataFrame, player_key: str, default: str = "
     if meta.empty or not player_key:
         return default
     favourite_map_candidates = [
+        "map",
         "favourite_map",
         "favorite_map",
         "fav_map",
@@ -58,9 +59,19 @@ def _best_map_for_player(
     if metric_col is None:
         return default
 
+    sample_col = "match_id" if "match_id" in subset.columns else None
+    if sample_col is None:
+        fallback_candidates = ["date", "opponent_team", "competition", "raw_competition_name"]
+        sample_col = next((col for col in fallback_candidates if col in subset.columns), None)
+
+    if sample_col:
+        sample_agg = (sample_col, "nunique")
+    else:
+        sample_agg = ("map", "size")
+
     grouped = (
         subset.groupby("map", dropna=False)
-        .agg(score=(metric_col, "mean"), samples=("match_id", "nunique"))
+        .agg(score=(metric_col, "mean"), samples=sample_agg)
         .query("samples > 0")
         .reset_index()
     )
