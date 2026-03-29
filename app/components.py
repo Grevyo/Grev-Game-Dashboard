@@ -69,7 +69,6 @@ def _strip_tags_to_text(value) -> str:
     text = str(value or "").strip()
     if not text:
         return ""
-    text = html.unescape(text)
     text = re.sub(r"<[^>]+>", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
@@ -81,14 +80,12 @@ def _identity_line_text(row: dict, is_streamer_card: bool) -> str:
         if not text:
             return ""
         lowered = text.casefold()
-        if re.search(r"\b(div|span|class|style|display)\b", lowered):
-            return ""
         if lowered in {"streamer", "n/a", "na", "none", "null", "unknown", "-", "--"}:
             return ""
         return text
 
     primary = _clean_identity_source(row.get("nationality"))
-    fallback = _clean_identity_source(row.get("country"))
+    fallback = "" if is_streamer_card else _clean_identity_source(row.get("country"))
     safe_identity = nationality_label(primary or fallback)
     return _strip_tags_to_text(safe_identity) or "Nationality N/A"
 
