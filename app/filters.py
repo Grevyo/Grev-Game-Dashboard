@@ -110,22 +110,6 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
     }
 
 
-def filter_panel_toggle(scope_key: str, *, default_visible: bool = True, label_prefix: str = "") -> bool:
-    state_key = f"{scope_key}_show_filters"
-    if state_key not in st.session_state:
-        st.session_state[state_key] = default_visible
-
-    is_visible = bool(st.session_state.get(state_key, default_visible))
-    button_label = "Hide filters" if is_visible else "Show filters"
-    if label_prefix:
-        button_label = f"{button_label} · {label_prefix}"
-
-    if st.button(button_label, key=f"{scope_key}_filter_toggle"):
-        st.session_state[state_key] = not is_visible
-
-    return bool(st.session_state.get(state_key, default_visible))
-
-
 def global_filters_from_state(player_df: pd.DataFrame):
     season_options = _int_sorted_values(player_df, "resolved_season")
     current_season = get_current_season(player_df, "resolved_season")

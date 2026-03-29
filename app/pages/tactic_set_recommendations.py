@@ -1,7 +1,6 @@
 import streamlit as st
 
 from app.components import insight_card, section_header, trend_chip
-from app.filters import filter_panel_toggle
 from app.tactics import recommend_set, tactic_summary
 
 
@@ -28,52 +27,26 @@ def render(ctx):
 
     section_header("Tactical Set Recommendations", "Context-locked recommendation engine")
 
-    map_options = sorted(summary["map"].dropna().unique().tolist())
-    side_options = sorted(summary["side"].dropna().unique().tolist())
-    defaults = {
-        "tactic_reco_map": map_options[0],
-        "tactic_reco_side": side_options[0],
-        "tactic_reco_min_sample": 5,
-        "tactic_reco_confidence_floor": 55,
-        "tactic_reco_include_tentative": True,
-        "tactic_reco_strict_mode": False,
-    }
-    for key, default in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = default
-    if st.session_state.get("tactic_reco_map") not in map_options:
-        st.session_state["tactic_reco_map"] = map_options[0]
-    if st.session_state.get("tactic_reco_side") not in side_options:
-        st.session_state["tactic_reco_side"] = side_options[0]
+    st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
+    c1, c2, c3, c4, c5 = st.columns(5, gap="small")
+    with c1:
+        season_hint = (filters.get("season") or ["Current"])[0]
+        st.caption(f"Season: {season_hint}")
+    with c2:
+        map_name = st.selectbox("Map", sorted(summary["map"].dropna().unique().tolist()))
+    with c3:
+        side = st.selectbox("Side", sorted(summary["side"].dropna().unique().tolist()))
+    with c4:
+        min_sample = st.slider("Min sample", 1, 20, 5)
+    with c5:
+        confidence_floor = st.slider("Confidence floor", 40, 85, 55)
 
-    if filter_panel_toggle("tactic_recommendations"):
-        st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
-        c1, c2, c3, c4, c5 = st.columns(5, gap="small")
-        with c1:
-            season_hint = (filters.get("season") or ["Current"])[0]
-            st.caption(f"Season: {season_hint}")
-        with c2:
-            st.selectbox("Map", map_options, key="tactic_reco_map")
-        with c3:
-            st.selectbox("Side", side_options, key="tactic_reco_side")
-        with c4:
-            st.slider("Min sample", 1, 20, key="tactic_reco_min_sample")
-        with c5:
-            st.slider("Confidence floor", 40, 85, key="tactic_reco_confidence_floor")
-
-        t1, t2 = st.columns(2, gap="small")
-        with t1:
-            st.toggle("Include tentative", key="tactic_reco_include_tentative")
-        with t2:
-            st.toggle("Strict confidence", key="tactic_reco_strict_mode")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    map_name = st.session_state.get("tactic_reco_map", map_options[0])
-    side = st.session_state.get("tactic_reco_side", side_options[0])
-    min_sample = int(st.session_state.get("tactic_reco_min_sample", 5))
-    confidence_floor = int(st.session_state.get("tactic_reco_confidence_floor", 55))
-    include_tentative = bool(st.session_state.get("tactic_reco_include_tentative", True))
-    strict_mode = bool(st.session_state.get("tactic_reco_strict_mode", False))
+    t1, t2 = st.columns(2, gap="small")
+    with t1:
+        include_tentative = st.toggle("Include tentative", value=True)
+    with t2:
+        strict_mode = st.toggle("Strict confidence", value=False)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     recs = recommend_set(summary, map_name, side)
     recs = recs[recs["uses"] >= min_sample]

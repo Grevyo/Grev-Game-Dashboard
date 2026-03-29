@@ -3,91 +3,13 @@ import pandas as pd
 
 from app.components import insight_card, player_card, section_header, stat_card
 from app.achievements import achievements_for_player
-from app.data_loader import get_medisports_player_names, get_medisports_roster_df, normalize_player_key, normalize_side_label
+from app.data_loader import get_medisports_player_names, get_medisports_roster_df, normalize_player_key
 from app.descriptions import player_description
 from app.roster_split import split_roster_active_benched_streamer_transferred
 from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo, resolve_transferred_logo
 from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
-
-
-def _resolve_favourite_map(meta: pd.DataFrame, player_key: str, default: str = "N/A") -> str:
-    if meta.empty or not player_key:
-        return default
-    favourite_map_candidates = [
-        "map",
-        "favourite_map",
-        "favorite_map",
-        "fav_map",
-        "favourite",
-        "favorite",
-        "map_favourite",
-        "map_favorite",
-    ]
-    favourite_col = next((col for col in favourite_map_candidates if col in meta.columns), None)
-    if not favourite_col:
-        return default
-    if "player_clean" not in meta.columns:
-        return default
-    player_meta = meta[meta["player_clean"].astype(str) == str(player_key)]
-    if player_meta.empty:
-        return default
-    raw_value = str(player_meta.iloc[0].get(favourite_col, "") or "").strip()
-    return raw_value if raw_value else default
-
-
-def _best_map_for_player(
-    df_context: pd.DataFrame,
-    player_name: str,
-    default: str = "N/A",
-    min_map_samples: int = 2,
-) -> str:
-    if df_context.empty or "player" not in df_context.columns or "map" not in df_context.columns:
-        return default
-
-    subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
-    if subset.empty:
-        return default
-    subset["map"] = subset["map"].astype(str).str.strip()
-    subset = subset[subset["map"] != ""]
-    if subset.empty:
-        return default
-
-    metric_priority = ["grevscore", "rating", "impact", "kpd", "kpr"]
-    metric_col = next((col for col in metric_priority if col in subset.columns), None)
-    if metric_col is None:
-        return default
-
-    sample_col = "match_id" if "match_id" in subset.columns else None
-    if sample_col is None:
-        fallback_candidates = ["date", "opponent_team", "competition", "raw_competition_name"]
-        sample_col = next((col for col in fallback_candidates if col in subset.columns), None)
-
-    if sample_col:
-        sample_agg = (sample_col, "nunique")
-    else:
-        sample_agg = ("map", "size")
-
-    grouped = (
-        subset.groupby("map", dropna=False)
-        .agg(score=(metric_col, "mean"), samples=sample_agg)
-        .query("samples > 0")
-        .reset_index()
-    )
-    if grouped.empty:
-        return default
-
-    eligible = grouped[grouped["samples"] >= min_map_samples]
-    if eligible.empty:
-        max_samples = grouped["samples"].max()
-        eligible = grouped[grouped["samples"] == max_samples]
-
-    best = eligible.sort_values(["score", "samples"], ascending=[False, False]).head(1)
-    if best.empty:
-        return default
-    value = str(best.iloc[0]["map"]).strip()
-    return value if value else default
 
 
 def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> str:
@@ -100,84 +22,6 @@ def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> 
     if best.empty:
         return default
     return str(best.iloc[0][by])
-
-
-def _best_side_for_player(
-    df_context: pd.DataFrame,
-    tactics_context: pd.DataFrame,
-    player_name: str,
-    default: str = "N/A",
-    debug: bool = False,
-) -> str:
-    """Return the side with the highest aggregate GrevScore for a player."""
-    if df_context.empty or "player" not in df_context.columns or "grevscore" not in df_context.columns:
-        return default
-
-    player_subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
-    if player_subset.empty:
-        return default
-
-    side_candidates = ["side", "team_side", "player_side", "starting_side"]
-    player_side_col = next((c for c in side_candidates if c in player_subset.columns), None)
-
-    if player_side_col:
-        side_rows = player_subset[["grevscore", player_side_col]].rename(columns={player_side_col: "side_raw"}).copy()
-    else:
-        if tactics_context.empty or "match_id" not in tactics_context.columns or "match_id" not in player_subset.columns:
-            return default
-        tactic_side_col = next((c for c in side_candidates if c in tactics_context.columns), None)
-        if tactic_side_col is None:
-            return default
-
-        player_rows = player_subset[["match_id", "grevscore"]].copy()
-        player_rows["match_id"] = player_rows["match_id"].astype(str)
-
-        tactic_rows = tactics_context[["match_id", tactic_side_col]].copy()
-        tactic_rows["match_id"] = tactic_rows["match_id"].astype(str)
-        tactic_rows = tactic_rows.rename(columns={tactic_side_col: "side_raw"})
-
-        side_rows = player_rows.merge(tactic_rows, on="match_id", how="inner")
-
-    if side_rows.empty:
-        return default
-
-    side_rows["grevscore"] = pd.to_numeric(side_rows["grevscore"], errors="coerce")
-    side_rows["side_raw"] = side_rows["side_raw"].astype(str).str.strip()
-    side_rows = side_rows[(side_rows["side_raw"] != "") & side_rows["grevscore"].notna()].copy()
-    if side_rows.empty:
-        return default
-
-    side_rows["side_norm"] = side_rows["side_raw"].map(normalize_side_label)
-    side_rows = side_rows[side_rows["side_norm"].astype(str).str.strip() != ""].copy()
-    if side_rows.empty:
-        return default
-
-    playable_sides = side_rows["side_norm"].value_counts().index.tolist()
-    if len(playable_sides) < 2:
-        return default
-    playable_sides = playable_sides[:2]
-
-    usable = side_rows[side_rows["side_norm"].isin(playable_sides)].copy()
-    grouped = (
-        usable.groupby("side_norm", dropna=False)
-        .agg(grevscore=("grevscore", "mean"), rows=("side_norm", "size"))
-        .reset_index()
-    )
-    if grouped.empty or grouped["side_norm"].nunique() < 2:
-        return default
-
-    best = grouped.sort_values(["grevscore", "rows"], ascending=[False, False]).head(1)
-    if best.empty:
-        return default
-
-    chosen = str(best.iloc[0]["side_norm"])
-    if debug:
-        side_scores = {str(r["side_norm"]): float(r["grevscore"]) for _, r in grouped.iterrows()}
-        print(
-            f"[BestSideDebug] player={player_name} usable_rows={len(usable)} "
-            f"sides_found={playable_sides} grevscore_by_side={side_scores} chosen={chosen}"
-        )
-    return chosen
 
 
 def _trend_for_player(df, player_name: str) -> str:
@@ -206,14 +50,12 @@ def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, fl
 def _render_roster_cards(
     summary: pd.DataFrame,
     df_context: pd.DataFrame,
-    tactics_context: pd.DataFrame,
     players_meta: pd.DataFrame,
     player_match_counts: pd.DataFrame,
     team_logo: str | None,
     achievements_df,
     card_variant: str = "default",
     transferred_logo_fallback: bool = False,
-    debug_player_name: str | None = None,
 ):
     rows = list(summary.iterrows())
     for i in range(0, len(rows), 5):
@@ -237,7 +79,6 @@ def _render_roster_cards(
                         "fame": m.get("fame", ""),
                     }
                 )
-            merged["favourite_map"] = _resolve_favourite_map(players_meta, key)
             new_team = str(merged.get("new_team", merged.get("New_team", "")) or "").strip()
             usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
@@ -250,13 +91,8 @@ def _render_roster_cards(
             else:
                 merged["roster_bucket"] = ""
                 merged["desc"] = player_description(merged)
-            merged["best_map"] = _best_map_for_player(df_context, str(row["player"]))
-            merged["best_side"] = _best_side_for_player(
-                df_context,
-                tactics_context,
-                str(row["player"]),
-                debug=(card_variant != "streamer" and debug_player_name == str(row["player"])),
-            ) if card_variant != "streamer" else "N/A"
+            merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map") if card_variant != "streamer" else "N/A"
+            merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side") if card_variant != "streamer" else "N/A"
             merged["trend"] = _trend_for_player(df_context, str(row["player"])) if card_variant != "streamer" else ""
             merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"])) if card_variant != "streamer" else {}
             photo = resolve_player_photo(str(row["player"]))
@@ -267,7 +103,7 @@ def _render_roster_cards(
             else:
                 merged["team_logo_uri"] = team_logo
             merged["photo_missing_reason"] = photo.get("reason")
-            ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=4, consumer="overview")
+            ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=4)
             merged["achievements"] = ach_list
             merged["achievements_hidden"] = ach_hidden
 
@@ -377,7 +213,6 @@ def render(ctx):
     streamer_meta_rows = _build_streamer_metadata_rows(players_meta, active_summary, benched_summary, transferred_summary)
     streamer_names = streamer_meta_rows["player"].astype(str).tolist() if not streamer_meta_rows.empty and "player" in streamer_meta_rows.columns else []
     all_streamer_names = all_streamer_meta_rows["player"].astype(str).tolist() if not all_streamer_meta_rows.empty and "player" in all_streamer_meta_rows.columns else []
-
     seasons = filters.get("season") or ([f"Season {auto_current_season}"] if auto_current_season else ["All seasons"])
     maps = filters.get("map") or ["All maps"]
 
@@ -452,7 +287,7 @@ def render(ctx):
         st.info("No players currently qualify for Active Roster in this filter context.")
     else:
         st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
-        _render_roster_cards(active_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df, debug_player_name=(active_summary.iloc[0]["player"] if not active_summary.empty else None))
+        _render_roster_cards(active_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
     section_header("Benched / Academy", "Secondary squad view — lower-usage players in the current filtered context")
@@ -460,7 +295,7 @@ def render(ctx):
         st.info("No Benched / Academy players in this filtered context.")
     else:
         st.markdown("<div class='roster-section roster-section-academy'>", unsafe_allow_html=True)
-        _render_roster_cards(benched_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
+        _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
     if all_streamer_names:
@@ -485,7 +320,7 @@ def render(ctx):
             st.info("No streamer-only profiles to show after excluding Active, Benched / Academy, and Transferred players.")
         else:
             st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
-            _render_roster_cards(streamer_cards, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
+            _render_roster_cards(streamer_cards, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
             st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
@@ -494,7 +329,6 @@ def render(ctx):
         _render_roster_cards(
             transferred_summary,
             df,
-            ctx.get("tactics", pd.DataFrame()),
             players_meta,
             player_match_counts,
             team_logo,

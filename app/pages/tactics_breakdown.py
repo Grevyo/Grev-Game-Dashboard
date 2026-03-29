@@ -10,7 +10,6 @@ except ModuleNotFoundError:
     PLOTLY_AVAILABLE = False
 
 from app.components import insight_card, section_header
-from app.filters import filter_panel_toggle
 from app.tactics import tactic_bucket, tactic_summary
 
 
@@ -26,23 +25,8 @@ def render(ctx):
         st.warning("Unable to derive tactic summaries.")
         return
 
-    map_options = sorted(summary["map"].dropna().unique().tolist())
-    side_options = sorted(summary["side"].dropna().unique().tolist())
-
-    if st.session_state.get("tactics_breakdown_map") not in map_options:
-        st.session_state["tactics_breakdown_map"] = map_options[0]
-    if st.session_state.get("tactics_breakdown_side") not in side_options:
-        st.session_state["tactics_breakdown_side"] = side_options[0]
-
-    if filter_panel_toggle("tactics_breakdown"):
-        f1, f2 = st.columns(2, gap="small")
-        with f1:
-            st.selectbox("Map", map_options, key="tactics_breakdown_map")
-        with f2:
-            st.selectbox("Side", side_options, key="tactics_breakdown_side")
-
-    map_name = st.session_state.get("tactics_breakdown_map", map_options[0])
-    side = st.session_state.get("tactics_breakdown_side", side_options[0])
+    map_name = st.selectbox("Map", sorted(summary["map"].dropna().unique().tolist()))
+    side = st.selectbox("Side", sorted(summary["side"].dropna().unique().tolist()))
     view = summary[(summary["map"] == map_name) & (summary["side"] == side)].copy()
     view["bucket"] = view.apply(tactic_bucket, axis=1)
 
