@@ -125,7 +125,7 @@ def player_card(row: dict):
     tone = _tone_from_score(grev)
     nationality = nationality_label(row.get("nationality") or row.get("country"))
     identity_line = nationality or "Nationality N/A"
-    role_line = row.get("role") or row.get("team_tag", "Medisports")
+    role_line = row.get("role") or row.get("team_tag") or "Medisports"
 
     photo_uri = row.get("photo_uri")
     logo_uri = row.get("team_logo_uri")
