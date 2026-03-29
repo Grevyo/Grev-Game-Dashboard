@@ -98,6 +98,9 @@ def _render_roster_cards(
             merged["achievements_hidden"] = ach_hidden
 
             with cols[c_idx]:
+                if "Hunglow" in str(merged.get("player", "")):
+                    with st.expander("DEBUG — Hunglow merged card payload", expanded=True):
+                        st.json({k: str(v) for k, v in merged.items()})
                 player_card(merged)
 
 
