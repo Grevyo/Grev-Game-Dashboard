@@ -263,9 +263,14 @@ def inject_styles(theme_name: str = "Dark"):
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      padding: 4px 4px 3px;
-      gap: 1px;
-      background: linear-gradient(180deg, transparent 0%, rgba(8,12,20,0.58) 100%);
+      padding: 3px 4px 4px;
+      gap: 3px;
+      background: linear-gradient(180deg, transparent 26%, rgba(8,12,20,0.66) 100%);
+    }}
+    .achievement-overlay-top {{
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
     }}
     .achievement-season-top {{
       position: absolute;
@@ -292,18 +297,28 @@ def inject_styles(theme_name: str = "Dark"):
       padding: 0 4px; border-radius: 999px; font-size: 8px; font-weight: 750; letter-spacing: 0.03em;
       border: 1px solid currentColor; align-self: flex-start;
     }}
+    .achievement-event-chip {{
+      background: color-mix(in srgb, rgba(6,10,20,0.94) 82%, #8ea9ff 18%);
+      border: 1px solid color-mix(in srgb, rgba(255,255,255,0.22) 70%, transparent);
+      border-radius: 6px;
+      padding: 2px 3px;
+      min-height: 20px;
+      display: flex;
+      align-items: center;
+    }}
     .achievement-event-title {{
       color: #eef2ff;
       font-size: 8px;
       line-height: 1.15;
-      font-weight: 600;
+      font-weight: 650;
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
       overflow: hidden;
       display: -webkit-box;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
+      text-overflow: ellipsis;
       word-break: break-word;
-      text-wrap: balance;
+      width: 100%;
     }}
     .achievement-overflow {{
       flex: 0 0 68px;
