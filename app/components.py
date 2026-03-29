@@ -10,7 +10,6 @@ from app.styles import achievement_tier_badge
 
 _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED = False
 _OVERVIEW_CARD_DICT_DEBUG_EMITTED = False
-_TARGET_PLAYER_DEBUG = "ⓜ | 8eeR"
 
 
 def section_header(title: str, subtitle: str = ""):
@@ -248,31 +247,6 @@ def player_card(row: dict):
         for label, val, formatted in stat_items
     )
     ach_items = row.get("achievements", []) or []
-    if str(row.get("player", "")).strip() == _TARGET_PLAYER_DEBUG:
-        tile_debug_rows = []
-        for achievement in ach_items:
-            tile_html = render_achievement_mini_tile(achievement)
-            tile_debug_rows.append(
-                {
-                    "name": achievement.get("name"),
-                    "season_label": achievement.get("season_label"),
-                    "tier": achievement.get("tier"),
-                    "image_uri_present": bool(achievement.get("image_uri")),
-                    "tile_html": tile_html,
-                }
-            )
-        print(
-            "[OVERVIEW_TILE_RENDER_DEBUG]",
-            {
-                "player": row.get("player"),
-                "rendered_tile_count": len(tile_debug_rows),
-                "rendered_tiles": tile_debug_rows,
-                "target_tile_rendered": any(str(t.get("name", "")).strip() == "CPL Open 10.38" for t in tile_debug_rows),
-            },
-        )
-        ach_html = "".join(t["tile_html"] for t in tile_debug_rows)
-    else:
-        ach_html = "".join(render_achievement_mini_tile(a) for a in ach_items)
     global _OVERVIEW_CARD_DICT_DEBUG_EMITTED
     if not _OVERVIEW_CARD_DICT_DEBUG_EMITTED:
         cpl_open_item = next((a for a in ach_items if "cpl open" in str(a.get("name", "")).casefold()), None)
@@ -288,6 +262,8 @@ def player_card(row: dict):
                 },
             )
             _OVERVIEW_CARD_DICT_DEBUG_EMITTED = True
+    ach_html = "".join(render_achievement_mini_tile(a) for a in ach_items)
+
     tier_order = ["S", "A", "B", "C"]
     tier_grevscores = row.get("tier_grevscores", {}) or {}
     tier_boxes = "".join(_tier_box_html(t, tier_grevscores.get(t)) for t in tier_order)
