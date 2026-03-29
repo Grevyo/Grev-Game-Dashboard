@@ -10,7 +10,7 @@ except ModuleNotFoundError:
     PLOTLY_AVAILABLE = False
 
 from app.components import section_header, stat_card
-from app.achievements import achievements_for_player
+from app.achievements import achievements_for_player, normalize_season_label
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.image_helpers import (
@@ -157,7 +157,7 @@ def render(ctx):
             with cols[idx % len(cols)]:
                 st.markdown(
                     f"<div class='panel panel-tight accent-mid'>{img_html}<strong>{a.get('name','Achievement')}</strong><br>"
-                    f"<span class='muted'>{a.get('position','')} • Season {a.get('season','-')}</span><br>{achievement_tier_badge(a.get('tier','-'))}</div>",
+                    f"<span class='muted'>{a.get('position','')} • {a.get('season_label') or normalize_season_label(a.get('season','-'))}</span><br>{achievement_tier_badge(a.get('tier','-'))}</div>",
                     unsafe_allow_html=True,
                 )
         if ach_hidden:

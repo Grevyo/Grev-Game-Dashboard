@@ -21,6 +21,16 @@ def _player_key(player_name: str | None) -> str:
     return re.sub(r"^ⓜ\s*\|\s*", "", str(player_name or ""), flags=re.IGNORECASE).strip().casefold()
 
 
+def normalize_season_label(season_value: str | int | float | None) -> str:
+    text = str(season_value or "").strip()
+    if not text:
+        return ""
+    match = re.search(r"(\d+)", text)
+    if match:
+        return f"Season {int(match.group(1))}"
+    return text if text.lower().startswith("season ") else f"Season {text}"
+
+
 def achievements_for_player(achievements_df: pd.DataFrame, player_name: str, cap: int = 3) -> tuple[list[dict], int]:
     if achievements_df.empty:
         return [], 0
@@ -51,10 +61,10 @@ def achievements_for_player(achievements_df: pd.DataFrame, player_name: str, cap
                 "name": str(row.get("achievement_name", "Achievement")),
                 "position": str(row.get("position", "")).strip(),
                 "season": str(row.get("season_name", "")).strip(),
+                "season_label": normalize_season_label(row.get("season_name")),
                 "tier": str(row.get("achievement_tier", "")).strip(),
                 "image_uri": image_data_uri(image_path),
             }
         )
     hidden = max(0, len(pool) - len(items))
     return items, hidden
-

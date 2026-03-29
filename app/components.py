@@ -58,12 +58,9 @@ def trend_chip(trend: str) -> str:
 def player_card(row: dict):
     grev = float(row.get("grevscore", 0) or 0)
     tone = _tone_from_score(grev)
-    identity_bits = [row.get("team_tag", "Medisports")]
-    if row.get("role"):
-        identity_bits.append(str(row.get("role")))
     nationality = nationality_label(row.get("nationality") or row.get("country"))
-    if nationality:
-        identity_bits.append(nationality)
+    identity_line = nationality or "Nationality N/A"
+    role_line = row.get("role") or row.get("team_tag", "Medisports")
 
     photo_uri = row.get("photo_uri")
     logo_uri = row.get("team_logo_uri")
@@ -102,12 +99,15 @@ def player_card(row: dict):
     ach_items = row.get("achievements", []) or []
     ach_chunks = []
     for a in ach_items[:3]:
-        thumb = f"<img class='achievement-chip-thumb' src='{a.get('image_uri')}' alt='Achievement'/>" if a.get("image_uri") else ""
-        season_tag = f"S{a.get('season')}" if a.get("season") else ""
+        thumb = f"<img class='achievement-tile-thumb' src='{a.get('image_uri')}' alt='Achievement'/>" if a.get("image_uri") else ""
+        season_tag = a.get("season_label") or ""
         tier = str(a.get("tier", "-")).strip().upper()
+        meta_bits = [x for x in [a.get("position", ""), season_tag] if x]
+        meta_html = " • ".join(meta_bits) if meta_bits else "Season —"
         ach_chunks.append(
-            f"<div class='achievement-chip'>{thumb}<div><div class='achievement-chip-name'>{a.get('name','Achievement')}</div>"
-            f"<div class='achievement-chip-meta'>{a.get('position','')} {season_tag}</div></div>{achievement_tier_badge(tier)}</div>"
+            f"<div class='achievement-tile tier-{tier}'>{thumb}"
+            f"<div class='achievement-tile-overlay'><div class='achievement-chip-name'>{a.get('name','Achievement')}</div>"
+            f"<div class='achievement-chip-meta'>{meta_html}</div>{achievement_tier_badge(tier)}</div></div>"
         )
     ach_html = "".join(ach_chunks)
     if row.get("achievements_hidden", 0):
@@ -116,19 +116,22 @@ def player_card(row: dict):
     card_html = f"""
     <div class='panel player-card accent-{tone}'>
         <div class='player-head'>
-          <div class='player-head-left'>{profile_visual}</div>
+          <div class='player-head-left'>
+            {profile_visual}
+            <div class='achievement-strip achievement-strip-featured'>{ach_html or "<span class='muted'>No achievements recorded</span>"}</div>
+          </div>
           <div class='player-head-meta'>
             <div class='player-head-title-row'>
               <p class='player-name'>{row.get('player', 'Unknown')}</p>
               <div>{logo_visual}</div>
             </div>
-            <p class='identity-line'>{' • '.join(identity_bits)}</p>
+            <p class='identity-line'>{identity_line}</p>
+            <p class='identity-line'>{role_line}</p>
             {fame_html}
-            <div class='achievement-strip achievement-strip-featured'>{ach_html or "<span class='muted'>No achievements recorded</span>"}</div>
+            <div class='player-meta-row'>{trend_chip(row.get('trend', 'Stable'))}<span class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></span></div>
+            <p class='player-desc'>{row.get('desc', '')}</p>
           </div>
         </div>
-        <div class='player-meta-row'>{trend_chip(row.get('trend', 'Stable'))}<span class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></span></div>
-        <p class='player-desc'>{row.get('desc', '')}</p>
         <div class='stats-grid'>{stats_html}</div>
     </div>
     """
