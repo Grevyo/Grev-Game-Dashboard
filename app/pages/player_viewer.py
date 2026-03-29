@@ -13,6 +13,7 @@ from app.components import section_header, stat_card
 from app.achievements import achievements_for_player, normalize_season_label
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
+from app.filters import filter_panel_toggle
 from app.image_helpers import (
     find_competition_logo,
     find_map_image,
@@ -58,24 +59,41 @@ def render(ctx):
 
     section_header("Player Stats Viewer", "Flagship profile layout for Medisports roster only")
 
-    with st.container():
-        st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
-        c1, c2, c3 = st.columns([2.3, 1.2, 1.2], gap="small")
-        with c1:
-            player = st.selectbox("Select Medisports player", medisports_roster)
-        with c2:
-            show_recent = st.toggle("Last 30-day focus", value=False)
-        with c3:
-            show_filters = st.toggle("Expand profile filters", value=False)
-        if show_filters:
-            f1, f2 = st.columns(2, gap="small")
-            with f1:
-                map_focus = st.multiselect("Map focus", sorted(df["map"].dropna().unique().tolist()) if "map" in df.columns else [])
-            with f2:
-                side_focus = st.multiselect("Side focus", sorted(df["side"].dropna().unique().tolist()) if "side" in df.columns else [])
-        else:
-            map_focus, side_focus = [], []
-        st.markdown("</div>", unsafe_allow_html=True)
+    default_player = medisports_roster[0]
+    if st.session_state.get("player_viewer_player") not in medisports_roster:
+        st.session_state["player_viewer_player"] = default_player
+    if "player_viewer_last_30" not in st.session_state:
+        st.session_state["player_viewer_last_30"] = False
+    if "player_viewer_expand_profile_filters" not in st.session_state:
+        st.session_state["player_viewer_expand_profile_filters"] = False
+    if "player_viewer_map_focus" not in st.session_state:
+        st.session_state["player_viewer_map_focus"] = []
+    if "player_viewer_side_focus" not in st.session_state:
+        st.session_state["player_viewer_side_focus"] = []
+
+    panel_visible = filter_panel_toggle("player_viewer")
+    if panel_visible:
+        with st.container():
+            st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
+            c1, c2, c3 = st.columns([2.3, 1.2, 1.2], gap="small")
+            with c1:
+                st.selectbox("Select Medisports player", medisports_roster, key="player_viewer_player")
+            with c2:
+                st.toggle("Last 30-day focus", key="player_viewer_last_30")
+            with c3:
+                st.toggle("Expand profile filters", key="player_viewer_expand_profile_filters")
+            if st.session_state.get("player_viewer_expand_profile_filters", False):
+                f1, f2 = st.columns(2, gap="small")
+                with f1:
+                    st.multiselect("Map focus", sorted(df["map"].dropna().unique().tolist()) if "map" in df.columns else [], key="player_viewer_map_focus")
+                with f2:
+                    st.multiselect("Side focus", sorted(df["side"].dropna().unique().tolist()) if "side" in df.columns else [], key="player_viewer_side_focus")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    player = st.session_state.get("player_viewer_player", default_player)
+    show_recent = bool(st.session_state.get("player_viewer_last_30", False))
+    map_focus = st.session_state.get("player_viewer_map_focus", []) if st.session_state.get("player_viewer_expand_profile_filters", False) else []
+    side_focus = st.session_state.get("player_viewer_side_focus", []) if st.session_state.get("player_viewer_expand_profile_filters", False) else []
 
     mask = df["player"] == player
     if show_recent and "date" in df.columns:

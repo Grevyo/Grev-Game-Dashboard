@@ -1,4 +1,5 @@
 import base64
+import io
 import mimetypes
 import re
 import unicodedata
@@ -144,14 +145,101 @@ def resolve_transferred_logo(new_team: str | None) -> str | None:
     return find_competition_logo("cpl")
 
 
-def find_achievement_image(link_or_name: str | None) -> str | None:
-    if not link_or_name:
+CPL_OPEN_EVENT_PATTERN = re.compile(r"cpl\s+open", flags=re.IGNORECASE)
+CPL_OPEN_PLACEMENT_IMAGE = {
+    1: "CPLOpen1.png",
+    2: "CPLOpen2.png",
+    3: "CPLOpen3.png",
+    4: "CPLOpen4.png",
+}
+
+
+def normalize_placement_value(placement: str | int | float | None) -> int | None:
+    text = str(placement or "").strip().casefold()
+    if not text:
         return None
-    file_name = Path(str(link_or_name)).name
-    direct = IMAGES["achievements"] / file_name
-    if direct.exists() and direct.suffix.lower() in SUPPORTED_EXTENSIONS:
-        return str(direct)
-    return _lookup_asset("achievements", file_name or link_or_name)
+
+    text = text.replace(" ", "")
+    text = re.sub(r"^[#]+", "", text)
+
+    digit_match = re.search(r"\d+", text)
+    if digit_match:
+        value = int(digit_match.group(0))
+        return value if value > 0 else None
+
+    word_map = {
+        "first": 1,
+        "second": 2,
+        "third": 3,
+        "fourth": 4,
+    }
+    return word_map.get(text)
+
+
+def resolve_achievement_image(
+    link_or_name: str | None,
+    achievement_name: str | None = None,
+    placement: str | int | float | None = None,
+) -> dict[str, str | bool | int | None]:
+    event_name = str(achievement_name or "").strip()
+    if event_name.casefold() in {"", "nan", "none", "null"}:
+        event_name = str(link_or_name or "").strip()
+    placement_normalized = normalize_placement_value(placement)
+    cpl_open_matched = bool(event_name and CPL_OPEN_EVENT_PATTERN.search(event_name))
+
+    selected_filename = None
+    resolved_path = None
+    exists = False
+    if cpl_open_matched and placement_normalized in CPL_OPEN_PLACEMENT_IMAGE:
+        selected_filename = CPL_OPEN_PLACEMENT_IMAGE[placement_normalized]
+        candidate_path = IMAGES["achievements"] / selected_filename
+        resolved_path = str(candidate_path)
+        exists = candidate_path.exists() and candidate_path.suffix.lower() in SUPPORTED_EXTENSIONS
+        if exists:
+            return {
+                "final_path": resolved_path,
+                "event_name": event_name,
+                "placement_raw": None if placement is None else str(placement),
+                "placement_normalized": placement_normalized,
+                "cpl_open_match": cpl_open_matched,
+                "selected_filename": selected_filename,
+                "resolved_path": resolved_path,
+                "resolved_exists": exists,
+                "source": "cpl_open_position_map",
+            }
+
+    fallback_path = None
+    if link_or_name:
+        file_name = Path(str(link_or_name)).name
+        direct = IMAGES["achievements"] / file_name
+        if direct.exists() and direct.suffix.lower() in SUPPORTED_EXTENSIONS:
+            fallback_path = str(direct)
+        else:
+            fallback_path = _lookup_asset("achievements", file_name or link_or_name)
+
+    return {
+        "final_path": fallback_path,
+        "event_name": event_name,
+        "placement_raw": None if placement is None else str(placement),
+        "placement_normalized": placement_normalized,
+        "cpl_open_match": cpl_open_matched,
+        "selected_filename": selected_filename,
+        "resolved_path": resolved_path,
+        "resolved_exists": exists,
+        "source": "fallback",
+    }
+
+
+def find_achievement_image(
+    link_or_name: str | None,
+    achievement_name: str | None = None,
+    placement: str | None = None,
+) -> str | None:
+    return resolve_achievement_image(
+        link_or_name=link_or_name,
+        achievement_name=achievement_name,
+        placement=placement,
+    ).get("final_path")
 
 
 def find_map_image(map_name: str | None) -> str | None:
@@ -171,3 +259,34 @@ def image_data_uri(image_path: str | None) -> str | None:
     except OSError:
         return None
     return f"data:{mime_type};base64,{encoded}"
+
+
+def image_data_uri_thumbnail(
+    image_path: str | None,
+    max_width: int = 136,
+    max_height: int = 152,
+) -> str | None:
+    """Encode an image as a compact PNG data URI for HTML thumbnail use."""
+    if not image_path:
+        return None
+    path = Path(image_path)
+    if not path.exists() or not path.is_file():
+        return None
+
+    try:
+        from PIL import Image
+    except Exception:
+        return image_data_uri(image_path)
+
+    try:
+        with Image.open(path) as img:
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGBA")
+            img.thumbnail((max_width, max_height))
+            output = io.BytesIO()
+            img.save(output, format="PNG", optimize=True)
+            encoded = base64.b64encode(output.getvalue()).decode("ascii")
+    except OSError:
+        return image_data_uri(image_path)
+
+    return f"data:image/png;base64,{encoded}"

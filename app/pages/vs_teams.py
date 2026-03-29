@@ -11,6 +11,7 @@ except ModuleNotFoundError:
 
 from app.components import insight_card, section_header
 from app.descriptions import matchup_insight
+from app.filters import filter_panel_toggle
 from app.metrics import confidence_from_sample
 
 
@@ -29,7 +30,14 @@ def render(ctx):
     grp["win_rate"] = (grp["wins"] / (grp["wins"] + grp["losses"]).clip(lower=1) * 100).fillna(0)
     grp["confidence"] = grp["rounds"].map(confidence_from_sample)
 
-    opp = st.selectbox("Drill into opponent", ["All"] + sorted(grp["opponent_team"].astype(str).unique().tolist()))
+    opponent_options = ["All"] + sorted(grp["opponent_team"].astype(str).unique().tolist())
+    if st.session_state.get("vs_teams_opponent") not in opponent_options:
+        st.session_state["vs_teams_opponent"] = "All"
+
+    if filter_panel_toggle("vs_teams"):
+        st.selectbox("Drill into opponent", opponent_options, key="vs_teams_opponent")
+
+    opp = st.session_state.get("vs_teams_opponent", "All")
     view = grp if opp == "All" else grp[grp["opponent_team"] == opp]
 
     section_header("Matchup Overview")
