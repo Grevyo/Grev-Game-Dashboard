@@ -145,13 +145,20 @@ def resolve_transferred_logo(new_team: str | None) -> str | None:
     return find_competition_logo("cpl")
 
 
-CPL_OPEN_EVENT_PATTERN = re.compile(r"cpl\s+open", flags=re.IGNORECASE)
 CPL_OPEN_PLACEMENT_IMAGE = {
     1: "CPLOpen1.png",
     2: "CPLOpen2.png",
     3: "CPLOpen3.png",
     4: "CPLOpen4.png",
 }
+
+
+def normalize_achievement_name(value: str | None) -> str:
+    text = str(value or "")
+    text = text.replace(" ", " ")
+    text = text.strip().lower()
+    text = re.sub(r"\s+", " ", text)
+    return text
 
 
 def normalize_placement_value(placement: str | int | float | None) -> int | None:
@@ -184,13 +191,16 @@ def resolve_achievement_image(
     event_name = str(achievement_name or "").strip()
     if event_name.casefold() in {"", "nan", "none", "null"}:
         event_name = str(link_or_name or "").strip()
+    event_name_normalized = normalize_achievement_name(event_name)
     placement_normalized = normalize_placement_value(placement)
-    cpl_open_matched = bool(event_name and CPL_OPEN_EVENT_PATTERN.search(event_name))
+    cpl_open_matched = "cpl open" in event_name_normalized
 
     selected_filename = None
     resolved_path = None
     exists = False
+    cpl_open_branch_entered = False
     if cpl_open_matched and placement_normalized in CPL_OPEN_PLACEMENT_IMAGE:
+        cpl_open_branch_entered = True
         selected_filename = CPL_OPEN_PLACEMENT_IMAGE[placement_normalized]
         candidate_path = IMAGES["achievements"] / selected_filename
         resolved_path = str(candidate_path)
@@ -199,9 +209,11 @@ def resolve_achievement_image(
             return {
                 "final_path": resolved_path,
                 "event_name": event_name,
+                "achievement_name_normalized": event_name_normalized,
                 "placement_raw": None if placement is None else str(placement),
                 "placement_normalized": placement_normalized,
                 "cpl_open_match": cpl_open_matched,
+                "cpl_open_branch_entered": cpl_open_branch_entered,
                 "selected_filename": selected_filename,
                 "resolved_path": resolved_path,
                 "resolved_exists": exists,
@@ -220,9 +232,11 @@ def resolve_achievement_image(
     return {
         "final_path": fallback_path,
         "event_name": event_name,
+        "achievement_name_normalized": event_name_normalized,
         "placement_raw": None if placement is None else str(placement),
         "placement_normalized": placement_normalized,
         "cpl_open_match": cpl_open_matched,
+        "cpl_open_branch_entered": cpl_open_branch_entered,
         "selected_filename": selected_filename,
         "resolved_path": resolved_path,
         "resolved_exists": exists,
