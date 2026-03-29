@@ -303,6 +303,75 @@ def inject_styles(theme_name: str = "Dark"):
       overflow-wrap: anywhere;
       text-wrap: wrap;
     }}
+    .achievement-tile.cpl-open-debug {{
+      border: 3px solid #7fff00 !important;
+      box-shadow: 0 0 0 2px #ffffff, 0 12px 24px rgba(0,0,0,0.45) !important;
+    }}
+    .achievement-tile.cpl-open-debug .achievement-tile-overlay {{
+      background: transparent;
+      padding-bottom: 16px;
+    }}
+    .achievement-tile.cpl-open-debug .achievement-event-title {{
+      background: #ffffff;
+      color: #0b1321;
+      font-weight: 800;
+      text-shadow: none;
+      padding: 1px 2px;
+      border-radius: 3px;
+    }}
+    .achievement-tile.cpl-open-debug .achievement-season-top {{
+      background: #ffffff;
+      color: #101010;
+      border-color: #101010;
+      text-shadow: none;
+      z-index: 6;
+    }}
+    .achievement-tile.cpl-open-debug .cpl-open-debug-top-badge {{
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      z-index: 8;
+      background: #ff0000;
+      color: #ffffff;
+      font-size: 8px;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      padding: 2px 5px;
+      border-bottom-right-radius: 6px;
+      border: 1px solid #ffffff;
+    }}
+    .achievement-tile.cpl-open-debug .cpl-open-debug-bottom-badge {{
+      position: absolute;
+      left: 1px;
+      right: 1px;
+      bottom: 1px;
+      z-index: 8;
+      background: #ffe600;
+      color: #111111;
+      font-size: 8px;
+      line-height: 1.15;
+      font-weight: 900;
+      text-align: center;
+      border-radius: 4px;
+      border: 1px solid #111111;
+      padding: 1px 2px;
+      overflow-wrap: anywhere;
+      text-wrap: wrap;
+    }}
+    .achievement-tile.cpl-open-debug .cpl-open-debug-position {{
+      position: absolute;
+      right: 1px;
+      top: 16px;
+      z-index: 8;
+      background: #ffffff;
+      color: #111111;
+      font-size: 8px;
+      font-weight: 900;
+      border: 1px solid #111111;
+      border-radius: 4px;
+      padding: 1px 3px;
+      line-height: 1.1;
+    }}
     .achievement-overflow {{
       flex: 0 0 68px;
       width: 68px;
