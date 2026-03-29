@@ -32,7 +32,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .stApp {{ background: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%), var(--bg); color: var(--text); }}
-    .block-container {{ padding-top: 0.9rem; padding-bottom: 1.4rem; max-width: 98%; }}
+    .block-container {{ padding-top: 1.55rem; padding-bottom: 1.4rem; max-width: 98%; }}
 
     .page-shell {{ display:flex; flex-direction:column; gap: var(--space-5); }}
     .section-title {{ margin: 0 0 var(--space-2) 0; font-size: 1.05rem; font-weight: 750; letter-spacing: 0.02em; color: var(--text); }}
@@ -76,11 +76,80 @@ def inject_styles(theme_name: str = "Dark"):
     .metric-title {{ color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }}
     .metric-value {{ font-size: 25px; line-height: 1.15; font-weight: 760; margin-top: 3px; }}
 
-    .top-nav {{
-      display:flex; align-items:center; gap: 10px; padding: 8px 10px;
-      background: color-mix(in srgb, var(--surface) 94%, #fff 6%);
-      border: 1px solid var(--border); border-radius: 999px;
+    /* Global page navigation: premium horizontal control (pills / segmented / radio fallback). */
+    div[data-testid="stPills"],
+    div[data-testid="stSegmentedControl"],
+    div[data-testid="stRadio"][role="radiogroup"] {{
+      display:flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px;
       margin-bottom: 12px;
+      background: color-mix(in srgb, var(--surface) 94%, #fff 6%);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+    }}
+    div[data-testid="stPills"] label[data-baseweb="checkbox"],
+    div[data-testid="stSegmentedControl"] label[data-baseweb="radio"],
+    div[data-testid="stRadio"] label[data-baseweb="radio"] {{
+      margin: 0;
+      min-height: 0;
+    }}
+    div[data-testid="stPills"] label[data-baseweb="checkbox"] > div:first-child,
+    div[data-testid="stSegmentedControl"] label[data-baseweb="radio"] > div:first-child,
+    div[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {{
+      display: none;
+    }}
+    div[data-testid="stPills"] label[data-baseweb="checkbox"] > div:last-child,
+    div[data-testid="stSegmentedControl"] label[data-baseweb="radio"] > div:last-child,
+    div[data-testid="stRadio"] label[data-baseweb="radio"] > div:last-child {{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--border) 82%, #fff 18%);
+      background: color-mix(in srgb, var(--surface) 82%, #fff 18%);
+      color: var(--muted);
+      font-weight: 620;
+      font-size: 0.84rem;
+      letter-spacing: 0.01em;
+      transition: all .18s ease;
+      cursor: pointer;
+    }}
+    div[data-testid="stPills"] label[data-baseweb="checkbox"]:hover > div:last-child,
+    div[data-testid="stSegmentedControl"] label[data-baseweb="radio"]:hover > div:last-child,
+    div[data-testid="stRadio"] label[data-baseweb="radio"]:hover > div:last-child {{
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+      background: color-mix(in srgb, var(--surface) 74%, var(--accent) 26%);
+      transform: translateY(-1px);
+    }}
+    div[data-testid="stPills"] input[type="checkbox"]:checked + div,
+    div[data-testid="stSegmentedControl"] input[type="radio"]:checked + div,
+    div[data-testid="stRadio"] input[type="radio"]:checked + div {{
+      color: #f5f8ff;
+      border-color: color-mix(in srgb, var(--accent) 75%, #ffffff 25%);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 70%, #1d2b45 30%), color-mix(in srgb, var(--accent) 58%, #101829 42%));
+      box-shadow: 0 6px 14px rgba(0,0,0,0.28), inset 0 0 0 1px color-mix(in srgb, #ffffff 18%, transparent);
+      font-weight: 700;
+    }}
+
+    @media (max-width: 768px) {{
+      .block-container {{ padding-top: 1.2rem; }}
+      div[data-testid="stPills"],
+      div[data-testid="stSegmentedControl"],
+      div[data-testid="stRadio"][role="radiogroup"] {{
+        border-radius: 16px;
+        padding: 8px;
+      }}
+      div[data-testid="stPills"] label[data-baseweb="checkbox"] > div:last-child,
+      div[data-testid="stSegmentedControl"] label[data-baseweb="radio"] > div:last-child,
+      div[data-testid="stRadio"] label[data-baseweb="radio"] > div:last-child {{
+        padding: 8px 12px;
+        font-size: 0.8rem;
+      }}
     }}
 
     .context-ribbon {{
@@ -99,11 +168,6 @@ def inject_styles(theme_name: str = "Dark"):
       gap: 8px;
       overflow: hidden;
     }}
-    .player-card-streamer {
-      min-height: 260px;
-      height: 260px;
-      justify-content: space-between;
-    }
     .player-head {{ display:flex; align-items:flex-start; gap:10px; min-height: 148px; }}
     .player-head-left {{ flex:0 0 92px; display:flex; flex-direction:column; gap:6px; }}
     .player-head-meta {{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; min-height: 0; }}
@@ -147,35 +211,15 @@ def inject_styles(theme_name: str = "Dark"):
     .fame-label {{ color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }}
     .fame-stars {{ font-size: 13px; letter-spacing: 0.08em; color: color-mix(in srgb, var(--mid) 70%, #fff 30%); }}
     .fame-value {{ color: var(--muted); font-size: 10px; }}
-    .streamer-meta-stack {
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-      min-height: 0;
-    }
-    .streamer-status-chip {
-      display:inline-flex;
-      align-items:center;
-      width: fit-content;
-      max-width: 100%;
-      padding: 4px 8px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--mid) 48%, var(--border));
-      background: color-mix(in srgb, var(--surface) 84%, var(--mid) 16%);
-      color: color-mix(in srgb, var(--text) 88%, #fff 12%);
-      font-size: 10px;
-      line-height: 1.2;
-    }
     .player-meta-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }}
     .achievement-strip {{
-      display:flex;
-      flex-direction: row;
-      flex-wrap: nowrap;
-      gap: 6px;
-      min-height: 58px;
-      max-height: 58px;
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      min-height: 0;
+      max-height: none;
       align-items:stretch;
-      overflow: hidden;
+      overflow: visible;
     }}
     .achievement-strip-featured {{ margin-top: 0; }}
     .achievement-empty {{
@@ -190,9 +234,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-tile {{
       position: relative;
-      flex: 0 0 50px;
-      width: 50px;
-      height: 58px;
+      width: 100%;
+      min-width: 0;
+      height: 76px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
@@ -218,26 +262,52 @@ def inject_styles(theme_name: str = "Dark"):
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      padding: 2px;
+      padding: 4px 4px 3px;
       gap: 1px;
       background: linear-gradient(180deg, transparent 0%, rgba(8,12,20,0.58) 100%);
+    }}
+    .achievement-season-top {{
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: calc(100% - 10px);
+      padding: 1px 6px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
+      background: color-mix(in srgb, rgba(7,12,24,0.9) 86%, #9fb8ff 14%);
+      color: #f5f8ff;
+      font-size: 8px;
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+      z-index: 2;
     }}
     .achievement-tier {{
       padding: 0 4px; border-radius: 999px; font-size: 8px; font-weight: 750; letter-spacing: 0.03em;
       border: 1px solid currentColor; align-self: flex-start;
     }}
-    .achievement-season {{
+    .achievement-event-title {{
       color: #eef2ff;
-      font-size: 7px;
-      line-height: 1.1;
+      font-size: 8px;
+      line-height: 1.15;
       font-weight: 600;
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-      white-space: nowrap;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      word-break: break-word;
+      text-wrap: balance;
     }}
     .achievement-overflow {{
-      flex: 0 0 50px;
-      width: 50px;
-      height: 58px;
+      width: 100%;
+      min-width: 0;
+      height: 76px;
       display:flex;
       align-items:center;
       justify-content:center;
