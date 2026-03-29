@@ -12,6 +12,73 @@ from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
 
 
+def _resolve_favourite_map(meta: pd.DataFrame, player_key: str, default: str = "N/A") -> str:
+    if meta.empty or not player_key:
+        return default
+    favourite_map_candidates = [
+        "favourite_map",
+        "favorite_map",
+        "fav_map",
+        "favourite",
+        "favorite",
+        "map_favourite",
+        "map_favorite",
+    ]
+    favourite_col = next((col for col in favourite_map_candidates if col in meta.columns), None)
+    if not favourite_col:
+        return default
+    if "player_clean" not in meta.columns:
+        return default
+    player_meta = meta[meta["player_clean"].astype(str) == str(player_key)]
+    if player_meta.empty:
+        return default
+    raw_value = str(player_meta.iloc[0].get(favourite_col, "") or "").strip()
+    return raw_value if raw_value else default
+
+
+def _best_map_for_player(
+    df_context: pd.DataFrame,
+    player_name: str,
+    default: str = "N/A",
+    min_map_samples: int = 2,
+) -> str:
+    if df_context.empty or "player" not in df_context.columns or "map" not in df_context.columns:
+        return default
+
+    subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
+    if subset.empty:
+        return default
+    subset["map"] = subset["map"].astype(str).str.strip()
+    subset = subset[subset["map"] != ""]
+    if subset.empty:
+        return default
+
+    metric_priority = ["grevscore", "rating", "impact", "kpd", "kpr"]
+    metric_col = next((col for col in metric_priority if col in subset.columns), None)
+    if metric_col is None:
+        return default
+
+    grouped = (
+        subset.groupby("map", dropna=False)
+        .agg(score=(metric_col, "mean"), samples=("match_id", "nunique"))
+        .query("samples > 0")
+        .reset_index()
+    )
+    if grouped.empty:
+        return default
+
+    eligible = grouped[grouped["samples"] >= min_map_samples]
+    if eligible.empty:
+        max_samples = grouped["samples"].max()
+        eligible = grouped[grouped["samples"] == max_samples]
+
+    best = eligible.sort_values(["score", "samples"], ascending=[False, False]).head(1)
+    if best.empty:
+        return default
+    value = str(best.iloc[0]["map"]).strip()
+    return value if value else default
+
+
 def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> str:
     if df.empty or by not in df.columns or "player" not in df.columns:
         return default
@@ -79,6 +146,7 @@ def _render_roster_cards(
                         "fame": m.get("fame", ""),
                     }
                 )
+            merged["favourite_map"] = _resolve_favourite_map(players_meta, key)
             new_team = str(merged.get("new_team", merged.get("New_team", "")) or "").strip()
             usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
@@ -91,7 +159,7 @@ def _render_roster_cards(
             else:
                 merged["roster_bucket"] = ""
                 merged["desc"] = player_description(merged)
-            merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map") if card_variant != "streamer" else "N/A"
+            merged["best_map"] = _best_map_for_player(df_context, str(row["player"]))
             merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side") if card_variant != "streamer" else "N/A"
             merged["trend"] = _trend_for_player(df_context, str(row["player"])) if card_variant != "streamer" else ""
             merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"])) if card_variant != "streamer" else {}

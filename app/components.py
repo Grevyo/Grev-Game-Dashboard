@@ -178,6 +178,8 @@ def player_card(row: dict):
     safe_identity_line = html.escape(str(identity_line))
     safe_role_line = html.escape(str(role_line))
     safe_player_note = html.escape(str(_player_note(row) or ""))
+    safe_best_map = html.escape(str(row.get("best_map", "N/A")))
+    safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
 
     if is_streamer_card:
         streamer_card_html = f"""
@@ -196,6 +198,7 @@ def player_card(row: dict):
                     <p class='identity-line'>{safe_identity_line}</p>
                     <p class='identity-line'>{safe_role_line}</p>
                     {fame_html}
+                    <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong></span></div>
                 </div>
             </div>
             <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
@@ -237,7 +240,7 @@ def player_card(row: dict):
     trend_html = trend_chip(row.get("trend", "Stable"))
     context_html = (
         "<div class='player-meta-row'><span class='muted'>Best map <strong>"
-        f"{html.escape(str(row.get('best_map', 'N/A')))}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
+        f"{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
     )
     stats_block_html = f"<div class='stats-grid'>{stats_html}</div>"
     tier_block_html = tier_html
