@@ -69,6 +69,8 @@ def _tone_from_score(score: float) -> str:
 
 
 def _player_note(row: dict) -> str:
+    if row.get("roster_bucket") == "streamer" or row.get("card_variant") == "streamer":
+        return "Streamer profile — competitive stats not yet tracked."
     custom_desc = str(row.get("desc", "")).strip()
     if custom_desc:
         return custom_desc
@@ -121,6 +123,7 @@ def _tier_box_html(tier: str, score: float | None) -> str:
 
 
 def player_card(row: dict):
+    is_streamer_card = row.get("roster_bucket") == "streamer" or row.get("card_variant") == "streamer"
     grev = float(row.get("grevscore", 0) or 0)
     tone = _tone_from_score(grev)
     nationality = nationality_label(row.get("nationality") or row.get("country"))
@@ -168,12 +171,7 @@ def player_card(row: dict):
     tier_order = ["S", "A", "B", "C"]
     tier_grevscores = row.get("tier_grevscores", {}) or {}
     tier_boxes = "".join(_tier_box_html(t, tier_grevscores.get(t)) for t in tier_order)
-    tier_html = (
-        "<div class='grev-tier-strip'>"
-        "<div class='grev-tier-label'>GrevScore vs Tier Bands</div>"
-        f"<div class='grev-tier-row'>{tier_boxes}<div class='grev-tier-score'>Overall {grev:.2f}</div></div>"
-        "</div>"
-    )
+    tier_html = "<div class='grev-tier-strip'><div class='grev-tier-label'>GrevScore vs Tier Bands</div>" f"<div class='grev-tier-row'>{tier_boxes}</div></div>"
     if int(row.get("achievements_hidden", 0) or 0) > 0:
         ach_html += f"<div class='achievement-overflow'>+{int(row.get('achievements_hidden', 0))}</div>"
     if not ach_html:
@@ -181,12 +179,21 @@ def player_card(row: dict):
 
     safe_identity_line = html.escape(str(identity_line))
     safe_role_line = html.escape(str(role_line))
-    safe_best_map = html.escape(str(row.get("best_map", "N/A")))
-    safe_best_side = html.escape(str(row.get("best_side", "N/A")))
     safe_player_note = html.escape(str(_player_note(row) or ""))
+    trend_html = "" if is_streamer_card else trend_chip(row.get("trend", "Stable"))
+    context_html = (
+        ""
+        if is_streamer_card
+        else (
+            "<div class='player-meta-row'><span class='muted'>Best map <strong>"
+            f"{html.escape(str(row.get('best_map', 'N/A')))}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
+        )
+    )
+    stats_block_html = "" if is_streamer_card else f"<div class='stats-grid'>{stats_html}</div>"
+    tier_block_html = "" if is_streamer_card else tier_html
 
     card_html = f"""
-    <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') == 'subdued' else ''}'>
+    <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') in {'subdued', 'streamer'} else ''}'>
         <div class='player-head'>
           <div class='player-head-left'>
             {profile_visual}
@@ -195,19 +202,19 @@ def player_card(row: dict):
             <div class='player-head-title-row'>
               <div class='player-name-row'>
                 <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
-                {trend_chip(row.get('trend', 'Stable'))}
+                {trend_html}
               </div>
               <div>{logo_visual}</div>
             </div>
             <p class='identity-line'>{safe_identity_line}</p>
             <p class='identity-line'>{safe_role_line}</p>
             {fame_html}
-            <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Best side <strong>{safe_best_side}</strong></span></div>
+            {context_html}
           </div>
         </div>
         <div class='achievement-strip achievement-strip-featured'>{ach_html}</div>
-        <div class='stats-grid'>{stats_html}</div>
-        {tier_html}
+        {stats_block_html}
+        {tier_block_html}
         <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
     </div>
     """

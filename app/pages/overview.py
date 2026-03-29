@@ -84,11 +84,12 @@ def _render_roster_cards(
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
 
             merged["card_variant"] = card_variant
-            merged["desc"] = player_description(merged)
-            merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map")
-            merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side")
-            merged["trend"] = _trend_for_player(df_context, str(row["player"]))
-            merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"]))
+            merged["roster_bucket"] = "streamer" if card_variant == "streamer" else ""
+            merged["desc"] = "Streamer profile — competitive stats not yet tracked." if card_variant == "streamer" else player_description(merged)
+            merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map") if card_variant != "streamer" else "N/A"
+            merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side") if card_variant != "streamer" else "N/A"
+            merged["trend"] = _trend_for_player(df_context, str(row["player"])) if card_variant != "streamer" else ""
+            merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"])) if card_variant != "streamer" else {}
             photo = resolve_player_photo(str(row["player"]))
             merged["photo_uri"] = image_data_uri(photo.get("path"))
             if transferred_logo_fallback:
@@ -242,9 +243,9 @@ def render(ctx):
         st.markdown("</div>", unsafe_allow_html=True)
 
     if not streamer_summary.empty:
-        section_header("Streamer", "Rostered Medisports members with no historical match data in the dataset")
+        section_header("Streamer", "Rostered Medisports streamer profiles from players metadata")
         st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
-        _render_roster_cards(streamer_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued")
+        _render_roster_cards(streamer_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
         st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:

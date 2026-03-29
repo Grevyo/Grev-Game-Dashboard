@@ -28,6 +28,25 @@ def _extract_metadata_players(players_meta: pd.DataFrame) -> list[str]:
     return sorted(set(medisports_meta.tolist()), key=str.casefold)
 
 
+def _extract_metadata_streamer_keys(players_meta: pd.DataFrame) -> set[str]:
+    if players_meta.empty:
+        return set()
+
+    name_col = None
+    for candidate in ["player", "name"]:
+        if candidate in players_meta.columns:
+            name_col = candidate
+            break
+    if name_col is None or "role" not in players_meta.columns:
+        return set()
+
+    meta = players_meta[[name_col, "role"]].copy()
+    meta[name_col] = meta[name_col].astype(str).str.strip()
+    meta["role_key"] = meta["role"].astype(str).str.strip().str.casefold()
+    streamer_meta = meta[(meta["role_key"] == "streamer") & meta[name_col].map(is_medisports_player)]
+    return set(streamer_meta[name_col].map(_player_key).tolist())
+
+
 def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
     if df.empty:
         return pd.Series(dtype=float)
@@ -177,6 +196,7 @@ def split_roster_active_benched_streamer_transferred(
 
     roster_names = set(merged.get("player", pd.Series(dtype=object)).dropna().astype(str).tolist())
     meta_players = _extract_metadata_players(players_meta)
+    streamer_keys = _extract_metadata_streamer_keys(players_meta)
 
     usage = (
         full_medisports_matches[["player", "match_id"]].copy()
@@ -210,11 +230,10 @@ def split_roster_active_benched_streamer_transferred(
             continue
 
         player_key = _player_key(player)
-        has_any_game_data = player_key in last_season_by_key
         in_metadata = player_key in meta_by_key
 
-        # 2) Streamer: exists in roster metadata, but has no game data at all.
-        if in_metadata and not has_any_game_data:
+        # 2) Streamer: explicit role in players metadata.
+        if player_key in streamer_keys:
             classified[player] = "streamer"
             continue
 
@@ -224,7 +243,7 @@ def split_roster_active_benched_streamer_transferred(
         classified[player] = classify_roster_bucket(
             player=player,
             in_metadata=in_metadata,
-            last_played_season=last_season_by_key.get(player_key) if has_any_game_data else None,
+            last_played_season=last_season_by_key.get(player_key),
             current_season=latest_dataset_season,
             can_classify_transferred=can_transfer_safely,
             appearance_share=appearance_share,
