@@ -2,8 +2,8 @@ import math
 
 import streamlit as st
 
-from app.metrics import classify_quality
-from app.styles import tier_badge
+from app.metrics import classify_quality, stat_tone
+from app.styles import achievement_tier_badge
 
 
 def section_header(title: str, subtitle: str = ""):
@@ -32,11 +32,11 @@ def stat_card(label: str, value, help_text: str = "", quality_override: str | No
 
 
 def _tone_from_score(score: float) -> str:
-    if score >= 72:
+    if score >= 1.4:
         return "good"
-    if score >= 58:
+    if score >= 1.0:
         return "mid"
-    if score >= 44:
+    if score >= 0.75:
         return "poor"
     return "bad"
 
@@ -62,6 +62,10 @@ def player_card(row: dict):
         identity_bits.append(str(row.get("country")))
     if row.get("role"):
         identity_bits.append(str(row.get("role")))
+    if row.get("fame") not in ["", None]:
+        identity_bits.append(f"Fame {row.get('fame')}")
+    if row.get("nationality"):
+        identity_bits.append(str(row.get("nationality")))
 
     photo_uri = row.get("photo_uri")
     logo_uri = row.get("team_logo_uri")
@@ -74,24 +78,31 @@ def player_card(row: dict):
     logo_visual = f"<img class='team-mini-logo' src='{logo_uri}' alt='Team logo'/>" if logo_uri else ""
 
     stat_items = [
-        ("GrevScore", f"{grev:.1f}"),
-        ("Rating", f"{float(row.get('rating', 0) or 0):.2f}"),
-        ("K/D", f"{float(row.get('kpd', 0) or 0):.2f}"),
-        ("Impact", f"{float(row.get('impact', 0) or 0):.1f}"),
-        ("HS%", f"{float(row.get('hs_pct', 0) or 0):.1f}%"),
-        ("Matches", f"{int(row.get('matches', 0) or 0)}"),
+        ("GrevScore", grev, f"{grev:.2f}"),
+        ("Rating", float(row.get("rating", 0) or 0), f"{float(row.get('rating', 0) or 0):.2f}"),
+        ("K/D", float(row.get("kpd", 0) or 0), f"{float(row.get('kpd', 0) or 0):.2f}"),
+        ("Impact", float(row.get("impact", 0) or 0), f"{float(row.get('impact', 0) or 0):.1f}"),
+        ("Form", float(row.get("form", 0) or 0), f"{float(row.get('form', 0) or 0):.2f}"),
+        ("KPR", float(row.get("kpr", 0) or 0), f"{float(row.get('kpr', 0) or 0):.2f}"),
+        ("Accuracy", float(row.get("accuracy_pct", 0) or 0), f"{float(row.get('accuracy_pct', 0) or 0):.1f}%"),
+        ("HS%", float(row.get("hs_pct", 0) or 0), f"{float(row.get('hs_pct', 0) or 0):.1f}%"),
     ]
     stats_html = "".join(
-        f"<div class='stat-item'><div class='label'>{label}</div><div class='value'>{value}</div></div>" for label, value in stat_items
+        (
+            f"<div class='stat-item tone-{stat_tone(label, val)}'>"
+            f"<div class='label'>{label}</div><div class='value stat-{stat_tone(label, val)}'>{formatted}</div></div>"
+        )
+        for label, val, formatted in stat_items
     )
     ach_items = row.get("achievements", []) or []
     ach_chunks = []
-    for a in ach_items[:3]:
+    for a in ach_items[:4]:
         thumb = f"<img class='achievement-chip-thumb' src='{a.get('image_uri')}' alt='Achievement'/>" if a.get("image_uri") else ""
         season_tag = f"S{a.get('season')}" if a.get("season") else ""
+        tier = str(a.get("tier", "-")).strip().upper()
         ach_chunks.append(
             f"<div class='achievement-chip'>{thumb}<div><div class='achievement-chip-name'>{a.get('name','Achievement')}</div>"
-            f"<div class='achievement-chip-meta'>{a.get('position','')} {season_tag}</div></div></div>"
+            f"<div class='achievement-chip-meta'>{a.get('position','')} {season_tag}</div></div>{achievement_tier_badge(tier)}</div>"
         )
     ach_html = "".join(ach_chunks)
     if row.get("achievements_hidden", 0):
@@ -107,7 +118,7 @@ def player_card(row: dict):
           </div>
           <div>{logo_visual}</div>
         </div>
-        <div>{tier_badge(row.get('tier', '-'))}{trend_chip(row.get('trend', 'Stable'))}</div>
+        <div>{trend_chip(row.get('trend', 'Stable'))}</div>
         <p class='player-desc'>{row.get('desc', '')}</p>
         <div class='stats-grid'>{stats_html}</div>
         <div class='achievement-strip'>{ach_html or "<span class='muted'>No achievements recorded</span>"}</div>
