@@ -147,9 +147,9 @@ def inject_styles(theme_name: str = "Dark"):
       display:flex;
       flex-direction: row;
       flex-wrap: nowrap;
-      gap: 6px;
-      min-height: 58px;
-      max-height: 58px;
+      gap: 7px;
+      min-height: 64px;
+      max-height: 64px;
       align-items:stretch;
       overflow: hidden;
     }}
@@ -166,9 +166,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-tile {{
       position: relative;
-      flex: 0 0 50px;
-      width: 50px;
-      height: 58px;
+      flex: 0 0 56px;
+      width: 56px;
+      height: 64px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
@@ -194,7 +194,7 @@ def inject_styles(theme_name: str = "Dark"):
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      padding: 2px;
+      padding: 3px;
       gap: 1px;
       background: linear-gradient(180deg, transparent 0%, rgba(8,12,20,0.58) 100%);
     }}
@@ -204,16 +204,16 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-season {{
       color: #eef2ff;
-      font-size: 7px;
+      font-size: 8px;
       line-height: 1.1;
       font-weight: 600;
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
       white-space: nowrap;
     }}
     .achievement-overflow {{
-      flex: 0 0 50px;
-      width: 50px;
-      height: 58px;
+      flex: 0 0 56px;
+      width: 56px;
+      height: 64px;
       display:flex;
       align-items:center;
       justify-content:center;
