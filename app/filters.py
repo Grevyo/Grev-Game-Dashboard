@@ -25,6 +25,15 @@ def _int_sorted_values(df: pd.DataFrame, col: str) -> list[str]:
     return sorted_values
 
 
+def get_current_season(df: pd.DataFrame, season_col: str = "season") -> str | None:
+    if df.empty or season_col not in df.columns:
+        return None
+    seasons = pd.to_numeric(df[season_col], errors="coerce").dropna()
+    if seasons.empty:
+        return None
+    return str(int(seasons.max()))
+
+
 def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
     st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
     st.markdown("<div class='section-title' style='margin-bottom:4px;'>Context Controls</div>", unsafe_allow_html=True)
@@ -40,7 +49,9 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
             comp_mode = st.radio("Competition mode", ["Grouped competitions", "Individual competitions"], index=0, horizontal=True)
         with c3:
             season_options = _int_sorted_values(player_df, "season")
-            season_vals = st.multiselect("Season", season_options, default=season_options)
+            current_season = get_current_season(player_df, "season")
+            default_season = [current_season] if current_season and current_season in season_options else season_options
+            season_vals = st.multiselect("Season", season_options, default=default_season)
 
     competitions_col = get_active_competition_col(is_grouped_mode(comp_mode))
 

@@ -19,6 +19,7 @@ from app.image_helpers import (
     image_data_uri,
     resolve_player_photo,
 )
+from app.styles import achievement_tier_badge
 from app.transforms import best_contexts
 
 
@@ -128,7 +129,7 @@ def render(ctx):
               <div style='display:flex;justify-content:flex-end;margin-bottom:8px;'>{hero_logo}</div>
               <div class='subtle-grid'>
                 <div class='panel panel-tight accent-mid'><div class='metric-title'>Team Rank</div><div class='metric-value'>{int((df.groupby('player')['grevscore'].mean().rank(ascending=False, method='min').get(player, 0)))}</div></div>
-                <div class='panel panel-tight accent-good'><div class='metric-title'>Record</div><div class='metric-value'>{int((p['grevscore'] >= 60).sum())}-{int((p['grevscore'] < 60).sum())}</div></div>
+                <div class='panel panel-tight accent-good'><div class='metric-title'>Record</div><div class='metric-value'>{int((p['grevscore'] >= 1.0).sum())}-{int((p['grevscore'] < 1.0).sum())}</div></div>
                 <div class='panel panel-tight accent-mid'><div class='metric-title'>Recent Streak</div><div class='metric-value'>{streak}</div></div>
                 <div class='panel panel-tight accent-{'good' if delta_10 >= 0 else 'bad'}'><div class='metric-title'>Last 10 Δ</div><div class='metric-value'>{delta_10:+.1f}</div></div>
               </div>
@@ -150,7 +151,7 @@ def render(ctx):
             with cols[idx % len(cols)]:
                 st.markdown(
                     f"<div class='panel panel-tight accent-mid'>{img_html}<strong>{a.get('name','Achievement')}</strong><br>"
-                    f"<span class='muted'>{a.get('position','')} • Season {a.get('season','-')} • Tier {a.get('tier','-')}</span></div>",
+                    f"<span class='muted'>{a.get('position','')} • Season {a.get('season','-')}</span><br>{achievement_tier_badge(a.get('tier','-'))}</div>",
                     unsafe_allow_html=True,
                 )
         if ach_hidden:

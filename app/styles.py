@@ -91,12 +91,12 @@ def inject_styles(theme_name: str = "Dark"):
       margin-bottom: 14px;
     }}
 
-    .player-card {{ min-height: 390px; display:flex; flex-direction:column; gap: 10px; }}
-    .player-head {{ display:flex; align-items:flex-start; gap:12px; }}
+    .player-card {{ min-height: 364px; display:flex; flex-direction:column; gap: 8px; }}
+    .player-head {{ display:flex; align-items:flex-start; gap:8px; }}
     .player-head-left {{ flex:0 0 auto; }}
     .player-head-meta {{ flex:1; min-width:0; }}
     .player-avatar-frame {{
-      width: 96px; height: 124px; border-radius: 14px; overflow:hidden;
+      width: 82px; height: 108px; border-radius: 12px; overflow:hidden;
       border: 1px solid var(--border);
       background: color-mix(in srgb, var(--surface) 72%, #fff 28%);
       display:flex; align-items:center; justify-content:center;
@@ -108,7 +108,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .fallback-avatar {{ display:flex; align-items:center; justify-content:center; font-size:10px; color: var(--muted); }}
     .team-mini-logo {{
-      width: 32px; height: 32px; object-fit: contain;
+      width: 26px; height: 26px; object-fit: contain;
       border-radius: 8px; padding: 3px;
       border: 1px solid var(--border);
       background: color-mix(in srgb, var(--surface) 70%, #fff 30%);
@@ -127,28 +127,36 @@ def inject_styles(theme_name: str = "Dark"):
       margin-bottom: 8px;
     }}
 
-    .player-name {{ font-size: 1.03rem; font-weight: 720; margin: 0; }}
-    .identity-line {{ color: var(--muted); font-size: 12px; margin: 0; }}
-    .player-desc {{ font-size: 12px; color: color-mix(in srgb, var(--text) 88%, #fff 12%); margin: 0; min-height: 30px; }}
-    .achievement-strip {{ display:flex; flex-wrap:wrap; gap: 6px; min-height: 36px; align-items:stretch; }}
+    .player-name {{ font-size: 0.95rem; font-weight: 720; margin: 0; }}
+    .identity-line {{ color: var(--muted); font-size: 11px; margin: 0; }}
+    .player-desc {{ font-size: 11px; color: color-mix(in srgb, var(--text) 88%, #fff 12%); margin: 0; min-height: 24px; }}
+    .achievement-strip {{ display:flex; flex-wrap:wrap; gap: 4px; min-height: 32px; align-items:stretch; }}
     .achievement-chip {{
       display:flex; gap:6px; align-items:center;
       background: color-mix(in srgb, var(--surface) 84%, #fff 16%);
-      border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+      border: 1px solid var(--border); border-radius: 9px; padding: 4px 5px;
       min-width: 0;
     }}
-    .achievement-chip-thumb {{ width: 26px; height: 26px; object-fit: contain; border-radius: 8px; }}
-    .achievement-chip-name {{ font-size: 11px; font-weight: 680; line-height: 1.1; }}
-    .achievement-chip-meta {{ font-size: 10px; color: var(--muted); }}
-    .stats-grid {{ display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }}
+    .achievement-chip-thumb {{ width: 22px; height: 22px; object-fit: contain; border-radius: 7px; }}
+    .achievement-chip-name {{ font-size: 10px; font-weight: 680; line-height: 1.1; }}
+    .achievement-chip-meta {{ font-size: 9px; color: var(--muted); }}
+    .achievement-tier {{
+      padding: 1px 6px; border-radius: 999px; font-size: 9px; font-weight: 750; letter-spacing: 0.05em;
+      border: 1px solid currentColor; align-self: flex-start;
+    }}
+    .stats-grid {{ display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }}
     .stat-item {{
       background: color-mix(in srgb, var(--surface) 82%, #fff 18%);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px;
+      border-radius: 9px;
+      padding: 6px 7px;
     }}
-    .stat-item .label {{ color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }}
-    .stat-item .value {{ font-size: 14px; font-weight: 680; margin-top: 2px; }}
+    .stat-item .label {{ color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; }}
+    .stat-item .value {{ font-size: 13px; font-weight: 680; margin-top: 1px; }}
+    .tone-good {{ border-color: color-mix(in srgb, var(--good) 60%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--good) 14%, transparent); }}
+    .tone-mid {{ border-color: color-mix(in srgb, var(--mid) 60%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mid) 14%, transparent); }}
+    .tone-poor {{ border-color: color-mix(in srgb, var(--poor) 64%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--poor) 16%, transparent); }}
+    .tone-bad {{ border-color: color-mix(in srgb, var(--bad) 70%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 15%, transparent); }}
 
     .toolbar-shell {{
       background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff 8%), var(--surface));
@@ -173,3 +181,15 @@ def inject_styles(theme_name: str = "Dark"):
 def tier_badge(tier: str) -> str:
     color = TIER_COLORS.get(str(tier).strip().upper(), "#8892b0")
     return f"<span class='chip' style='background:{color}26;border-color:{color};'>Tier {tier}</span>"
+
+
+def achievement_tier_badge(tier: str) -> str:
+    palette = {
+        "S": "#f5c542",
+        "A": "#9c6bff",
+        "B": "#4f8dff",
+        "C": "#3db97a",
+    }
+    key = str(tier or "-").strip().upper()
+    color = palette.get(key, "#8892b0")
+    return f"<span class='achievement-tier' style='color:{color};background:{color}1f;'>Tier {key}</span>"
