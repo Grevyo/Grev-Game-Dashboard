@@ -106,6 +106,48 @@ def _render_roster_cards(
                 player_card(merged)
 
 
+def _build_streamer_metadata_rows(
+    players_meta: pd.DataFrame,
+    active_summary: pd.DataFrame,
+    benched_summary: pd.DataFrame,
+    transferred_summary: pd.DataFrame,
+) -> pd.DataFrame:
+    if players_meta.empty:
+        return pd.DataFrame(columns=["player", "country", "nationality", "role", "fame", "new_team"])
+
+    name_col = "player_clean" if "player_clean" in players_meta.columns else "player" if "player" in players_meta.columns else "name" if "name" in players_meta.columns else None
+    if not name_col or "role" not in players_meta.columns:
+        return pd.DataFrame(columns=["player", "country", "nationality", "role", "fame", "new_team"])
+
+    meta = players_meta.copy()
+    meta["role_key"] = meta["role"].astype(str).str.strip().str.casefold()
+    meta["player_key"] = meta[name_col].astype(str).map(_player_key)
+
+    medisports_mask = pd.Series([False] * len(meta), index=meta.index)
+    if "player" in meta.columns:
+        medisports_mask = medisports_mask | meta["player"].map(lambda v: "ⓜ" in str(v or ""))
+    if "name" in meta.columns:
+        medisports_mask = medisports_mask | meta["name"].map(lambda v: "ⓜ" in str(v or ""))
+
+    streamer_meta = meta[medisports_mask & (meta["role_key"] == "streamer")].copy()
+    if streamer_meta.empty:
+        return pd.DataFrame(columns=["player", "country", "nationality", "role", "fame", "new_team"])
+
+    excluded_keys: set[str] = set()
+    for section_df in [active_summary, benched_summary, transferred_summary]:
+        if not section_df.empty and "player" in section_df.columns:
+            excluded_keys.update(section_df["player"].astype(str).map(_player_key).tolist())
+
+    if excluded_keys:
+        streamer_meta = streamer_meta[~streamer_meta["player_key"].isin(excluded_keys)]
+
+    display_name_col = "player" if "player" in streamer_meta.columns else "name"
+    streamer_meta = streamer_meta.rename(columns={display_name_col: "player"})
+    if "nationality" not in streamer_meta.columns:
+        streamer_meta["nationality"] = streamer_meta.get("country", "")
+    return streamer_meta.drop_duplicates(subset=["player_key"], keep="first")
+
+
 def render(ctx):
     full_df = ctx["player_matches"]
     full_history_df = ctx.get("player_matches_full", full_df)
@@ -157,6 +199,15 @@ def render(ctx):
         players_meta=players_meta,
         active_threshold=0.10,
     )
+    all_streamer_meta_rows = _build_streamer_metadata_rows(
+        players_meta,
+        active_summary.iloc[0:0],
+        benched_summary.iloc[0:0],
+        transferred_summary.iloc[0:0],
+    )
+    streamer_meta_rows = _build_streamer_metadata_rows(players_meta, active_summary, benched_summary, transferred_summary)
+    streamer_names = streamer_meta_rows["player"].astype(str).tolist() if not streamer_meta_rows.empty and "player" in streamer_meta_rows.columns else []
+    all_streamer_names = all_streamer_meta_rows["player"].astype(str).tolist() if not all_streamer_meta_rows.empty and "player" in all_streamer_meta_rows.columns else []
 
     seasons = filters.get("season") or ([f"Season {auto_current_season}"] if auto_current_season else ["All seasons"])
     maps = filters.get("map") or ["All maps"]
@@ -180,7 +231,7 @@ def render(ctx):
               <div>
                 <span class='chip chip-good'>Active: {active_summary['player'].nunique()}</span>
                 <span class='chip chip-poor'>Benched/Academy: {benched_summary['player'].nunique()}</span>
-                <span class='chip chip-mid'>Streamer: {streamer_summary['player'].nunique()}</span>
+                <span class='chip chip-mid'>Streamer: {len(all_streamer_names)}</span>
                 <span class='chip chip-bad'>Transferred: {transferred_summary['player'].nunique()}</span>
               </div>
             </div>
@@ -243,11 +294,31 @@ def render(ctx):
         _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if not streamer_summary.empty:
+    if all_streamer_names:
         section_header("Streamer", "Rostered Medisports streamer profiles from players metadata")
-        st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
-        _render_roster_cards(streamer_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.write("Streamer names from players.csv:", all_streamer_names)
+        streamer_cards = pd.DataFrame(
+            {
+                "player": streamer_meta_rows.get("player", pd.Series(dtype=object)).astype(str),
+                "country": streamer_meta_rows.get("country", ""),
+                "nationality": streamer_meta_rows.get("nationality", streamer_meta_rows.get("country", "")),
+                "role": streamer_meta_rows.get("role", ""),
+                "fame": streamer_meta_rows.get("fame", ""),
+                "photo_uri": "",
+                "team_logo_uri": "",
+                "achievements": [[] for _ in range(len(streamer_meta_rows))],
+                "achievements_hidden": [0] * len(streamer_meta_rows),
+                "roster_bucket": "streamer",
+                "desc": "Streamer profile — competitive stats not yet tracked.",
+                "new_team": streamer_meta_rows.get("new_team", ""),
+            }
+        )
+        if streamer_cards.empty:
+            st.info("No streamer-only profiles to show after excluding Active, Benched / Academy, and Transferred players.")
+        else:
+            st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
+            _render_roster_cards(streamer_cards, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
+            st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
         section_header("Transferred", "Historical Medisports players absent for more than two seasons")
