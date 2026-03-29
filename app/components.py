@@ -6,6 +6,8 @@ from app.metrics import classify_quality, stat_tone
 from app.presentation_helpers import fame_to_stars, nationality_label
 from app.styles import achievement_tier_badge
 
+_HIDDEN_META_VALUES = {"", "nan", "none", "null", "div"}
+
 
 def section_header(title: str, subtitle: str = ""):
     st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
@@ -41,6 +43,23 @@ def _tone_from_score(score: float) -> str:
         return "poor"
     return "bad"
 
+
+def _clean_player_card_meta(value) -> str:
+    text = str(value or "").strip()
+    return "" if text.casefold() in _HIDDEN_META_VALUES else text
+
+
+def _allowed_player_card_meta(row: dict) -> dict[str, str]:
+    """Explicit metadata allowlist for player-card rendering."""
+    nationality = _clean_player_card_meta(row.get("nationality")) or _clean_player_card_meta(row.get("country"))
+    role = _clean_player_card_meta(row.get("role"))
+    transfer_destination = _clean_player_card_meta(row.get("transfer_destination"))
+    return {
+        "nationality": nationality,
+        "role": role,
+        "transfer_destination": transfer_destination,
+        "fame": _clean_player_card_meta(row.get("fame")),
+    }
 
 
 
@@ -100,10 +119,11 @@ def _tier_box_html(tier: str, score: float | None) -> str:
 def player_card(row: dict):
     grev = float(row.get("grevscore", 0) or 0)
     tone = _tone_from_score(grev)
-    nationality = nationality_label(row.get("nationality") or row.get("country"))
+    card_meta = _allowed_player_card_meta(row)
+    nationality = nationality_label(card_meta["nationality"])
     identity_line = nationality or "Nationality N/A"
-    role_line = row.get("role") or row.get("team_tag", "Medisports")
-    transfer_destination = str(row.get("transfer_destination", "") or "").strip()
+    role_line = card_meta["role"] or row.get("team_tag", "Medisports")
+    transfer_destination = card_meta["transfer_destination"]
     transfer_line = (
         f"<p class='identity-line'><strong>Moved to:</strong> {transfer_destination}</p>"
         if str(row.get("roster_bucket", "")).strip().lower() == "transferred" and transfer_destination
@@ -120,7 +140,7 @@ def player_card(row: dict):
     )
     logo_visual = f"<img class='team-mini-logo' src='{logo_uri}' alt='Team logo'/>" if logo_uri else ""
 
-    fame_stars, fame_numeric = fame_to_stars(row.get("fame"))
+    fame_stars, fame_numeric = fame_to_stars(card_meta["fame"])
     fame_html = (
         f"<div class='fame-line'><span class='fame-label'>Fame</span><span class='fame-stars'>{fame_stars}</span><span class='fame-value'>{fame_numeric}</span></div>"
         if fame_stars
