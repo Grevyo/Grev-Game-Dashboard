@@ -127,12 +127,14 @@ def render_achievement_mini_tile(achievement: dict) -> str:
         else "<div class='achievement-tile-thumb achievement-tile-thumb-fallback'>No Image</div>"
     )
     season_label = str(achievement.get("season_label", "")).strip()
+    event_title = str(achievement.get("name", "")).strip()
     return (
         f"<div class='achievement-tile tier-{tier}'>"
         f"{thumb}"
+        f"<div class='achievement-season-top'>{season_label}</div>"
         f"<div class='achievement-tile-overlay'>"
         f"{achievement_tier_badge(tier)}"
-        f"<span class='achievement-season'>{season_label}</span>"
+        f"<span class='achievement-event-title' title='{event_title}'>{event_title}</span>"
         f"</div></div>"
     )
 
