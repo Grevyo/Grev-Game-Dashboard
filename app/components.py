@@ -8,9 +8,6 @@ from app.metrics import classify_quality, stat_tone
 from app.presentation_helpers import fame_to_stars, nationality_label
 from app.styles import achievement_tier_badge
 
-_OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED = False
-_OVERVIEW_CARD_DICT_DEBUG_EMITTED = False
-
 
 def section_header(title: str, subtitle: str = ""):
     st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
@@ -122,41 +119,22 @@ def trend_chip(trend: str) -> str:
 
 
 def render_achievement_mini_tile(achievement: dict) -> str:
-    global _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED
     tier = str(achievement.get("tier", "")).strip().upper()
     tier = tier if tier in {"S", "A", "B", "C"} else "C"
-    image_value = achievement.get("image_uri")
-    has_image_branch = bool(image_value)
     thumb = (
-        f"<img class='achievement-tile-thumb' src='{image_value}' alt='{achievement.get('name', 'Achievement')}'/>"
-        if has_image_branch
+        f"<img class='achievement-tile-thumb' src='{achievement.get('image_uri')}' alt='{achievement.get('name', 'Achievement')}'/>"
+        if achievement.get("image_uri")
         else "<div class='achievement-tile-thumb achievement-tile-thumb-fallback'>No Image</div>"
     )
     season_label = str(achievement.get("season_label", "")).strip()
-    event_title = str(achievement.get("name", "")).strip()
-    card_html = (
+    return (
         f"<div class='achievement-tile tier-{tier}'>"
         f"{thumb}"
-        f"<div class='achievement-season-top'>{season_label}</div>"
         f"<div class='achievement-tile-overlay'>"
         f"{achievement_tier_badge(tier)}"
-        f"<span class='achievement-event-title' title='{event_title}'>{event_title}</span>"
+        f"<span class='achievement-season'>{season_label}</span>"
         f"</div></div>"
     )
-
-    if "cpl open" in event_title.casefold() and not _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED:
-        print(
-            "[OVERVIEW_ACHIEVEMENT_RENDER_DEBUG]",
-            {
-                "achievement_name": achievement.get("name"),
-                "image_uri_truthy": has_image_branch,
-                "render_branch": "image" if has_image_branch else "fallback",
-                "image_src_preview": str(image_value or "")[:72],
-                "image_src_length": len(image_value) if isinstance(image_value, str) else 0,
-            },
-        )
-        _OVERVIEW_ACHIEVEMENT_RENDER_DEBUG_EMITTED = True
-    return card_html
 
 
 def _tier_box_html(tier: str, score: float | None) -> str:
@@ -193,40 +171,39 @@ def player_card(row: dict):
     fame_html = (
         f"<div class='fame-line'><span class='fame-label'>Fame</span><span class='fame-stars'>{fame_stars}</span><span class='fame-value'>{fame_numeric}</span></div>"
         if fame_stars and fame_numeric
-        else ""
+        else "<div class='fame-line'><span class='fame-label'>Fame</span><span class='fame-value'>N/A</span></div>" if is_streamer_card else ""
     )
 
-    safe_player_name = html.escape(str(row.get("player", "Unknown")))
     safe_identity_line = html.escape(str(identity_line))
     safe_role_line = html.escape(str(role_line))
     safe_player_note = html.escape(str(_player_note(row) or ""))
-    safe_best_map = html.escape(str(row.get("best_map", "N/A")))
-    safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
 
     if is_streamer_card:
-        streamer_card_html = f"""
-        <div class='panel player-card player-card-streamer accent-mid player-card-subdued'>
-            <div class='player-head player-head-streamer'>
-                <div class='player-head-left'>
-                    {profile_visual}
+        card_html = f"""
+        <div class='panel player-card player-card-streamer accent-{tone} player-card-subdued'>
+            <div class='player-head'>
+              <div class='player-head-left'>
+                {profile_visual}
+              </div>
+              <div class='player-head-meta'>
+                <div class='player-head-title-row'>
+                  <div class='player-name-row'>
+                    <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
+                  </div>
+                  <div>{logo_visual}</div>
                 </div>
-                <div class='player-head-meta'>
-                    <div class='player-head-title-row'>
-                        <div class='player-name-row'>
-                            <p class='player-name'>{safe_player_name}</p>
-                        </div>
-                        <div>{logo_visual}</div>
-                    </div>
-                    <p class='identity-line'>{safe_identity_line}</p>
-                    <p class='identity-line'>{safe_role_line}</p>
-                    {fame_html}
-                    <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong></span></div>
+                <div class='streamer-meta-stack'>
+                  <p class='identity-line'>{safe_identity_line}</p>
+                  <p class='identity-line'>{safe_role_line}</p>
+                  {fame_html}
+                  <div class='streamer-status-chip'>No competitive match sample yet</div>
                 </div>
+              </div>
             </div>
             <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
         </div>
         """
-        st.markdown(streamer_card_html, unsafe_allow_html=True)
+        st.markdown(card_html, unsafe_allow_html=True)
         return
 
     stat_items = [
@@ -247,21 +224,6 @@ def player_card(row: dict):
         for label, val, formatted in stat_items
     )
     ach_items = row.get("achievements", []) or []
-    global _OVERVIEW_CARD_DICT_DEBUG_EMITTED
-    if not _OVERVIEW_CARD_DICT_DEBUG_EMITTED:
-        cpl_open_item = next((a for a in ach_items if "cpl open" in str(a.get("name", "")).casefold()), None)
-        if cpl_open_item:
-            print(
-                "[OVERVIEW_CARD_ACHIEVEMENT_DICT_DEBUG]",
-                {
-                    "achievement_dict": cpl_open_item,
-                    "name": cpl_open_item.get("name"),
-                    "season": cpl_open_item.get("season"),
-                    "tier": cpl_open_item.get("tier"),
-                    "image_uri_present": bool(cpl_open_item.get("image_uri")),
-                },
-            )
-            _OVERVIEW_CARD_DICT_DEBUG_EMITTED = True
     ach_html = "".join(render_achievement_mini_tile(a) for a in ach_items[:4])
 
     tier_order = ["S", "A", "B", "C"]
@@ -277,7 +239,7 @@ def player_card(row: dict):
     trend_html = trend_chip(row.get("trend", "Stable"))
     context_html = (
         "<div class='player-meta-row'><span class='muted'>Best map <strong>"
-        f"{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
+        f"{html.escape(str(row.get('best_map', 'N/A')))}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
     )
     stats_block_html = f"<div class='stats-grid'>{stats_html}</div>"
     tier_block_html = tier_html
@@ -291,7 +253,7 @@ def player_card(row: dict):
           <div class='player-head-meta'>
             <div class='player-head-title-row'>
               <div class='player-name-row'>
-                <p class='player-name'>{safe_player_name}</p>
+                <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
                 {trend_html}
               </div>
               <div>{logo_visual}</div>
