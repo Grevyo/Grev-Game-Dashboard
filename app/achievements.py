@@ -2,7 +2,7 @@ import re
 
 import pandas as pd
 
-from app.image_helpers import find_achievement_image, image_data_uri
+from app.image_helpers import image_data_uri, resolve_achievement_image
 
 POSITION_PRIORITY = {
     "1st": 100,
@@ -15,6 +15,7 @@ POSITION_PRIORITY = {
     "8th": 30,
 }
 TIER_PRIORITY = {"S": 90, "A": 75, "B": 60, "C": 45, "D": 30}
+_CPL_OPEN_DEBUG_EMITTED = False
 
 
 def _player_key(player_name: str | None) -> str:
@@ -55,11 +56,31 @@ def achievements_for_player(achievements_df: pd.DataFrame, player_name: str, cap
     top = pool.head(cap)
     items = []
     for _, row in top.iterrows():
-        image_path = find_achievement_image(
+        image_resolution = resolve_achievement_image(
             row.get("achievement_link") or row.get("achievement_name"),
             achievement_name=row.get("achievement_name"),
             placement=row.get("position"),
         )
+        image_path = image_resolution.get("final_path")
+        image_uri = image_data_uri(image_path)
+        global _CPL_OPEN_DEBUG_EMITTED
+        if image_resolution.get("cpl_open_match") and not _CPL_OPEN_DEBUG_EMITTED:
+            print(
+                "[CPL_OPEN_DEBUG]",
+                {
+                    "raw_achievement": row.to_dict(),
+                    "event_title_raw": image_resolution.get("event_name"),
+                    "parsed_placement": image_resolution.get("placement_normalized"),
+                    "cpl_open_regex_matched": image_resolution.get("cpl_open_match"),
+                    "selected_filename": image_resolution.get("selected_filename"),
+                    "resolved_filesystem_path": image_resolution.get("resolved_path"),
+                    "resolved_file_exists": image_resolution.get("resolved_exists"),
+                    "final_render_image_path": image_path,
+                    "final_render_image_uri_present": bool(image_uri),
+                    "resolver_source": image_resolution.get("source"),
+                },
+            )
+            _CPL_OPEN_DEBUG_EMITTED = True
         items.append(
             {
                 "name": str(row.get("achievement_name", "Achievement")),
@@ -67,7 +88,7 @@ def achievements_for_player(achievements_df: pd.DataFrame, player_name: str, cap
                 "season": str(row.get("season_name", "")).strip(),
                 "season_label": normalize_season_label(row.get("season_name")),
                 "tier": str(row.get("achievement_tier", "")).strip(),
-                "image_uri": image_data_uri(image_path),
+                "image_uri": image_uri,
             }
         )
     hidden = max(0, len(pool) - len(items))
