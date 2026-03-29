@@ -16,8 +16,6 @@ POSITION_PRIORITY = {
     "8th": 30,
 }
 TIER_PRIORITY = {"S": 90, "A": 75, "B": 60, "C": 45, "D": 30}
-_CPL_OPEN_DEBUG_EMITTED = False
-_ACHIEVEMENT_PIPELINE_DEBUG_PLAYER = "ⓜ | 8eeR"
 
 
 def _is_present_text(value) -> bool:
@@ -25,7 +23,7 @@ def _is_present_text(value) -> bool:
     return bool(text and text.casefold() not in {"nan", "none", "null"})
 
 
-def _resolve_achievement_image_for_overview(row: pd.Series) -> tuple[str | None, str | None, str, dict]:
+def _resolve_achievement_image_for_overview(row: pd.Series) -> tuple[str | None, str | None]:
     """Resolve achievement image with explicit priority for parsed achievement_link.
 
     Priority order:
@@ -34,32 +32,17 @@ def _resolve_achievement_image_for_overview(row: pd.Series) -> tuple[str | None,
     3) Placeholder (no image)
     """
     link_value = str(row.get("achievement_link", "") or "").strip()
-    debug: dict = {
-        "achievement_link_raw": link_value,
-        "link_present": _is_present_text(link_value),
-    }
-
     if _is_present_text(link_value):
         if link_value.startswith("data:image/"):
-            debug["link_strategy"] = "data_uri_direct"
-            return link_value, None, "achievement_link:data_uri", debug
+            return link_value, None
         if re.match(r"^https?://", link_value, flags=re.IGNORECASE):
-            debug["link_strategy"] = "http_url_direct"
-            return link_value, None, "achievement_link:url", debug
+            return link_value, None
 
         link_path = Path(link_value).expanduser()
         if link_path.exists() and link_path.is_file():
             image_uri = image_data_uri_thumbnail(str(link_path))
-            debug["link_strategy"] = "filesystem_path"
-            debug["link_exists"] = True
-            debug["link_is_file"] = True
-            debug["link_uri_generated"] = bool(image_uri)
             if image_uri:
-                return image_uri, str(link_path), "achievement_link:file", debug
-        else:
-            debug["link_strategy"] = "filesystem_path"
-            debug["link_exists"] = False
-            debug["link_is_file"] = False
+                return image_uri, str(link_path)
 
     image_resolution = resolve_achievement_image(
         link_value or row.get("achievement_name"),
@@ -68,10 +51,7 @@ def _resolve_achievement_image_for_overview(row: pd.Series) -> tuple[str | None,
     )
     image_path = image_resolution.get("final_path")
     image_uri = image_data_uri_thumbnail(image_path)
-    debug["resolver_source"] = image_resolution.get("source")
-    debug["resolver_final_path"] = image_path
-    debug["resolver_uri_generated"] = bool(image_uri)
-    return image_uri, image_path, "resolver", debug
+    return image_uri, image_path
 
 
 def _player_key(player_name: str | None) -> str:
@@ -98,7 +78,6 @@ def achievements_for_player(
         return [], 0
 
     key = _player_key(player_name)
-    debug_trace = key == _player_key(_ACHIEVEMENT_PIPELINE_DEBUG_PLAYER)
     pool = achievements_df.copy()
     raw_player_mask = pool.get("player", pd.Series(index=pool.index, dtype=str)).astype(str).map(_player_key) == key
     if "player_clean" in pool.columns:
@@ -109,24 +88,8 @@ def achievements_for_player(
     else:
         mask = raw_player_mask
     pool = pool[mask]
-    if debug_trace:
-        stage_cols = [c for c in ["player", "achievement_name", "season_name", "position", "player_clean"] if c in pool.columns]
-        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=1_after_player_name_filter rows={len(pool)}")
-        print(pool[stage_cols].to_string(index=False) if not pool.empty else "[ACH_PIPELINE_DEBUG] (none)")
-        if "achievement_name" in pool.columns:
-            cpl_open_stage = pool[pool["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
-            print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=1_after_player_name_filter cpl_open_rows={len(cpl_open_stage)}")
-            print(cpl_open_stage[stage_cols].to_string(index=False) if not cpl_open_stage.empty else "[ACH_PIPELINE_DEBUG] (none)")
     if pool.empty:
         return [], 0
-
-    if debug_trace:
-        stage_cols = [c for c in ["player", "achievement_name", "season_name", "position", "player_clean"] if c in pool.columns]
-        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=2_after_cleanup_dedup_dropna rows={len(pool)} (no-op cleanup)")
-        print(pool[stage_cols].to_string(index=False))
-        cpl_open_stage = pool[pool["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
-        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=2_after_cleanup_dedup_dropna cpl_open_rows={len(cpl_open_stage)}")
-        print(cpl_open_stage[stage_cols].to_string(index=False) if not cpl_open_stage.empty else "[ACH_PIPELINE_DEBUG] (none)")
 
     season_num = pd.to_numeric(pool.get("season_name"), errors="coerce").fillna(0)
     pos_priority = pool.get("position", "").astype(str).str.strip().map(POSITION_PRIORITY).fillna(10)
@@ -134,55 +97,17 @@ def achievements_for_player(
 
     pool = pool.assign(_season=season_num, _pos=pos_priority, _tier=tier_priority)
     pool = pool.sort_values(["_pos", "_tier", "_season"], ascending=[False, False, False])
-    if debug_trace:
-        stage_cols = [c for c in ["player", "achievement_name", "season_name", "position", "_pos", "_tier", "_season"] if c in pool.columns]
-        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=3_after_sort rows={len(pool)}")
-        print(pool[stage_cols].to_string(index=False))
-        cpl_open_stage = pool[pool["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
-        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=3_after_sort cpl_open_rows={len(cpl_open_stage)}")
-        print(cpl_open_stage[stage_cols].to_string(index=False) if not cpl_open_stage.empty else "[ACH_PIPELINE_DEBUG] (none)")
 
     if cap is None:
         top = pool
     else:
         top = pool.head(cap)
-    if debug_trace:
-        stage_cols = [c for c in ["player", "achievement_name", "season_name", "position", "_pos", "_tier", "_season"] if c in top.columns]
-        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=4_after_trimming cap={cap} rows={len(top)}")
-        print(top[stage_cols].to_string(index=False))
-        cpl_open_stage = top[top["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
-        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=4_after_trimming cpl_open_rows={len(cpl_open_stage)}")
-        print(cpl_open_stage[stage_cols].to_string(index=False) if not cpl_open_stage.empty else "[ACH_PIPELINE_DEBUG] (none)")
     items = []
     for _, row in top.iterrows():
-        image_uri, image_path, image_source, image_debug = _resolve_achievement_image_for_overview(row)
+        image_uri, image_path = _resolve_achievement_image_for_overview(row)
         if not image_uri and image_path and Path(str(image_path)).exists():
             # Hard fallback: if local file exists but thumbnail encoding failed, still force a data URI.
             image_uri = image_data_uri(str(image_path))
-        global _CPL_OPEN_DEBUG_EMITTED
-        is_cpl_open = "cpl open" in str(row.get("achievement_name", "")).casefold()
-        if is_cpl_open and not _CPL_OPEN_DEBUG_EMITTED:
-            image_path_exists = bool(image_path and Path(str(image_path)).exists())
-            image_uri_is_none = image_uri is None
-            image_uri_len = len(image_uri) if isinstance(image_uri, str) else 0
-            has_image_branch = bool(image_uri)
-            print(
-                "[CPL_OPEN_DEBUG]",
-                {
-                    "player_name": player_name,
-                    "achievement_name": row.get("achievement_name"),
-                    "achievement_link": row.get("achievement_link"),
-                    "resolved_image_path": image_path,
-                    "resolved_image_path_exists": image_path_exists,
-                    "image_uri_is_none": image_uri_is_none,
-                    "image_uri_len": image_uri_len,
-                    "image_uri_prefix": str(image_uri or "")[:48],
-                    "image_source_selected": image_source,
-                    "image_resolution_debug": image_debug,
-                    "consumer": consumer,
-                },
-            )
-            _CPL_OPEN_DEBUG_EMITTED = True
         items.append(
             {
                 "name": str(row.get("achievement_name", "Achievement")),
@@ -196,9 +121,4 @@ def achievements_for_player(
             }
         )
     hidden = max(0, len(pool) - len(items))
-    if debug_trace:
-        final_names = [str(item.get("name", "")).strip() for item in items]
-        final_cpl_open = [name for name in final_names if "cpl open" in name.casefold()]
-        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=5_final_names names={final_names}")
-        print(f"[ACH_PIPELINE_DEBUG] player={player_name} stage=5_final_names cpl_open_names={final_cpl_open}")
     return items, hidden

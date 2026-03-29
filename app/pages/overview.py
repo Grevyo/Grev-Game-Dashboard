@@ -107,7 +107,6 @@ def _best_side_for_player(
     tactics_context: pd.DataFrame,
     player_name: str,
     default: str = "N/A",
-    debug: bool = False,
 ) -> str:
     """Return the side with the highest aggregate GrevScore for a player."""
     if df_context.empty or "player" not in df_context.columns or "grevscore" not in df_context.columns:
@@ -170,14 +169,7 @@ def _best_side_for_player(
     if best.empty:
         return default
 
-    chosen = str(best.iloc[0]["side_norm"])
-    if debug:
-        side_scores = {str(r["side_norm"]): float(r["grevscore"]) for _, r in grouped.iterrows()}
-        print(
-            f"[BestSideDebug] player={player_name} usable_rows={len(usable)} "
-            f"sides_found={playable_sides} grevscore_by_side={side_scores} chosen={chosen}"
-        )
-    return chosen
+    return str(best.iloc[0]["side_norm"])
 
 
 def _trend_for_player(df, player_name: str) -> str:
@@ -213,7 +205,6 @@ def _render_roster_cards(
     achievements_df,
     card_variant: str = "default",
     transferred_logo_fallback: bool = False,
-    debug_player_name: str | None = None,
 ):
     rows = list(summary.iterrows())
     for i in range(0, len(rows), 5):
@@ -255,7 +246,6 @@ def _render_roster_cards(
                 df_context,
                 tactics_context,
                 str(row["player"]),
-                debug=(card_variant != "streamer" and debug_player_name == str(row["player"])),
             ) if card_variant != "streamer" else "N/A"
             merged["trend"] = _trend_for_player(df_context, str(row["player"])) if card_variant != "streamer" else ""
             merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"])) if card_variant != "streamer" else {}
@@ -365,7 +355,7 @@ def render(ctx):
 
     full_medisports_matches = get_medisports_roster_df(full_history_df, player_col="player")
     selected_medisports_matches = get_medisports_roster_df(df, player_col="player")
-    active_summary, benched_summary, streamer_summary, transferred_summary, roster_bucket_debug = split_roster_active_benched_streamer_transferred(
+    active_summary, benched_summary, streamer_summary, transferred_summary, _ = split_roster_active_benched_streamer_transferred(
         summary=summary,
         player_match_counts=player_match_counts,
         selected_medisports_matches=selected_medisports_matches,
@@ -457,7 +447,7 @@ def render(ctx):
         st.info("No players currently qualify for Active Roster in this filter context.")
     else:
         st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
-        _render_roster_cards(active_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df, debug_player_name=(active_summary.iloc[0]["player"] if not active_summary.empty else None))
+        _render_roster_cards(active_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
     section_header("Benched / Academy", "Secondary squad view — lower-usage players in the current filtered context")
@@ -517,33 +507,3 @@ def render(ctx):
         insight_card("Risk Note", "Review low-yield side starts where entry impact is trending below baseline.", "warn")
     with w3:
         insight_card("Focus Note", "Use map veto prep to prioritize strongest map clusters from current filter scope.", "info")
-
-    section_header("Season Filter Debug", "Temporary validation table for selected-season row visibility")
-    selected_seasons = filters.get("season") or []
-    selected_label = ",".join(map(str, selected_seasons)) if selected_seasons else "All"
-    selected_ints = []
-    for value in selected_seasons:
-        try:
-            selected_ints.append(int(str(value)))
-        except (TypeError, ValueError):
-            continue
-    resolved_numeric = pd.to_numeric(full_history_df.get("resolved_season"), errors="coerce")
-    if selected_ints:
-        visibility_mask = resolved_numeric.isin(selected_ints)
-    else:
-        visibility_mask = pd.Series([True] * len(full_history_df), index=full_history_df.index)
-
-    season_filter_debug = pd.DataFrame(
-        {
-            "competition": full_history_df.get("raw_competition_name", full_history_df.get("competition")),
-            "date": full_history_df.get("date"),
-            "resolved_season": full_history_df.get("resolved_season"),
-            "selected_season": selected_label,
-            "row_visible_after_season_filter": visibility_mask,
-        }
-    )
-    season_filter_debug = season_filter_debug.sort_values("date", ascending=False, na_position="last").reset_index(drop=True)
-    st.dataframe(season_filter_debug, use_container_width=True, hide_index=True)
-
-    section_header("Roster Bucket Debug", "Temporary validation table for roster bucket assignments")
-    st.dataframe(roster_bucket_debug, use_container_width=True, hide_index=True)
