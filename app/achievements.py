@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from pathlib import Path
 
 import pandas as pd
@@ -17,6 +18,8 @@ POSITION_PRIORITY = {
 }
 TIER_PRIORITY = {"S": 90, "A": 75, "B": 60, "C": 45, "D": 30}
 _CPL_OPEN_DEBUG_EMITTED = False
+_TARGET_PLAYER_DEBUG = "ⓜ | 8eeR"
+_TARGET_ACHIEVEMENT_DEBUG = "CPL Open 10.38"
 
 
 def _is_present_text(value) -> bool:
@@ -74,7 +77,15 @@ def _resolve_achievement_image_for_overview(row: pd.Series) -> tuple[str | None,
 
 
 def _player_key(player_name: str | None) -> str:
-    return re.sub(r"^ⓜ\s*\|\s*", "", str(player_name or ""), flags=re.IGNORECASE).strip().casefold()
+    return _normalize_player_identity(player_name)
+
+
+def _normalize_player_identity(player_name: str | None) -> str:
+    text = str(player_name or "")
+    text = unicodedata.normalize("NFC", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"^ⓜ\s*\|\s*", "", text, flags=re.IGNORECASE).strip()
+    return text.casefold()
 
 
 def normalize_season_label(season_value: str | int | float | None) -> str:
@@ -98,12 +109,68 @@ def achievements_for_player(
 
     key = _player_key(player_name)
     pool = achievements_df.copy()
+    debug_target_player = _normalize_player_identity(player_name) == _normalize_player_identity(_TARGET_PLAYER_DEBUG)
+    pre_filter_count = len(pool)
+    target_row_df = achievements_df[
+        (achievements_df.get("player", pd.Series(index=achievements_df.index, dtype=str)).astype(str) == _TARGET_PLAYER_DEBUG)
+        & (achievements_df.get("achievement_name", pd.Series(index=achievements_df.index, dtype=str)).astype(str) == _TARGET_ACHIEVEMENT_DEBUG)
+    ]
+    if debug_target_player:
+        if not target_row_df.empty:
+            target_dict = target_row_df.iloc[0].to_dict()
+            print(
+                "[ROW_TRACE_EXACT]",
+                {
+                    "parsed_row_dict": target_dict,
+                    "repr_player": repr(target_dict.get("player")),
+                    "repr_achievement_name": repr(target_dict.get("achievement_name")),
+                },
+            )
+        near_mask = achievements_df.get("player", pd.Series(index=achievements_df.index, dtype=str)).astype(str).str.contains("8eeR", case=False, na=False)
+        near_rows = achievements_df[near_mask].copy()
+        near_rows["player_repr"] = near_rows.get("player", "").map(repr)
+        near_rows["player_normalized"] = near_rows.get("player", "").map(_normalize_player_identity)
+        near_rows["achievement_name_repr"] = near_rows.get("achievement_name", "").map(repr)
+        print(
+            "[PLAYER_MATCH_DEBUG]",
+            {
+                "requested_player_name": player_name,
+                "requested_player_repr": repr(player_name),
+                "requested_player_normalized": _normalize_player_identity(player_name),
+                "near_match_player_values": near_rows[["player", "player_repr", "player_normalized", "achievement_name", "achievement_name_repr"]].to_dict("records"),
+            },
+        )
+
     if "player_clean" in pool.columns:
-        mask = pool["player_clean"].astype(str).str.strip().str.casefold() == key
+        mask = pool["player_clean"].astype(str).map(_normalize_player_identity) == key
     else:
-        mask = pool.get("player", pd.Series(index=pool.index, dtype=str)).astype(str).map(_player_key) == key
+        mask = pool.get("player", pd.Series(index=pool.index, dtype=str)).astype(str).map(_normalize_player_identity) == key
+    if debug_target_player and not target_row_df.empty:
+        target_index = target_row_df.index[0]
+        survives_player_filter = bool(mask.get(target_index, False))
+        print(
+            "[PLAYER_FILTER_SURVIVAL]",
+            {
+                "target_row_index": int(target_index),
+                "survives_player_name_filter": survives_player_filter,
+            },
+        )
     pool = pool[mask]
+    after_player_filter_count = len(pool)
     if pool.empty:
+        if debug_target_player:
+            print(
+                "[ACHIEVEMENT_PIPELINE_COUNTS]",
+                {
+                    "player": player_name,
+                    "stage_total_rows": pre_filter_count,
+                    "stage_player_match_rows": after_player_filter_count,
+                    "stage_after_cleanup_filtering_rows": 0,
+                    "stage_after_sort_rows": 0,
+                    "stage_returned_rows": 0,
+                    "final_returned_achievement_names": [],
+                },
+            )
         return [], 0
 
     season_num = pd.to_numeric(pool.get("season_name"), errors="coerce").fillna(0)
@@ -111,7 +178,9 @@ def achievements_for_player(
     tier_priority = pool.get("achievement_tier", "").astype(str).str.upper().map(TIER_PRIORITY).fillna(20)
 
     pool = pool.assign(_season=season_num, _pos=pos_priority, _tier=tier_priority)
+    after_cleanup_count = len(pool)
     pool = pool.sort_values(["_pos", "_tier", "_season"], ascending=[False, False, False])
+    after_sort_count = len(pool)
 
     top = pool
     if cap is not None:
@@ -157,6 +226,19 @@ def achievements_for_player(
                 "image_path": image_path,
                 "image_render_type": "data_uri" if image_uri and str(image_uri).startswith("data:image/") else "url" if image_uri else "none",
             }
+        )
+    if debug_target_player:
+        print(
+            "[ACHIEVEMENT_PIPELINE_COUNTS]",
+            {
+                "player": player_name,
+                "stage_total_rows": pre_filter_count,
+                "stage_player_match_rows": after_player_filter_count,
+                "stage_after_cleanup_filtering_rows": after_cleanup_count,
+                "stage_after_sort_rows": after_sort_count,
+                "stage_returned_rows": len(items),
+                "final_returned_achievement_names": [item.get("name") for item in items],
+            },
         )
     hidden = max(0, len(pool) - len(items))
     return items, hidden
