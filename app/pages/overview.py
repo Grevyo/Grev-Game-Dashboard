@@ -215,7 +215,6 @@ def _render_roster_cards(
     transferred_logo_fallback: bool = False,
     debug_player_name: str | None = None,
 ):
-    debug_player_target_key = _player_key("ⓜ | 8eeR")
     rows = list(summary.iterrows())
     for i in range(0, len(rows), 5):
         cols = st.columns(5, gap="small")
@@ -271,14 +270,6 @@ def _render_roster_cards(
             ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=None, consumer="overview")
             merged["achievements"] = ach_list
             merged["achievements_hidden"] = ach_hidden
-            if _player_key(str(row["player"])) == debug_player_target_key:
-                print(
-                    "[OVERVIEW_CARD_INPUT_DEBUG]",
-                    {
-                        "player_name": str(row["player"]),
-                        "achievement_names_passed_to_card": [a.get("name") for a in ach_list],
-                    },
-                )
 
             with cols[c_idx]:
                 player_card(merged)
