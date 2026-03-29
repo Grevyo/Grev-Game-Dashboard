@@ -113,9 +113,10 @@ def render(ctx):
     selected_seasons = filters.get("season") or []
     auto_current_season = None
     if not selected_seasons:
-        auto_current_season = get_current_season(df_base, "season")
-        if auto_current_season and "season" in df_base.columns:
-            df_base = df_base[df_base["season"].astype(str) == auto_current_season].copy()
+        auto_current_season = get_current_season(df_base, "resolved_season")
+        season_col = "resolved_season" if "resolved_season" in df_base.columns else "season"
+        if auto_current_season and season_col in df_base.columns:
+            df_base = df_base[df_base[season_col].astype(str) == auto_current_season].copy()
 
     if auto_current_season:
         st.markdown(f"<span class='chip chip-mid'>Defaulted to Season {auto_current_season}</span>", unsafe_allow_html=True)

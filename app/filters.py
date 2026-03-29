@@ -35,8 +35,8 @@ def get_current_season(df: pd.DataFrame, season_col: str = "season") -> str | No
 
 
 def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
-    season_options = _int_sorted_values(player_df, "season")
-    current_season = get_current_season(player_df, "season")
+    season_options = _int_sorted_values(player_df, "resolved_season")
+    current_season = get_current_season(player_df, "resolved_season")
     default_season = [current_season] if current_season and current_season in season_options else season_options
     default_comp_mode = "Grouped competitions"
 
@@ -111,8 +111,8 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
 
 
 def global_filters_from_state(player_df: pd.DataFrame):
-    season_options = _int_sorted_values(player_df, "season")
-    current_season = get_current_season(player_df, "season")
+    season_options = _int_sorted_values(player_df, "resolved_season")
+    current_season = get_current_season(player_df, "resolved_season")
     default_season = [current_season] if current_season and current_season in season_options else season_options
 
     comp_mode = st.session_state.get("global_comp_mode", "Grouped competitions")
@@ -136,13 +136,14 @@ def apply_filters(df, filters):
         return df
     out = df.copy()
 
-    if filters.get("season") and "season" in out.columns:
+    season_col = "resolved_season" if "resolved_season" in out.columns else "season"
+    if filters.get("season") and season_col in out.columns:
         selected_seasons = {str(v) for v in filters["season"]}
         valid = {s for s in selected_seasons if s != "Unspecified"}
         include_unspecified = "Unspecified" in selected_seasons
-        season_mask = out["season"].astype(str).isin(valid)
+        season_mask = out[season_col].astype(str).isin(valid)
         if include_unspecified:
-            season_mask = season_mask | out["season"].isna()
+            season_mask = season_mask | out[season_col].isna()
         out = out[season_mask]
 
     comp_col = filters.get("competition_col") or get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))

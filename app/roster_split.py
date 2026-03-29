@@ -32,9 +32,10 @@ def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
     if df.empty:
         return pd.Series(dtype=float)
 
-    primary = pd.to_numeric(df.get("season", pd.Series(index=df.index, dtype=float)), errors="coerce")
-    fallback = pd.to_numeric(df.get("parsed_season_number", pd.Series(index=df.index, dtype=float)), errors="coerce")
-    return primary.fillna(fallback)
+    primary = pd.to_numeric(df.get("resolved_season", pd.Series(index=df.index, dtype=float)), errors="coerce")
+    fallback = pd.to_numeric(df.get("season", pd.Series(index=df.index, dtype=float)), errors="coerce")
+    explicit = pd.to_numeric(df.get("parsed_season_number", pd.Series(index=df.index, dtype=float)), errors="coerce")
+    return primary.fillna(fallback).fillna(explicit)
 
 
 def get_player_last_played_season(full_medisports_matches: pd.DataFrame) -> dict[str, int]:
