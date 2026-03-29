@@ -235,9 +235,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .player-card.overview-player-card .achievement-tile {{
       position: relative;
-      flex: 0 0 78px;
-      width: 78px;
-      height: 86px;
+      flex: 0 0 86px;
+      width: 86px;
+      height: 94px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: visible;
@@ -263,8 +263,8 @@ def inject_styles(theme_name: str = "Dark"):
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      padding: 5px 5px 4px;
-      gap: 1px;
+      padding: 6px 6px 5px;
+      gap: 2px;
       background: linear-gradient(180deg, transparent 0%, rgba(8,12,20,0.58) 100%);
     }}
     .player-card.overview-player-card .achievement-season-top {{
@@ -278,7 +278,7 @@ def inject_styles(theme_name: str = "Dark"):
       border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
       background: color-mix(in srgb, rgba(7,12,24,0.9) 86%, #9fb8ff 14%);
       color: #f5f8ff;
-      font-size: 7px;
+      font-size: 8px;
       line-height: 1.15;
       font-weight: 700;
       letter-spacing: 0.02em;
@@ -295,9 +295,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-event-title {{
       color: #eef2ff;
-      font-size: 8px;
+      font-size: 8.5px;
       line-height: 1.15;
-      font-weight: 600;
+      font-weight: 750;
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
       display: block;
       word-break: break-word;
@@ -305,9 +305,9 @@ def inject_styles(theme_name: str = "Dark"):
       text-wrap: wrap;
     }}
     .player-card.overview-player-card .achievement-overflow {{
-      flex: 0 0 78px;
-      width: 78px;
-      height: 86px;
+      flex: 0 0 86px;
+      width: 86px;
+      height: 94px;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -354,12 +354,21 @@ def inject_styles(theme_name: str = "Dark"):
       padding: 7px 8px;
       background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 86%, #0a1220 14%), color-mix(in srgb, var(--surface) 95%, #05080f 5%));
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }}
     .grev-tier-label {{ font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 5px; }}
-    .grev-tier-row {{ display:flex; align-items:stretch; gap: 5px; }}
+    .grev-tier-row {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      width: 100%;
+      align-items: stretch;
+    }}
     .grev-tier-box {{
-      width: 40px;
-      min-height: 34px;
+      width: 100%;
+      min-height: 42px;
       border-radius: 6px;
       border: 1px solid color-mix(in srgb, var(--border) 86%, #fff 14%);
       display:flex;
@@ -370,7 +379,7 @@ def inject_styles(theme_name: str = "Dark"):
       color: color-mix(in srgb, var(--muted) 84%, #fff 16%);
       background: color-mix(in srgb, var(--surface) 89%, #fff 11%);
       gap: 1px;
-      padding: 2px 1px;
+      padding: 4px 2px;
     }}
     .tier-name {{ font-size: 8px; line-height: 1; font-weight: 700; }}
     .tier-score {{ font-size: 11.5px; line-height: 1.05; font-weight: 780; color: var(--text); }}
