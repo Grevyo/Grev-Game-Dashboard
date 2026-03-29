@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from app.config import FILES
-from app.grouping import normalize_competitions
+from app.grouping import build_season_resolution_debug_table, normalize_competitions
 
 SYNONYMS = {
     "date": ["date", "match_date"],
@@ -202,6 +202,12 @@ def load_data() -> dict[str, pd.DataFrame]:
 
     if "player_clean" in players.columns:
         players["player_clean"] = players["player_clean"].astype(str).str.replace("ⓜ\s*\|\s*", "", regex=True).str.strip()
+
+    # Temporary debug export to validate row-level season resolution.
+    if not player_matches.empty:
+        debug_table = build_season_resolution_debug_table(player_matches)
+        if not debug_table.empty:
+            debug_table.to_csv(Path("data/season_resolution_debug.csv"), index=False)
 
     return {
         "player_matches": player_matches,

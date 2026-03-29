@@ -39,6 +39,12 @@ def _parse_season_tokens(name: str) -> tuple[int | None, int | None]:
     return int(season), int(instance) if instance is not None else None
 
 
+def parse_explicit_season_from_name(raw_competition_name: str) -> int | None:
+    """Extract explicit season marker from competition title (e.g. S10.12 -> 10)."""
+    season, _ = _parse_season_tokens(raw_competition_name)
+    return season
+
+
 def parse_competition_name(name: str) -> tuple[str, int | None, int | None]:
     """Backward-compatible parser for legacy callers."""
     details = parse_competition_details(name)
@@ -133,6 +139,11 @@ def build_season_anchors(df: pd.DataFrame) -> pd.DataFrame:
     return _build_season_date_anchors(df)
 
 
+def build_season_date_anchors(df: pd.DataFrame) -> pd.DataFrame:
+    """Alias with explicit naming for row-level season resolver pipeline."""
+    return build_season_anchors(df)
+
+
 def _infer_season_from_date(date_value: pd.Timestamp, season_windows: pd.DataFrame) -> int | None:
     if pd.isna(date_value) or season_windows.empty:
         return None
@@ -168,6 +179,11 @@ def _infer_season_from_date(date_value: pd.Timestamp, season_windows: pd.DataFra
 
     candidates = [season for season, left, right in boundaries if left <= date_value <= right]
     return candidates[0] if len(candidates) == 1 else None
+
+
+def infer_season_from_date(row_date: pd.Timestamp | None, anchors: pd.DataFrame) -> int | None:
+    """Infer season from row date using explicit-season anchor windows."""
+    return _infer_season_from_date(row_date, anchors)
 
 
 def infer_season_from_name_or_date(
@@ -217,7 +233,7 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
     inference_df = out.copy()
     inference_df["date"] = inference_df["date_for_season_inference"]
     inferred_family = _infer_nova_prime_season(inference_df)
-    season_windows = build_season_anchors(inference_df)
+    season_windows = build_season_date_anchors(inference_df)
 
     resolved_seasons: list[int | None] = []
     resolve_strategies: list[str] = []
@@ -268,8 +284,12 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
     out["raw_competition_name"] = out[name_col].fillna("").astype(str).str.strip()
     out["grouped_competition_name"] = grouped_names
     out["grouping_strategy"] = strategies
-    out["season_resolution_strategy"] = resolve_strategies
-    out["season"] = pd.to_numeric(final_season, errors="coerce").astype("Int64").astype(str).replace("<NA>", None)
+    out["explicit_season_from_name"] = pd.to_numeric(out["parsed_season_number"], errors="coerce").astype("Int64")
+    out["resolved_season"] = pd.to_numeric(final_season, errors="coerce").astype("Int64").astype(str).replace("<NA>", None)
+    out["season_resolution_method"] = resolve_strategies
+    out["season_resolution_strategy"] = out["season_resolution_method"]
+    # Backward-compatible alias.
+    out["season"] = out["resolved_season"]
     out = out.drop(columns=["date_for_season_inference"], errors="ignore")
 
     # Backward-compatible alias used by older pages.
@@ -283,3 +303,18 @@ def normalize_competition_name(name: str) -> str:
     if details.grouping_allowed and details.parsed_season_number is not None:
         return f"{details.family_display_name} Season {details.parsed_season_number}"
     return details.raw_name
+
+
+def build_season_resolution_debug_table(df: pd.DataFrame) -> pd.DataFrame:
+    """Debug table for validating row-level season resolution."""
+    debug_cols = [
+        "raw_competition_name",
+        "date",
+        "explicit_season_from_name",
+        "resolved_season",
+        "season_resolution_method",
+    ]
+    available = [col for col in debug_cols if col in df.columns]
+    if not available:
+        return pd.DataFrame(columns=debug_cols)
+    return df[available].copy()
