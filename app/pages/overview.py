@@ -108,9 +108,19 @@ def _render_roster_cards(
             merged["achievements_hidden"] = ach_hidden
 
             with cols[c_idx]:
-                if _player_key(str(merged.get("player", ""))) == "hunglow":
-                    st.caption("Hunglow merged payload (pre-player_card)")
-                    st.json(merged, expanded=False)
+                if "Hunglow" in str(merged.get("player", "")):
+                    st.write("Hunglow country:", repr(merged.get("country")))
+                    st.write("Hunglow nationality:", repr(merged.get("nationality")))
+                    st.write("Hunglow role:", repr(merged.get("role")))
+                    st.write("Hunglow fame:", repr(merged.get("fame")))
+                    st.write("Hunglow desc:", repr(str(merged.get("desc") or "")[:300]))
+                    st.write("Hunglow best_map:", repr(merged.get("best_map")))
+                    st.write("Hunglow best_side:", repr(merged.get("best_side")))
+                    st.write("Hunglow trend:", repr(merged.get("trend")))
+                    st.write("Hunglow photo_uri_prefix:", repr(str(merged.get("photo_uri") or "")[:120]))
+                    st.write("Hunglow team_logo_uri_prefix:", repr(str(merged.get("team_logo_uri") or "")[:120]))
+                    st.write("Hunglow achievements_count:", len(merged.get("achievements") or []))
+                    st.write("Hunglow achievements_hidden:", repr(merged.get("achievements_hidden")))
                 player_card(merged)
 
 
