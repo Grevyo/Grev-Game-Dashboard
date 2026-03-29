@@ -144,7 +144,15 @@ def resolve_transferred_logo(new_team: str | None) -> str | None:
     return find_competition_logo("cpl")
 
 
-CPL_OPEN_EVENT_PATTERN = re.compile(r"\bcpl\s+open\s+\d+(?:\.\d+)?\b", flags=re.IGNORECASE)
+CPL_OPEN_EVENT_PATTERN = re.compile(
+    r"""
+    \bcpl\s*open\b            # event family name
+    (?:\s+tournament\b)?       # optional legacy token
+    [^\d]{0,8}                    # optional separators before the number (space, -, :, etc.)
+    \d+(?:\.\d+)+\b          # event instance number like 9.1 or 15.31
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
 CPL_OPEN_PLACEMENT_IMAGE = {
     "1st": "CPLOpen1.png",
     "2nd": "CPLOpen2.png",
