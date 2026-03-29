@@ -239,7 +239,7 @@ def inject_styles(theme_name: str = "Dark"):
       height: 76px;
       border: 1px solid var(--border);
       border-radius: 8px;
-      overflow: hidden;
+      overflow: visible;
       background: color-mix(in srgb, var(--surface) 88%, #fff 12%);
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }}
@@ -281,9 +281,9 @@ def inject_styles(theme_name: str = "Dark"):
       line-height: 1.1;
       font-weight: 700;
       letter-spacing: 0.02em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      text-align: center;
       text-shadow: 0 1px 2px rgba(0,0,0,0.55);
       z-index: 2;
     }}
@@ -297,12 +297,10 @@ def inject_styles(theme_name: str = "Dark"):
       line-height: 1.15;
       font-weight: 600;
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
+      display: block;
       word-break: break-word;
-      text-wrap: balance;
+      overflow-wrap: anywhere;
+      text-wrap: wrap;
     }}
     .achievement-overflow {{
       flex: 0 0 68px;
