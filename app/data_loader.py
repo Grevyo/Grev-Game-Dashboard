@@ -30,6 +30,23 @@ MEDISPORTS_ALIASES = {
 }
 MEDISPORTS_PLAYER_MARKER = "ⓜ"
 
+SIDE_NORMALIZATION_MAP = {
+    "red": "Red",
+    "t": "Red",
+    "attack": "Red",
+    "attacking": "Red",
+    "offense": "Red",
+    "offence": "Red",
+    "blue": "Blue",
+    "ct": "Blue",
+    "counterterrorist": "Blue",
+    "counter-terrorist": "Blue",
+    "counter terrorist": "Blue",
+    "defense": "Blue",
+    "defence": "Blue",
+    "defending": "Blue",
+}
+
 def normalize_player_key(name: str | None) -> str:
     """Normalize player names into a stable comparison key."""
     text = str(name or "").strip()
@@ -53,6 +70,15 @@ def is_medisports_team(team_name: str | None) -> bool:
 
 def is_medisports_player(player_name: str | None) -> bool:
     return MEDISPORTS_PLAYER_MARKER in str(player_name or "")
+
+
+def normalize_side_label(value: str | None) -> str:
+    """Normalize side aliases to the canonical dashboard labels (Red/Blue)."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    key = re.sub(r"[^a-z0-9]+", "", text.casefold())
+    return SIDE_NORMALIZATION_MAP.get(key, text.title())
 
 
 def get_medisports_player_names(df: pd.DataFrame, player_col: str = "player") -> list[str]:
@@ -185,7 +211,7 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
     if "map" in df.columns:
         df["map"] = df["map"].astype(str).str.title().str.strip()
     if "side" in df.columns:
-        df["side"] = df["side"].astype(str).str.title().replace({"Ct": "Blue", "T": "Red"})
+        df["side"] = df["side"].map(normalize_side_label)
     if "competition" in df.columns:
         df["raw_competition_name"] = df["competition"].fillna("").astype(str).str.strip()
     elif "raw_competition_name" in df.columns:
