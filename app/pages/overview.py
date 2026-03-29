@@ -12,6 +12,7 @@ from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
 from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
+from app.grouping import build_season_resolution_debug_table
 
 
 def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> str:
@@ -255,3 +256,7 @@ def render(ctx):
         insight_card("Risk Note", "Review low-yield side starts where entry impact is trending below baseline.", "warn")
     with w3:
         insight_card("Focus Note", "Use map veto prep to prioritize strongest map clusters from current filter scope.", "info")
+
+    section_header("Season Resolution Debug", "Temporary validation table for row-level season assignment")
+    debug_df = build_season_resolution_debug_table(full_df)
+    st.dataframe(debug_df, use_container_width=True, hide_index=True)

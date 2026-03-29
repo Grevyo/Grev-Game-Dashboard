@@ -110,17 +110,17 @@ def _infer_nova_prime_season(df: pd.DataFrame) -> pd.Series:
     return inferred
 
 
-def _build_season_date_anchors(df: pd.DataFrame) -> pd.DataFrame:
-    """Build conservative per-season date anchors from explicit season rows."""
-    required = {"parsed_season_number", "date"}
+def build_season_spans(df: pd.DataFrame) -> pd.DataFrame:
+    """Build season date spans using only explicit-season rows."""
+    required = {"explicit_season", "date"}
     if df.empty or not required.issubset(df.columns):
         return pd.DataFrame(columns=["season", "start_date", "end_date"])
 
-    anchors = df[df["parsed_season_number"].notna() & df["date"].notna()].copy()
+    anchors = df[df["explicit_season"].notna() & df["date"].notna()].copy()
     if anchors.empty:
         return pd.DataFrame(columns=["season", "start_date", "end_date"])
 
-    anchors["season"] = pd.to_numeric(anchors["parsed_season_number"], errors="coerce").astype("Int64")
+    anchors["season"] = pd.to_numeric(anchors["explicit_season"], errors="coerce").astype("Int64")
     anchors = anchors[anchors["season"].notna()]
     if anchors.empty:
         return pd.DataFrame(columns=["season", "start_date", "end_date"])
@@ -136,82 +136,96 @@ def _build_season_date_anchors(df: pd.DataFrame) -> pd.DataFrame:
 
 def build_season_anchors(df: pd.DataFrame) -> pd.DataFrame:
     """Public helper: season/date anchor windows from explicit season-labeled rows."""
-    return _build_season_date_anchors(df)
+    return build_season_spans(df)
 
 
 def build_season_date_anchors(df: pd.DataFrame) -> pd.DataFrame:
     """Alias with explicit naming for row-level season resolver pipeline."""
     return build_season_anchors(df)
 
+def build_season_boundaries(season_spans: pd.DataFrame) -> pd.DataFrame:
+    """Build midpoint boundaries between adjacent seasons."""
+    required = {"season", "start_date", "end_date"}
+    if season_spans.empty or not required.issubset(season_spans.columns):
+        return pd.DataFrame(columns=["left_season", "right_season", "boundary"])
 
-def _infer_season_from_date(date_value: pd.Timestamp, season_windows: pd.DataFrame) -> int | None:
-    if pd.isna(date_value) or season_windows.empty:
+    spans = season_spans.copy()
+    spans["season"] = pd.to_numeric(spans["season"], errors="coerce").astype("Int64")
+    spans = spans.dropna(subset=["season", "start_date", "end_date"]).sort_values("season").reset_index(drop=True)
+    if len(spans) < 2:
+        return pd.DataFrame(columns=["left_season", "right_season", "boundary"])
+
+    boundaries: list[dict[str, object]] = []
+    for idx in range(len(spans) - 1):
+        left = spans.iloc[idx]
+        right = spans.iloc[idx + 1]
+        boundary = left["end_date"] + (right["start_date"] - left["end_date"]) / 2
+        boundaries.append(
+            {
+                "left_season": int(left["season"]),
+                "right_season": int(right["season"]),
+                "boundary": boundary,
+            }
+        )
+    return pd.DataFrame(boundaries)
+
+
+def infer_season_from_date(date_value: pd.Timestamp | None, boundaries: pd.DataFrame, season_spans: pd.DataFrame) -> int | None:
+    if pd.isna(date_value) or season_spans.empty:
         return None
 
-    # Prefer unambiguous proximity to a single season window.
-    padded = season_windows.copy()
-    padded["pad_start"] = padded["start_date"] - pd.Timedelta(days=45)
-    padded["pad_end"] = padded["end_date"] + pd.Timedelta(days=45)
-    in_window = padded[(padded["pad_start"] <= date_value) & (date_value <= padded["pad_end"])]
-    unique_window_seasons = sorted({int(s) for s in in_window["season"].tolist()})
-    if len(unique_window_seasons) == 1:
-        return unique_window_seasons[0]
-
-    # Fallback: assign by transition midpoints between explicit-season windows.
-    rows = season_windows.sort_values("season").reset_index(drop=True)
-    if rows.empty:
+    spans = season_spans.copy()
+    spans["season"] = pd.to_numeric(spans["season"], errors="coerce").astype("Int64")
+    spans = spans.dropna(subset=["season"]).sort_values("season").reset_index(drop=True)
+    if spans.empty:
         return None
 
-    boundaries: list[tuple[int, pd.Timestamp, pd.Timestamp]] = []
-    for idx, row in rows.iterrows():
-        season = int(row["season"])
-        left = pd.Timestamp.min
-        right = pd.Timestamp.max
-        if idx > 0:
-            prev = rows.iloc[idx - 1]
-            left_mid = prev["end_date"] + (row["start_date"] - prev["end_date"]) / 2
-            left = left_mid
-        if idx < len(rows) - 1:
-            nxt = rows.iloc[idx + 1]
-            right_mid = row["end_date"] + (nxt["start_date"] - row["end_date"]) / 2
-            right = right_mid
-        boundaries.append((season, left, right))
+    if boundaries.empty:
+        return int(spans.iloc[0]["season"]) if len(spans) == 1 else None
 
-    candidates = [season for season, left, right in boundaries if left <= date_value <= right]
-    return candidates[0] if len(candidates) == 1 else None
+    ordered = boundaries.sort_values("boundary").reset_index(drop=True)
+    first_boundary = ordered.iloc[0]["boundary"]
+    if date_value <= first_boundary:
+        return int(ordered.iloc[0]["left_season"])
 
+    for idx in range(len(ordered) - 1):
+        left_boundary = ordered.iloc[idx]["boundary"]
+        right_boundary = ordered.iloc[idx + 1]["boundary"]
+        if left_boundary < date_value <= right_boundary:
+            return int(ordered.iloc[idx]["right_season"])
 
-def infer_season_from_date(row_date: pd.Timestamp | None, anchors: pd.DataFrame) -> int | None:
-    """Infer season from row date using explicit-season anchor windows."""
-    return _infer_season_from_date(row_date, anchors)
+    return int(ordered.iloc[-1]["right_season"])
 
 
 def infer_season_from_name_or_date(
     raw_competition_name: str,
     event_date: pd.Timestamp | None,
-    season_windows: pd.DataFrame,
+    season_spans: pd.DataFrame,
+    season_boundaries: pd.DataFrame,
 ) -> tuple[int | None, str]:
     """Resolve season using explicit marker first, then conservative date anchors."""
-    details = parse_competition_details(raw_competition_name)
-    if details.parsed_season_number is not None:
-        return int(details.parsed_season_number), "explicit_from_name"
+    explicit_season = parse_explicit_season_from_name(raw_competition_name)
+    if explicit_season is not None:
+        return int(explicit_season), "explicit"
 
-    inferred = _infer_season_from_date(event_date, season_windows)
+    inferred = infer_season_from_date(event_date, season_boundaries, season_spans)
     if inferred is not None:
-        return inferred, "inferred_from_date_anchor"
+        return inferred, "date_inferred"
     return None, "unresolved"
 
 
 def resolve_row_season(
     raw_competition_name: str,
     event_date: pd.Timestamp | None,
-    season_anchors: pd.DataFrame,
+    season_spans: pd.DataFrame,
+    season_boundaries: pd.DataFrame,
 ) -> tuple[int | None, str]:
     """Resolve one row season using explicit marker, then anchor-based date inference."""
     return infer_season_from_name_or_date(
         raw_competition_name=raw_competition_name,
         event_date=event_date,
-        season_windows=season_anchors,
+        season_spans=season_spans,
+        season_boundaries=season_boundaries,
     )
 
 
@@ -224,6 +238,7 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
 
     out["competition_family"] = parsed.map(lambda p: p.competition_family)
     out["parsed_season_number"] = pd.array(parsed.map(lambda p: p.parsed_season_number), dtype="Int64")
+    out["explicit_season"] = pd.array(parsed.map(lambda p: p.parsed_season_number), dtype="Int64")
     out["parsed_event_instance_number"] = pd.array(parsed.map(lambda p: p.parsed_event_instance_number), dtype="Int64")
     out["should_group_competition"] = parsed.map(lambda p: bool(p.grouping_allowed))
 
@@ -233,7 +248,8 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
     inference_df = out.copy()
     inference_df["date"] = inference_df["date_for_season_inference"]
     inferred_family = _infer_nova_prime_season(inference_df)
-    season_windows = build_season_date_anchors(inference_df)
+    season_spans = build_season_spans(inference_df)
+    season_boundaries = build_season_boundaries(season_spans)
 
     resolved_seasons: list[int | None] = []
     resolve_strategies: list[str] = []
@@ -241,17 +257,17 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
         explicit = row.get("parsed_season_number")
         if pd.notna(explicit):
             resolved_seasons.append(int(explicit))
-            resolve_strategies.append("explicit_from_name")
+            resolve_strategies.append("explicit")
             continue
 
         name = row.get(name_col, "")
         date_value = row.get("date_for_season_inference")
-        season_from_date, strategy = resolve_row_season(name, date_value, season_windows)
+        season_from_date, strategy = resolve_row_season(name, date_value, season_spans, season_boundaries)
 
         # Keep legacy Nova Prime heuristic as a conservative fallback.
         if season_from_date is None and pd.notna(inferred_family.loc[idx]):
             season_from_date = int(inferred_family.loc[idx])
-            strategy = "family_inferred_season_from_timeline"
+            strategy = "date_inferred"
 
         resolved_seasons.append(season_from_date)
         resolve_strategies.append(strategy)
@@ -307,14 +323,16 @@ def normalize_competition_name(name: str) -> str:
 
 def build_season_resolution_debug_table(df: pd.DataFrame) -> pd.DataFrame:
     """Debug table for validating row-level season resolution."""
-    debug_cols = [
-        "raw_competition_name",
-        "date",
-        "explicit_season_from_name",
-        "resolved_season",
-        "season_resolution_method",
-    ]
-    available = [col for col in debug_cols if col in df.columns]
-    if not available:
-        return pd.DataFrame(columns=debug_cols)
-    return df[available].copy()
+    table = pd.DataFrame(
+        {
+            "competition": df.get("raw_competition_name"),
+            "date": df.get("date"),
+            "explicit_season": df.get("explicit_season"),
+            "resolved_season": df.get("resolved_season"),
+            "resolution_method": df.get("season_resolution_method"),
+        }
+    )
+    table = table.dropna(subset=["competition"], how="all")
+    if "date" in table.columns:
+        table = table.sort_values("date", na_position="last")
+    return table.reset_index(drop=True)
