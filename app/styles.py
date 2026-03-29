@@ -211,31 +211,31 @@ def inject_styles(theme_name: str = "Dark"):
       white-space: nowrap;
     }}
 
-    .achievement-gallery-row {{
+    .achievement-gallery-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 10px;
       margin-bottom: 6px;
-    }}
-    .achievement-gallery-card {{ padding: 8px; display:flex; flex-direction:column; gap:8px; }}
-    .achievement-gallery-media {{
+    }
+    .achievement-gallery-card { padding: 8px; display:flex; flex-direction:column; gap:8px; }
+    .achievement-gallery-media {
       position: relative;
       height: 116px;
       border-radius: 10px;
       overflow: hidden;
       border: 1px solid var(--border);
       background: color-mix(in srgb, var(--surface) 86%, #fff 14%);
-    }}
-    .achievement-gallery-thumb {{ width:100%; height:100%; object-fit: cover; }}
-    .achievement-gallery-thumb-fallback {{ display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px; }}
-    .achievement-gallery-overlay {{
+    }
+    .achievement-gallery-thumb { width:100%; height:100%; object-fit: cover; }
+    .achievement-gallery-thumb-fallback { display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px; }
+    .achievement-gallery-overlay {
       position:absolute; left:6px; bottom:6px;
       background: linear-gradient(180deg, rgba(3,6,12,0.2), rgba(3,6,12,0.72));
       border-radius: 999px;
       padding: 2px;
-    }}
-    .achievement-gallery-body {{ display:flex; flex-direction:column; gap:3px; }}
-    .achievement-gallery-title {{
+    }
+    .achievement-gallery-body { display:flex; flex-direction:column; gap:3px; }
+    .achievement-gallery-title {
       font-size: 12px;
       font-weight: 700;
       line-height: 1.25;
@@ -244,9 +244,9 @@ def inject_styles(theme_name: str = "Dark"):
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
-    }}
-    .achievement-gallery-meta {{ color: var(--muted); font-size: 10px; line-height: 1.2; }}
-    .achievement-gallery-pos {{ color: color-mix(in srgb, var(--text) 86%, #fff 14%); font-weight: 650; }}
+    }
+    .achievement-gallery-meta { color: var(--muted); font-size: 10px; line-height: 1.2; }
+    .achievement-gallery-pos { color: color-mix(in srgb, var(--text) 86%, #fff 14%); font-weight: 650; }
 
     .achievement-overflow {{
       flex: 0 0 50px;
