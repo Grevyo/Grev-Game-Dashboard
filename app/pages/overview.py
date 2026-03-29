@@ -140,23 +140,12 @@ def render(ctx):
     df = df_base.copy()
 
     if df.empty:
-        st.warning("No Medisports rows available after filters.")
-        return
+        st.warning("No Medisports match rows available after filters. Showing metadata-driven roster cards where possible.")
 
     medisports_roster = get_medisports_player_names(df, player_col="player")
-    if not medisports_roster:
-        st.warning("No Medisports roster available for Overview.")
-        return
-
-    summary = summarize_player(df)
-    if summary.empty:
-        st.warning("No Medisports player summary available with current filters.")
-        return
-
-    summary = summary[summary["player"].isin(medisports_roster)]
-    if summary.empty:
-        st.warning("No Medisports roster available for Overview.")
-        return
+    summary = summarize_player(df) if not df.empty else pd.DataFrame(columns=["player", "matches", "grevscore", "rating", "impact", "form", "kpd", "kpr", "accuracy_pct", "hs_pct"])
+    if not summary.empty and medisports_roster:
+        summary = summary[summary["player"].isin(medisports_roster)]
 
     full_medisports_matches = get_medisports_roster_df(full_history_df, player_col="player")
     selected_medisports_matches = get_medisports_roster_df(df, player_col="player")
@@ -201,30 +190,42 @@ def render(ctx):
     )
 
     k1, k2, k3, k4 = st.columns(4, gap="small")
+    squad_avg_grev = float(summary["grevscore"].mean()) if not summary.empty else 0.0
+    squad_avg_rating = float(summary["rating"].mean()) if not summary.empty else 0.0
+    squad_avg_impact = float(summary["impact"].mean()) if not summary.empty else 0.0
     with k1:
-        stat_card("Squad Avg GrevScore", f"{summary['grevscore'].mean():.2f}", "Current output index")
+        stat_card("Squad Avg GrevScore", f"{squad_avg_grev:.2f}", "Current output index")
     with k2:
-        stat_card("Squad Avg Rating", f"{summary['rating'].mean():.2f}", "Form-normalized")
+        stat_card("Squad Avg Rating", f"{squad_avg_rating:.2f}", "Form-normalized")
     with k3:
-        stat_card("Avg Impact", f"{summary['impact'].mean():.1f}", "Kills + clutch value")
+        stat_card("Avg Impact", f"{squad_avg_impact:.1f}", "Kills + clutch value")
     with k4:
         stat_card("Tracked Matches", int(df["match_id"].nunique()), "Selected context window")
 
     insight_pool = active_summary if not active_summary.empty else summary
-    top_player = insight_pool.sort_values("grevscore", ascending=False).iloc[0]
-    improved = insight_pool.sort_values("form", ascending=False).iloc[0]
-    coldest = insight_pool.sort_values("form", ascending=True).iloc[0]
-
     section_header("Team Pulse", "High-signal summary strip")
     p1, p2, p3, p4 = st.columns(4, gap="small")
-    with p1:
-        insight_card("Strongest Player", f"{top_player['player']} leads at {top_player['grevscore']:.2f} GrevScore.", "good")
-    with p2:
-        insight_card("Hottest Form", f"{improved['player']} currently shows the strongest rolling form.", "info")
-    with p3:
-        insight_card("Biggest Concern", f"{coldest['player']} is in the coldest form window and needs stabilization.", "bad")
-    with p4:
-        insight_card("Avg Team Impact", f"Team baseline is {summary['impact'].mean():.1f} impact per match sample.", "warn")
+    if insight_pool.empty:
+        with p1:
+            insight_card("Strongest Player", "No stat-tracked players in this filter scope yet.", "info")
+        with p2:
+            insight_card("Hottest Form", "No form trend data available in this scope.", "info")
+        with p3:
+            insight_card("Biggest Concern", "No volatility signal available until match stats are present.", "warn")
+        with p4:
+            insight_card("Avg Team Impact", "Impact summary will appear when match rows are available.", "warn")
+    else:
+        top_player = insight_pool.sort_values("grevscore", ascending=False).iloc[0]
+        improved = insight_pool.sort_values("form", ascending=False).iloc[0]
+        coldest = insight_pool.sort_values("form", ascending=True).iloc[0]
+        with p1:
+            insight_card("Strongest Player", f"{top_player['player']} leads at {top_player['grevscore']:.2f} GrevScore.", "good")
+        with p2:
+            insight_card("Hottest Form", f"{improved['player']} currently shows the strongest rolling form.", "info")
+        with p3:
+            insight_card("Biggest Concern", f"{coldest['player']} is in the coldest form window and needs stabilization.", "bad")
+        with p4:
+            insight_card("Avg Team Impact", f"Team baseline is {squad_avg_impact:.1f} impact per match sample.", "warn")
 
     section_header("Active Roster", "Primary five-man usage core (>10% match appearance share in current context)")
     if active_summary.empty:
