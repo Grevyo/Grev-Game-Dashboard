@@ -9,7 +9,7 @@ from app.data_loader import get_medisports_player_names, get_medisports_roster_d
 from app.descriptions import player_description
 from app.roster_split import split_roster_active_benched_streamer_transferred
 from app.filters import get_current_season
-from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
+from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo, resolve_transferred_logo
 from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
 
@@ -59,6 +59,7 @@ def _render_roster_cards(
     team_logo: str | None,
     achievements_df,
     card_variant: str = "default",
+    transferred_logo_fallback: bool = False,
 ):
     rows = list(summary.iterrows())
     for i in range(0, len(rows), 5):
@@ -79,6 +80,7 @@ def _render_roster_cards(
                         "fame": m.get("fame", ""),
                     }
                 )
+            new_team = str(merged.get("new_team", merged.get("New_team", "")) or "").strip()
             usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
 
@@ -91,7 +93,11 @@ def _render_roster_cards(
             merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"]))
             photo = resolve_player_photo(str(row["player"]))
             merged["photo_uri"] = image_data_uri(photo.get("path"))
-            merged["team_logo_uri"] = team_logo
+            if transferred_logo_fallback:
+                destination = new_team if new_team else None
+                merged["team_logo_uri"] = image_data_uri(resolve_transferred_logo(destination))
+            else:
+                merged["team_logo_uri"] = team_logo
             merged["photo_missing_reason"] = photo.get("reason")
             ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=4)
             merged["achievements"] = ach_list
@@ -249,7 +255,16 @@ def render(ctx):
     if not transferred_summary.empty:
         section_header("Transferred", "Historical Medisports players absent for more than two seasons")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
-        _render_roster_cards(transferred_summary, df, players_meta, player_match_counts, team_logo, achievements_df, card_variant="subdued")
+        _render_roster_cards(
+            transferred_summary,
+            df,
+            players_meta,
+            player_match_counts,
+            team_logo,
+            achievements_df,
+            card_variant="subdued",
+            transferred_logo_fallback=True,
+        )
         st.markdown("</div>", unsafe_allow_html=True)
 
     section_header("Bottom Insights", "Compact coaching cues")
