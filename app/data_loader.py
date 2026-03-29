@@ -32,19 +32,29 @@ MEDISPORTS_PLAYER_MARKER = "ⓜ"
 
 SIDE_NORMALIZATION_MAP = {
     "red": "Red",
+    "redside": "Red",
     "t": "Red",
+    "tside": "Red",
     "attack": "Red",
     "attacking": "Red",
+    "attacker": "Red",
+    "attackers": "Red",
     "offense": "Red",
     "offence": "Red",
+    "offensive": "Red",
     "blue": "Blue",
+    "blueside": "Blue",
     "ct": "Blue",
+    "ctside": "Blue",
     "counterterrorist": "Blue",
     "counter-terrorist": "Blue",
     "counter terrorist": "Blue",
     "defense": "Blue",
     "defence": "Blue",
     "defending": "Blue",
+    "defender": "Blue",
+    "defenders": "Blue",
+    "defensive": "Blue",
 }
 
 def normalize_player_key(name: str | None) -> str:
