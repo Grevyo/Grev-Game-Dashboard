@@ -215,12 +215,11 @@ def inject_styles(theme_name: str = "Dark"):
     .achievement-strip {{
       display:flex;
       flex-direction: row;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       gap: 7px;
       min-height: 76px;
-      max-height: 76px;
       align-items:stretch;
-      overflow: hidden;
+      overflow: visible;
     }}
     .achievement-strip-featured {{ margin-top: 0; }}
     .achievement-empty {{
