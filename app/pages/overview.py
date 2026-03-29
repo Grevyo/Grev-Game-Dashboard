@@ -85,6 +85,8 @@ def _render_roster_cards(
 
             merged["card_variant"] = card_variant
             merged["roster_bucket"] = "streamer" if card_variant == "streamer" else ""
+            if card_variant == "streamer":
+                merged["role"] = "Streamer"
             merged["desc"] = "Streamer profile — competitive stats not yet tracked." if card_variant == "streamer" else player_description(merged)
             merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map") if card_variant != "streamer" else "N/A"
             merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side") if card_variant != "streamer" else "N/A"
