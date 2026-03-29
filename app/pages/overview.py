@@ -307,7 +307,7 @@ def render(ctx):
                 "player": streamer_meta_rows.get("player", pd.Series(dtype=object)).astype(str),
                 "country": streamer_meta_rows.get("country", ""),
                 "nationality": streamer_meta_rows.get("nationality", streamer_meta_rows.get("country", "")),
-                "role": streamer_meta_rows.get("role", ""),
+                "role": "Streamer",
                 "fame": streamer_meta_rows.get("fame", ""),
                 "photo_uri": "",
                 "team_logo_uri": "",
