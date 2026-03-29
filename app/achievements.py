@@ -90,7 +90,7 @@ def normalize_season_label(season_value: str | int | float | None) -> str:
 def achievements_for_player(
     achievements_df: pd.DataFrame,
     player_name: str,
-    cap: int | None = 3,
+    cap: int | None = None,
     consumer: str = "unknown",
 ) -> tuple[list[dict], int]:
     if achievements_df.empty:
@@ -113,7 +113,9 @@ def achievements_for_player(
     pool = pool.assign(_season=season_num, _pos=pos_priority, _tier=tier_priority)
     pool = pool.sort_values(["_pos", "_tier", "_season"], ascending=[False, False, False])
 
-    top = pool if cap is None else pool.head(cap)
+    top = pool
+    if cap is not None:
+        top = pool.head(cap)
     items = []
     for _, row in top.iterrows():
         image_uri, image_path, image_source, image_debug = _resolve_achievement_image_for_overview(row)
