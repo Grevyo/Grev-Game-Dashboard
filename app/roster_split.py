@@ -32,19 +32,36 @@ def _extract_metadata_streamer_keys(players_meta: pd.DataFrame) -> set[str]:
     if players_meta.empty:
         return set()
 
-    name_col = None
-    for candidate in ["player", "name"]:
-        if candidate in players_meta.columns:
-            name_col = candidate
-            break
-    if name_col is None or "role" not in players_meta.columns:
+    if "role" not in players_meta.columns:
         return set()
 
-    meta = players_meta[[name_col, "role"]].copy()
-    meta[name_col] = meta[name_col].astype(str).str.strip()
+    key_col = None
+    for candidate in ["player_clean", "player", "name"]:
+        if candidate in players_meta.columns:
+            key_col = candidate
+            break
+    if key_col is None:
+        return set()
+
+    keep_cols = [key_col, "role"]
+    if "player" in players_meta.columns and "player" not in keep_cols:
+        keep_cols.append("player")
+    if "name" in players_meta.columns and "name" not in keep_cols:
+        keep_cols.append("name")
+
+    meta = players_meta[keep_cols].copy()
+    meta[key_col] = meta[key_col].astype(str).str.strip()
     meta["role_key"] = meta["role"].astype(str).str.strip().str.casefold()
-    streamer_meta = meta[(meta["role_key"] == "streamer") & meta[name_col].map(is_medisports_player)]
-    return set(streamer_meta[name_col].map(_player_key).tolist())
+    streamer_meta = meta[meta["role_key"] == "streamer"].copy()
+    if streamer_meta.empty:
+        return set()
+
+    if "player" in streamer_meta.columns:
+        streamer_meta = streamer_meta[streamer_meta["player"].map(is_medisports_player)]
+    elif "name" in streamer_meta.columns:
+        streamer_meta = streamer_meta[streamer_meta["name"].map(is_medisports_player)]
+
+    return set(streamer_meta[key_col].map(_player_key).tolist())
 
 
 def _resolved_season_series(df: pd.DataFrame) -> pd.Series:

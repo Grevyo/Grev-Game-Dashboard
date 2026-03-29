@@ -92,8 +92,8 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .player-card {{
-      min-height: 640px;
-      height: 640px;
+      min-height: 690px;
+      height: 690px;
       display:flex;
       flex-direction:column;
       gap: 8px;
@@ -279,33 +279,23 @@ def inject_styles(theme_name: str = "Dark"):
       padding: 2px 1px;
     }}
     .tier-name {{ font-size: 8px; line-height: 1; font-weight: 700; }}
-    .tier-score {{ font-size: 10px; line-height: 1.05; font-weight: 760; color: var(--text); }}
+    .tier-score {{ font-size: 11.5px; line-height: 1.05; font-weight: 780; color: var(--text); }}
     .grev-tier-S {{ border-color: color-mix(in srgb, #f5c542 65%, var(--border)); background: color-mix(in srgb, #f5c542 18%, var(--surface)); }}
     .grev-tier-A {{ border-color: color-mix(in srgb, #9c6bff 65%, var(--border)); background: color-mix(in srgb, #9c6bff 18%, var(--surface)); }}
     .grev-tier-B {{ border-color: color-mix(in srgb, #4f8dff 65%, var(--border)); background: color-mix(in srgb, #4f8dff 18%, var(--surface)); }}
     .grev-tier-C {{ border-color: color-mix(in srgb, #3db97a 65%, var(--border)); background: color-mix(in srgb, #3db97a 18%, var(--surface)); }}
-    .grev-tier-score {{
-      margin-left: auto;
-      font-size: 12px;
-      font-weight: 740;
-      color: var(--text);
-      padding: 2px 7px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
-      background: color-mix(in srgb, var(--accent) 18%, var(--surface));
-    }}
     .player-card-bottom {{ margin-top: auto; }}
     .player-card-note {{
       font-size: 10.5px;
       color: color-mix(in srgb, var(--text) 90%, #fff 10%);
       margin: 0;
-      min-height: 56px;
-      max-height: 56px;
+      min-height: 76px;
+      max-height: 76px;
       overflow: hidden;
       display: -webkit-box;
-      -webkit-line-clamp: 4;
+      -webkit-line-clamp: 6;
       -webkit-box-orient: vertical;
-      line-clamp: 4;
+      line-clamp: 6;
     }}
     .roster-section {{
       border-radius: var(--radius-l);
