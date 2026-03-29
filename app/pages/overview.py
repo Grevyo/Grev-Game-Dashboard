@@ -1,11 +1,9 @@
-import re
-
 import streamlit as st
 import pandas as pd
 
 from app.components import insight_card, player_card, section_header, stat_card
 from app.achievements import achievements_for_player
-from app.data_loader import get_medisports_player_names, get_medisports_roster_df
+from app.data_loader import get_medisports_player_names, get_medisports_roster_df, normalize_player_key
 from app.descriptions import player_description
 from app.roster_split import split_roster_active_benched_streamer_transferred
 from app.filters import get_current_season
@@ -35,11 +33,7 @@ def _trend_for_player(df, player_name: str) -> str:
 
 
 def _player_key(name: str) -> str:
-    text = str(name or "").strip()
-    text = re.sub(r"ⓜ\s*\|\s*", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"\s+", " ", text).strip()
-    text = re.sub(r"[^0-9a-z]+", "", text.casefold())
-    return text
+    return normalize_player_key(name)
 
 
 def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, float]:
@@ -108,19 +102,6 @@ def _render_roster_cards(
             merged["achievements_hidden"] = ach_hidden
 
             with cols[c_idx]:
-                if "Hunglow" in str(merged.get("player", "")):
-                    st.write("Hunglow country:", repr(merged.get("country")))
-                    st.write("Hunglow nationality:", repr(merged.get("nationality")))
-                    st.write("Hunglow role:", repr(merged.get("role")))
-                    st.write("Hunglow fame:", repr(merged.get("fame")))
-                    st.write("Hunglow desc:", repr(str(merged.get("desc") or "")[:300]))
-                    st.write("Hunglow best_map:", repr(merged.get("best_map")))
-                    st.write("Hunglow best_side:", repr(merged.get("best_side")))
-                    st.write("Hunglow trend:", repr(merged.get("trend")))
-                    st.write("Hunglow photo_uri_prefix:", repr(str(merged.get("photo_uri") or "")[:120]))
-                    st.write("Hunglow team_logo_uri_prefix:", repr(str(merged.get("team_logo_uri") or "")[:120]))
-                    st.write("Hunglow achievements_count:", len(merged.get("achievements") or []))
-                    st.write("Hunglow achievements_hidden:", repr(merged.get("achievements_hidden")))
                 player_card(merged)
 
 
