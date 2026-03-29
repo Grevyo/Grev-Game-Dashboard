@@ -137,6 +137,13 @@ def find_competition_logo(competition_name: str | None) -> str | None:
     return _lookup_asset("competition_logos", competition_name)
 
 
+def resolve_transferred_logo(new_team: str | None) -> str | None:
+    team_logo = find_team_logo(new_team)
+    if team_logo:
+        return team_logo
+    return find_competition_logo("cpl")
+
+
 def find_achievement_image(link_or_name: str | None) -> str | None:
     if not link_or_name:
         return None
