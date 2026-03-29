@@ -1,4 +1,5 @@
 import math
+import re
 
 import streamlit as st
 
@@ -44,22 +45,28 @@ def _tone_from_score(score: float) -> str:
 
 def _clean_card_meta_value(value) -> str:
     text = str(value or "").strip()
-    if text.casefold() in {"", "nan", "none", "null", "n/a", "na", "div", "division"}:
+    normalized = text.casefold()
+    if normalized in {"", "nan", "none", "null", "n/a", "na"}:
+        return ""
+    if re.match(r"^(div|division)(\s|$)", normalized):
         return ""
     return text
 
+
+def _safe_text(value) -> str:
+    return _clean_card_meta_value(value)
 
 
 
 
 def _player_note(row: dict) -> str:
-    custom_desc = str(row.get("desc", "")).strip()
+    custom_desc = _safe_text(row.get("desc", ""))
     if custom_desc:
         return custom_desc
     grev = float(row.get("grevscore", 0) or 0)
     kpd = float(row.get("kpd", 0) or 0)
-    trend = str(row.get("trend", "Stable") or "Stable")
-    best_map = row.get("best_map", "N/A")
+    trend = _safe_text(row.get("trend", "Stable")) or "Stable"
+    best_map = _safe_text(row.get("best_map", "N/A")) or "N/A"
     return f"{trend} form. Best map: {best_map}. Baseline: {grev:.2f} GrevScore with {kpd:.2f} K/D in this scope."
 
 def trend_chip(trend: str) -> str:
@@ -107,11 +114,11 @@ def _tier_box_html(tier: str, score: float | None) -> str:
 def player_card(row: dict):
     grev = float(row.get("grevscore", 0) or 0)
     tone = _tone_from_score(grev)
-    nationality = nationality_label(_clean_card_meta_value(row.get("nationality")) or _clean_card_meta_value(row.get("country")))
+    nationality = nationality_label(_safe_text(row.get("nationality")) or _safe_text(row.get("country")))
     identity_line = nationality or "Nationality N/A"
-    role_line = _clean_card_meta_value(row.get("role"))
+    role_line = _safe_text(row.get("role"))
     role_html = f"<p class='identity-line'>{role_line}</p>" if role_line else ""
-    transfer_destination = str(row.get("transfer_destination", "") or "").strip()
+    transfer_destination = _safe_text(row.get("transfer_destination", ""))
     transfer_line = (
         f"<p class='identity-line'><strong>Moved to:</strong> {transfer_destination}</p>"
         if str(row.get("roster_bucket", "")).strip().lower() == "transferred" and transfer_destination
@@ -180,8 +187,8 @@ def player_card(row: dict):
           <div class='player-head-meta'>
             <div class='player-head-title-row'>
               <div class='player-name-row'>
-                <p class='player-name'>{row.get('player', 'Unknown')}</p>
-                {trend_chip(row.get('trend', 'Stable'))}
+                <p class='player-name'>{_safe_text(row.get('player', 'Unknown')) or 'Unknown'}</p>
+                {trend_chip(_safe_text(row.get('trend', 'Stable')) or 'Stable')}
               </div>
               <div>{logo_visual}</div>
             </div>
@@ -189,13 +196,13 @@ def player_card(row: dict):
             {role_html}
             {transfer_line}
             {fame_html}
-            <div class='player-meta-row'><span class='muted'>Best map <strong>{row.get('best_map', 'N/A')}</strong> · Best side <strong>{row.get('best_side', 'N/A')}</strong></span></div>
+            <div class='player-meta-row'><span class='muted'>Best map <strong>{_safe_text(row.get('best_map', 'N/A')) or 'N/A'}</strong> · Best side <strong>{_safe_text(row.get('best_side', 'N/A')) or 'N/A'}</strong></span></div>
           </div>
         </div>
         <div class='achievement-strip achievement-strip-featured'>{ach_html}</div>
         <div class='stats-grid'>{stats_html}</div>
         {tier_html}
-        <div class='player-card-bottom'><p class='player-card-note'>{_player_note(row)}</p></div>
+        <div class='player-card-bottom'><p class='player-card-note'>{_safe_text(_player_note(row))}</p></div>
     </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
