@@ -1,4 +1,3 @@
-import pandas as pd
 import streamlit as st
 
 from app.data_loader import detect_our_team, load_data, validate_columns
@@ -6,7 +5,7 @@ from app.filters import apply_filters, build_global_filters, filter_summary, glo
 from app.image_helpers import find_team_logo, image_data_uri
 from app.pages import overview, player_viewer, tactic_set_recommendations, tactics_breakdown, vs_teams, vs_tournaments
 from app.styles import inject_styles
-from app.transforms import with_player_metrics, with_resolved_season
+from app.transforms import with_player_metrics
 
 
 PAGES = {
@@ -24,50 +23,7 @@ def run_app():
 
     data = load_data()
     p_df = with_player_metrics(data["player_matches"])
-    t_df = with_resolved_season(data["tactics"], date_col="date")
-
-    if "match_id" in p_df.columns and "match_id" in t_df.columns:
-        player_season_lookup = (
-            p_df[["match_id", "resolved_season", "season_resolution_method", "date"]]
-            .drop_duplicates(subset=["match_id"])
-            .rename(
-                columns={
-                    "resolved_season": "resolved_season_from_match",
-                    "season_resolution_method": "season_resolution_method_from_match",
-                    "date": "match_date",
-                }
-            )
-        )
-
-        t_df = t_df.merge(player_season_lookup, on="match_id", how="left")
-        season_from_date = pd.to_numeric(t_df.get("resolved_season"), errors="coerce")
-        inherited_from_match = pd.to_numeric(t_df.get("resolved_season_from_match"), errors="coerce")
-        has_match_season = inherited_from_match.notna()
-        t_df["resolved_season"] = season_from_date.combine_first(inherited_from_match).astype("Int64")
-
-        t_df["season_resolution_method"] = t_df.get(
-            "season_resolution_method", pd.Series(index=t_df.index, dtype="object")
-        )
-        t_df.loc[
-            season_from_date.isna() & has_match_season,
-            "season_resolution_method",
-        ] = "inherited_from_player_match"
-        t_df.loc[
-            season_from_date.notna() & t_df["season_resolution_method"].isna(),
-            "season_resolution_method",
-        ] = "hardcoded_date_window"
-        t_df["season_resolution_method"] = t_df["season_resolution_method"].fillna("unresolved")
-        t_df["season_resolution_strategy"] = t_df["season_resolution_method"]
-
-        t_df["season"] = t_df["resolved_season"]
-        t_df = t_df.drop(
-            columns=[
-                "resolved_season_from_match",
-                "season_resolution_method_from_match",
-            ],
-            errors="ignore",
-        )
-
+    t_df = data["tactics"]
     team_name = detect_our_team(p_df, t_df)
 
     validate_columns(p_df, ["match_id", "date", "map", "competition", "my_team", "opponent_team", "player"], "PlayerDataMatser.csv")
