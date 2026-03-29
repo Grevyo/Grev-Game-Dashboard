@@ -34,11 +34,60 @@ def _trend_for_player(df, player_name: str) -> str:
 
 
 def _player_key(name: str) -> str:
-    import re
-
     text = str(name or "").strip()
     text = re.sub(r"^ⓜ\s*\|\s*", "", text, flags=re.IGNORECASE)
     return text.casefold()
+
+
+def split_roster_active_vs_benched(summary: pd.DataFrame, player_match_counts: pd.DataFrame, threshold: float = 0.10):
+    if summary.empty:
+        return summary.copy(), summary.copy()
+    counts = player_match_counts[["player", "appearance_share"]].copy() if not player_match_counts.empty else pd.DataFrame(columns=["player", "appearance_share"])
+    merged = summary.merge(counts, on="player", how="left")
+    merged["appearance_share"] = merged["appearance_share"].fillna(0.0)
+    active_summary = merged[merged["appearance_share"] > threshold].copy()
+    benched_summary = merged[merged["appearance_share"] <= threshold].copy()
+    return active_summary, benched_summary
+
+
+def _render_roster_cards(summary: pd.DataFrame, df_context: pd.DataFrame, players_meta: pd.DataFrame, player_match_counts: pd.DataFrame, team_logo: str | None, achievements_df):
+    rows = list(summary.iterrows())
+    for i in range(0, len(rows), 5):
+        cols = st.columns(5, gap="small")
+        for c_idx, item in enumerate(rows[i : i + 5]):
+            _, row = item
+            merged = row.to_dict()
+            key = _player_key(str(row["player"]))
+            meta_source = players_meta.get("player_clean", players_meta.get("player", players_meta.get("name", ""))).astype(str).map(_player_key)
+            meta = players_meta[meta_source == key]
+            if not meta.empty:
+                m = meta.iloc[0].to_dict()
+                merged.update(
+                    {
+                        "country": m.get("country", ""),
+                        "nationality": m.get("nationality", ""),
+                        "role": m.get("role", ""),
+                        "fame": m.get("fame", ""),
+                    }
+                )
+            usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
+            merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
+
+            merged["team_tag"] = "Medisports"
+            merged["desc"] = player_description(row)
+            merged["best_map"] = _context_for_player(df_context, str(row["player"]), "map")
+            merged["best_side"] = _context_for_player(df_context, str(row["player"]), "side")
+            merged["trend"] = _trend_for_player(df_context, str(row["player"]))
+            photo = resolve_player_photo(str(row["player"]))
+            merged["photo_uri"] = image_data_uri(photo.get("path"))
+            merged["team_logo_uri"] = team_logo
+            merged["photo_missing_reason"] = photo.get("reason")
+            ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=4)
+            merged["achievements"] = ach_list
+            merged["achievements_hidden"] = ach_hidden
+
+            with cols[c_idx]:
+                player_card(merged)
 
 
 def render(ctx):
@@ -71,12 +120,11 @@ def render(ctx):
     )
     if total_matches > 0 and not player_match_counts.empty:
         player_match_counts["appearance_share"] = player_match_counts["matches_played"] / total_matches
-        active_players = set(player_match_counts.loc[player_match_counts["appearance_share"] > 0.10, "player"].astype(str))
     else:
         player_match_counts["appearance_share"] = 0.0
-        active_players = set()
 
-    df = df_base[df_base["player"].astype(str).isin(active_players)].copy() if active_only and active_players else df_base.copy()
+    active_players = set(player_match_counts.loc[player_match_counts["appearance_share"] > 0.10, "player"].astype(str))
+    df = df_base.copy()
 
     if df.empty:
         st.warning("No Medisports rows available after filters.")
@@ -96,6 +144,9 @@ def render(ctx):
     if summary.empty:
         st.warning("No Medisports roster available for Overview.")
         return
+
+    active_summary, benched_summary = split_roster_active_vs_benched(summary, player_match_counts)
+    display_summary = active_summary if active_only else summary
 
     seasons = filters.get("season") or ([f"Season {auto_current_season}"] if auto_current_season else ["All seasons"])
     maps = filters.get("map") or ["All maps"]
@@ -118,7 +169,7 @@ def render(ctx):
               </div>
               <div>
                 <span class='chip chip-good'>Roster: {'Active only' if active_only else 'All roster'}</span>
-                <span class='chip'>Medisports Roster: {summary['player'].nunique()}</span>
+                <span class='chip'>Medisports Roster: {display_summary['player'].nunique()}</span>
               </div>
             </div>
         </div>
@@ -128,17 +179,17 @@ def render(ctx):
 
     k1, k2, k3, k4 = st.columns(4, gap="small")
     with k1:
-        stat_card("Squad Avg GrevScore", f"{summary['grevscore'].mean():.2f}", "Current output index")
+        stat_card("Squad Avg GrevScore", f"{display_summary['grevscore'].mean():.2f}", "Current output index")
     with k2:
-        stat_card("Squad Avg Rating", f"{summary['rating'].mean():.2f}", "Form-normalized")
+        stat_card("Squad Avg Rating", f"{display_summary['rating'].mean():.2f}", "Form-normalized")
     with k3:
-        stat_card("Avg Impact", f"{summary['impact'].mean():.1f}", "Kills + clutch value")
+        stat_card("Avg Impact", f"{display_summary['impact'].mean():.1f}", "Kills + clutch value")
     with k4:
         stat_card("Tracked Matches", int(df["match_id"].nunique()), "Selected context window")
 
-    top_player = summary.sort_values("grevscore", ascending=False).iloc[0]
-    improved = summary.sort_values("form", ascending=False).iloc[0]
-    coldest = summary.sort_values("form", ascending=True).iloc[0]
+    top_player = display_summary.sort_values("grevscore", ascending=False).iloc[0]
+    improved = display_summary.sort_values("form", ascending=False).iloc[0]
+    coldest = display_summary.sort_values("form", ascending=True).iloc[0]
 
     section_header("Team Pulse", "High-signal summary strip")
     p1, p2, p3, p4 = st.columns(4, gap="small")
@@ -151,44 +202,20 @@ def render(ctx):
     with p4:
         insight_card("Avg Team Impact", f"Team baseline is {summary['impact'].mean():.1f} impact per match sample.", "warn")
 
-    section_header("Main Roster Grid", "Compact equal-height profile cards")
-    rows = list(summary.iterrows())
-    for i in range(0, len(rows), 5):
-        cols = st.columns(5, gap="small")
-        for c_idx, item in enumerate(rows[i : i + 5]):
-            _, row = item
-            merged = row.to_dict()
-            key = _player_key(str(row["player"]))
-            meta_source = players_meta.get("player_clean", players_meta.get("player", players_meta.get("name", ""))).astype(str).map(_player_key)
-            meta = players_meta[meta_source == key]
-            if not meta.empty:
-                m = meta.iloc[0].to_dict()
-                merged.update(
-                    {
-                        "country": m.get("country", ""),
-                        "nationality": m.get("nationality", ""),
-                        "role": m.get("role", ""),
-                        "fame": m.get("fame", ""),
-                    }
-                )
-            usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
-            merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
+    active_title = "Active Roster" if active_only else "Main Roster Grid"
+    active_subtitle = "Players appearing in more than 10% of matches" if active_only else "Compact equal-height profile cards"
+    section_header(active_title, active_subtitle)
+    if display_summary.empty:
+        st.info("No players qualify for the current roster mode.")
+    else:
+        _render_roster_cards(display_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
 
-            merged["team_tag"] = "Medisports"
-            merged["desc"] = player_description(row)
-            merged["best_map"] = _context_for_player(df, str(row["player"]), "map")
-            merged["best_side"] = _context_for_player(df, str(row["player"]), "side")
-            merged["trend"] = _trend_for_player(df, str(row["player"]))
-            photo = resolve_player_photo(str(row["player"]))
-            merged["photo_uri"] = image_data_uri(photo.get("path"))
-            merged["team_logo_uri"] = team_logo
-            merged["photo_missing_reason"] = photo.get("reason")
-            ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=4)
-            merged["achievements"] = ach_list
-            merged["achievements_hidden"] = ach_hidden
-
-            with cols[c_idx]:
-                player_card(merged)
+    if active_only:
+        section_header("Benched / Academy", "Medisports players at or below 10% appearance share")
+        if benched_summary.empty:
+            st.info("No Benched / Academy players in this filtered context.")
+        else:
+            _render_roster_cards(benched_summary, df, players_meta, player_match_counts, team_logo, achievements_df)
 
     section_header("Bottom Insights", "Compact coaching cues")
     w1, w2, w3 = st.columns(3, gap="small")

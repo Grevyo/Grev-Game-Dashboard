@@ -35,6 +35,26 @@ def get_current_season(df: pd.DataFrame, season_col: str = "season") -> str | No
 
 
 def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
+    season_options = _int_sorted_values(player_df, "season")
+    current_season = get_current_season(player_df, "season")
+    default_season = [current_season] if current_season and current_season in season_options else season_options
+    default_comp_mode = "Grouped competitions"
+
+    state_defaults = {
+        "global_theme": "Dark",
+        "global_comp_mode": default_comp_mode,
+        "global_season": default_season,
+        "global_competition": [],
+        "global_map": [],
+        "global_opponent": [],
+        "global_side": [],
+        "global_last_days": None,
+        "global_last_matches": None,
+    }
+    for key, default in state_defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = default
+
     st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
     st.markdown("<div class='section-title' style='margin-bottom:4px;'>Context Controls</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-subtitle'>Compact page-level filters replacing the old sidebar stack.</div>", unsafe_allow_html=True)
@@ -44,14 +64,11 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
     with context_col:
         c1, c2, c3 = st.columns([0.9, 1.3, 2.0], gap="small")
         with c1:
-            theme = st.selectbox("Theme", ["Dark", "Light"], index=0)
+            theme = st.selectbox("Theme", ["Dark", "Light"], key="global_theme")
         with c2:
-            comp_mode = st.radio("Competition mode", ["Grouped competitions", "Individual competitions"], index=0, horizontal=True)
+            comp_mode = st.radio("Competition mode", ["Grouped competitions", "Individual competitions"], key="global_comp_mode", horizontal=True)
         with c3:
-            season_options = _int_sorted_values(player_df, "season")
-            current_season = get_current_season(player_df, "season")
-            default_season = [current_season] if current_season and current_season in season_options else season_options
-            season_vals = st.multiselect("Season", season_options, default=default_season)
+            season_vals = st.multiselect("Season", season_options, key="global_season")
 
     competitions_col = get_active_competition_col(is_grouped_mode(comp_mode))
 
@@ -61,21 +78,21 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
             competition_vals = st.multiselect(
                 "Competition",
                 _sorted_values(player_df, competitions_col),
-                key=f"competition_filter_{'group' if comp_mode == 'Grouped competitions' else 'individual'}",
+                key="global_competition",
             )
         with f2:
-            map_vals = st.multiselect("Map", _sorted_values(player_df, "map"))
+            map_vals = st.multiselect("Map", _sorted_values(player_df, "map"), key="global_map")
         with f3:
-            opp_vals = st.multiselect("Opponent", _sorted_values(player_df, "opponent_team"))
+            opp_vals = st.multiselect("Opponent", _sorted_values(player_df, "opponent_team"), key="global_opponent")
 
     with recency_col:
         r1, r2, r3 = st.columns(3, gap="small")
         with r1:
-            side_vals = st.multiselect("Side", ["Red", "Blue"], default=[])
+            side_vals = st.multiselect("Side", ["Red", "Blue"], key="global_side")
         with r2:
-            last_days = st.selectbox("Last X days", [None, 5, 10, 20, 30], index=0)
+            last_days = st.selectbox("Last X days", [None, 5, 10, 20, 30], key="global_last_days")
         with r3:
-            last_matches = st.selectbox("Last X matches", [None, 5, 10, 20, 30], index=0)
+            last_matches = st.selectbox("Last X matches", [None, 5, 10, 20, 30], key="global_last_matches")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -90,6 +107,27 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
         "side": side_vals,
         "last_days": last_days,
         "last_matches": last_matches,
+    }
+
+
+def global_filters_from_state(player_df: pd.DataFrame):
+    season_options = _int_sorted_values(player_df, "season")
+    current_season = get_current_season(player_df, "season")
+    default_season = [current_season] if current_season and current_season in season_options else season_options
+
+    comp_mode = st.session_state.get("global_comp_mode", "Grouped competitions")
+    competitions_col = get_active_competition_col(is_grouped_mode(comp_mode))
+    return {
+        "theme": st.session_state.get("global_theme", "Dark"),
+        "season": st.session_state.get("global_season", default_season),
+        "competition_mode": comp_mode,
+        "competition_col": competitions_col,
+        "competition": st.session_state.get("global_competition", []),
+        "map": st.session_state.get("global_map", []),
+        "opponent": st.session_state.get("global_opponent", []),
+        "side": st.session_state.get("global_side", []),
+        "last_days": st.session_state.get("global_last_days", None),
+        "last_matches": st.session_state.get("global_last_matches", None),
     }
 
 
