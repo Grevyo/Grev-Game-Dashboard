@@ -187,7 +187,7 @@ def player_card(row: dict):
 
     if is_streamer_card:
         streamer_card_html = f"""
-        <div class='panel player-card player-card-streamer accent-mid player-card-subdued'>
+        <div class='panel player-card overview-player-card player-card-streamer accent-mid player-card-subdued'>
             <div class='player-head player-head-streamer'>
                 <div class='player-head-left'>
                     {profile_visual}
@@ -252,7 +252,7 @@ def player_card(row: dict):
     tier_block_html = tier_html
 
     card_html = f"""
-    <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') in {'subdued', 'streamer'} else ''}'>
+    <div class='panel player-card overview-player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') in {'subdued', 'streamer'} else ''}'>
         <div class='player-head'>
           <div class='player-head-left'>
             {profile_visual}

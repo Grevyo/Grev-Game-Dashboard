@@ -233,57 +233,58 @@ def inject_styles(theme_name: str = "Dark"):
       color: var(--muted);
       font-size: 10px;
     }}
-    .achievement-tile {{
+    .player-card.overview-player-card .achievement-tile {{
       position: relative;
-      flex: 0 0 68px;
-      width: 68px;
-      height: 76px;
+      flex: 0 0 78px;
+      width: 78px;
+      height: 86px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: visible;
       background: color-mix(in srgb, var(--surface) 88%, #fff 12%);
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }}
-    .achievement-tile-thumb {{
+    .player-card.overview-player-card .achievement-tile-thumb {{
       width: 100%;
       height: 100%;
       object-fit: cover;
       filter: saturate(1.05);
     }}
-    .achievement-tile-thumb-fallback {{
+    .player-card.overview-player-card .achievement-tile-thumb-fallback {{
       display:flex;
       align-items:center;
       justify-content:center;
       font-size: 8px;
       color: var(--muted);
     }}
-    .achievement-tile-overlay {{
+    .player-card.overview-player-card .achievement-tile-overlay {{
       position: absolute;
       left: 0; right: 0; bottom: 0;
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      padding: 4px 4px 3px;
+      padding: 5px 5px 4px;
       gap: 1px;
       background: linear-gradient(180deg, transparent 0%, rgba(8,12,20,0.58) 100%);
     }}
-    .achievement-season-top {{
+    .player-card.overview-player-card .achievement-season-top {{
       position: absolute;
-      top: 4px;
+      top: 5px;
       left: 50%;
       transform: translateX(-50%);
-      max-width: calc(100% - 10px);
-      padding: 1px 6px;
+      max-width: calc(100% - 8px);
+      padding: 1px 7px;
       border-radius: 999px;
       border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
       background: color-mix(in srgb, rgba(7,12,24,0.9) 86%, #9fb8ff 14%);
       color: #f5f8ff;
-      font-size: 8px;
-      line-height: 1.1;
+      font-size: 7px;
+      line-height: 1.15;
       font-weight: 700;
       letter-spacing: 0.02em;
-      white-space: normal;
-      overflow-wrap: anywhere;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       text-align: center;
       text-shadow: 0 1px 2px rgba(0,0,0,0.55);
       z-index: 2;
@@ -303,10 +304,10 @@ def inject_styles(theme_name: str = "Dark"):
       overflow-wrap: anywhere;
       text-wrap: wrap;
     }}
-    .achievement-overflow {{
-      flex: 0 0 68px;
-      width: 68px;
-      height: 76px;
+    .player-card.overview-player-card .achievement-overflow {{
+      flex: 0 0 78px;
+      width: 78px;
+      height: 86px;
       display:flex;
       align-items:center;
       justify-content:center;
