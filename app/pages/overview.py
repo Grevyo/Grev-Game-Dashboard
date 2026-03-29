@@ -34,7 +34,11 @@ def _trend_for_player(df, player_name: str) -> str:
 
 
 def _player_key(name: str) -> str:
-    return re.sub(r"^ⓜ\s*\|\s*", "", str(name or ""), flags=re.IGNORECASE).strip().casefold()
+    import re
+
+    text = str(name or "").strip()
+    text = re.sub(r"^ⓜ\s*\|\s*", "", text, flags=re.IGNORECASE)
+    return text.casefold()
 
 
 def render(ctx):
