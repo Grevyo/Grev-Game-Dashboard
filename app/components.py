@@ -55,6 +55,25 @@ def trend_chip(trend: str) -> str:
     return f"<span class='chip chip-{tone}'>{icon} {trend}</span>"
 
 
+def render_achievement_mini_tile(achievement: dict) -> str:
+    tier = str(achievement.get("tier", "")).strip().upper()
+    tier = tier if tier in {"S", "A", "B", "C"} else "C"
+    thumb = (
+        f"<img class='achievement-tile-thumb' src='{achievement.get('image_uri')}' alt='{achievement.get('name', 'Achievement')}'/>"
+        if achievement.get("image_uri")
+        else "<div class='achievement-tile-thumb achievement-tile-thumb-fallback'>No Image</div>"
+    )
+    season_label = str(achievement.get("season_label", "")).strip()
+    return (
+        f"<div class='achievement-tile tier-{tier}'>"
+        f"{thumb}"
+        f"<div class='achievement-tile-overlay'>"
+        f"{achievement_tier_badge(tier)}"
+        f"<span class='achievement-season'>{season_label}</span>"
+        f"</div></div>"
+    )
+
+
 def player_card(row: dict):
     grev = float(row.get("grevscore", 0) or 0)
     tone = _tone_from_score(grev)
@@ -97,24 +116,17 @@ def player_card(row: dict):
         for label, val, formatted in stat_items
     )
     ach_items = row.get("achievements", []) or []
-    ach_chunks = []
-    for a in ach_items[:5]:
-        thumb = f"<img class='achievement-tile-thumb' src='{a.get('image_uri')}' alt='Achievement'/>" if a.get("image_uri") else ""
-        tier = str(a.get("tier", "-")).strip().upper()
-        ach_chunks.append(
-            f"<div class='achievement-tile tier-{tier}'>{thumb}"
-            f"<div class='achievement-tile-overlay'>{achievement_tier_badge(tier)}</div></div>"
-        )
-    ach_html = "".join(ach_chunks)
-    if row.get("achievements_hidden", 0):
-        ach_html += f"<div class='chip achievement-more'>+{int(row.get('achievements_hidden', 0))} more</div>"
+    ach_html = "".join(render_achievement_mini_tile(a) for a in ach_items[:4])
+    if int(row.get("achievements_hidden", 0) or 0) > 0:
+        ach_html += f"<div class='achievement-overflow'>+{int(row.get('achievements_hidden', 0))}</div>"
+    if not ach_html:
+        ach_html = "<div class='achievement-empty'>No achievements recorded</div>"
 
     card_html = f"""
     <div class='panel player-card accent-{tone}'>
         <div class='player-head'>
           <div class='player-head-left'>
             {profile_visual}
-            <div class='achievement-strip achievement-strip-featured'>{ach_html or "<span class='muted'>No achievements recorded</span>"}</div>
           </div>
           <div class='player-head-meta'>
             <div class='player-head-title-row'>
@@ -128,6 +140,7 @@ def player_card(row: dict):
             <p class='player-desc'>{row.get('desc', '')}</p>
           </div>
         </div>
+        <div class='achievement-strip achievement-strip-featured'>{ach_html}</div>
         <div class='stats-grid'>{stats_html}</div>
     </div>
     """
