@@ -29,6 +29,12 @@ MEDISPORTS_ALIASES = {
 }
 MEDISPORTS_PLAYER_MARKER = "ⓜ"
 
+def normalize_player_key(name: str | None) -> str:
+    """Normalize player names into a stable comparison key."""
+    text = str(name or "").strip()
+    text = re.sub(r"^ⓜ\s*\|\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text.casefold()
 
 def normalize_team_name(team_name: str | None) -> str:
     """Normalize stylized team names into a compact comparison key."""
@@ -192,16 +198,16 @@ def load_data() -> dict[str, pd.DataFrame]:
     )
 
     if "player" in players.columns:
-        players["player_clean"] = players["player"].astype(str)
+        players["player_clean"] = players["player"].map(normalize_player_key)
     elif "name" in players.columns:
-        players["player_clean"] = players["name"].astype(str)
+        players["player_clean"] = players["name"].map(normalize_player_key)
 
     for df in [player_matches, achievements]:
         if "player" in df.columns:
-            df["player_clean"] = df["player"].astype(str).str.replace("ⓜ\s*\|\s*", "", regex=True).str.strip()
+            df["player_clean"] = df["player"].map(normalize_player_key)
 
     if "player_clean" in players.columns:
-        players["player_clean"] = players["player_clean"].astype(str).str.replace("ⓜ\s*\|\s*", "", regex=True).str.strip()
+        players["player_clean"] = players["player_clean"].map(normalize_player_key)
 
     # Temporary debug export to validate row-level season resolution.
     if not player_matches.empty:
