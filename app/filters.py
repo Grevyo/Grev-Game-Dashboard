@@ -35,8 +35,18 @@ def get_current_season(df: pd.DataFrame, season_col: str = "season") -> str | No
 
 
 def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
-    season_options = _int_sorted_values(player_df, "resolved_season")
-    current_season = get_current_season(player_df, "resolved_season")
+    season_options = sorted(
+        set(_int_sorted_values(player_df, "resolved_season"))
+        | set(_int_sorted_values(tactics_df, "resolved_season"))
+    )
+    combined_season_df = pd.concat(
+        [
+            player_df[["resolved_season"]] if "resolved_season" in player_df.columns else pd.DataFrame(columns=["resolved_season"]),
+            tactics_df[["resolved_season"]] if "resolved_season" in tactics_df.columns else pd.DataFrame(columns=["resolved_season"]),
+        ],
+        ignore_index=True,
+    )
+    current_season = get_current_season(combined_season_df, "resolved_season")
     default_season = [current_season] if current_season and current_season in season_options else season_options
     default_comp_mode = "Grouped competitions"
 

@@ -12,10 +12,11 @@ except ModuleNotFoundError:
 from app.components import section_header
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.metrics import confidence_from_sample
+from app.transforms import with_resolved_season
 
 
 def render(ctx):
-    tdf = ctx["tactics"]
+    tdf = with_resolved_season(ctx["tactics"], date_col="date")
     filters = ctx["filters"]
     col = get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))
 

@@ -11,7 +11,7 @@ from app.roster_split import split_roster_active_benched_streamer_transferred
 from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo
 from app.metrics import trend_label
-from app.transforms import best_contexts, summarize_player
+from app.transforms import best_contexts, summarize_player, with_resolved_season
 
 
 def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> str:
@@ -102,8 +102,8 @@ def _render_roster_cards(
 
 
 def render(ctx):
-    full_df = ctx["player_matches"]
-    full_history_df = ctx.get("player_matches_full", full_df)
+    full_df = with_resolved_season(ctx["player_matches"], date_col="date")
+    full_history_df = with_resolved_season(ctx.get("player_matches_full", full_df), date_col="date")
     players_meta = ctx["players"]
     team_name = ctx["team_name"]
     filters = ctx.get("filters", {})
