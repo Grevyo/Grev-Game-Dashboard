@@ -183,7 +183,7 @@ def render(ctx):
             merged["photo_uri"] = image_data_uri(photo.get("path"))
             merged["team_logo_uri"] = team_logo
             merged["photo_missing_reason"] = photo.get("reason")
-            ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=4)
+            ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=3)
             merged["achievements"] = ach_list
             merged["achievements_hidden"] = ach_hidden
 
