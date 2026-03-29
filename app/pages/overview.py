@@ -12,69 +12,6 @@ from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
 
 
-_CPL_OPEN_FLOW_DEBUG_EMITTED = False
-
-
-def _debug_trace_cpl_open_flow(player_name: str, achievements_df: pd.DataFrame, achievements_output: list[dict], row_achievements: list[dict]):
-    """Emit one structured trace for CPL Open flow in Overview card assembly."""
-    global _CPL_OPEN_FLOW_DEBUG_EMITTED
-    if _CPL_OPEN_FLOW_DEBUG_EMITTED or achievements_df is None or achievements_df.empty:
-        return
-
-    player_key = normalize_player_key(player_name)
-    if "player_clean" in achievements_df.columns:
-        mask = achievements_df["player_clean"].astype(str).str.strip().str.casefold() == player_key
-    else:
-        mask = achievements_df.get("player", pd.Series(index=achievements_df.index, dtype=str)).astype(str).map(normalize_player_key) == player_key
-
-    raw_rows = achievements_df[mask].copy()
-    if raw_rows.empty:
-        return
-
-    cpl_mask = raw_rows.get("achievement_name", pd.Series(index=raw_rows.index, dtype=str)).astype(str).str.contains("cpl open", case=False, na=False)
-    if not bool(cpl_mask.any()):
-        return
-
-    raw_dump = raw_rows[["player", "achievement_name", "achievement_link", "achievement_tier", "season_name", "position"]].to_dict("records")
-    output_dump = [
-        {
-            "name": entry.get("name"),
-            "season": entry.get("season"),
-            "tier": entry.get("tier"),
-            "image_path": entry.get("image_path"),
-            "image_uri_present": bool(entry.get("image_uri")),
-        }
-        for entry in achievements_output
-    ]
-    row_dump = [
-        {
-            "name": entry.get("name"),
-            "season": entry.get("season"),
-            "tier": entry.get("tier"),
-            "image_path": entry.get("image_path"),
-            "image_uri_present": bool(entry.get("image_uri")),
-        }
-        for entry in row_achievements
-    ]
-
-    presence = {
-        "raw_dataframe_rows": any("cpl open" in str(r.get("achievement_name", "")).casefold() for r in raw_dump),
-        "achievements_for_player_output": any("cpl open" in str(r.get("name", "")).casefold() for r in output_dump),
-        "player_card_row_achievements": any("cpl open" in str(r.get("name", "")).casefold() for r in row_dump),
-    }
-    print(
-        "[CPL_OPEN_FLOW_TRACE]",
-        {
-            "player": player_name,
-            "raw_dataframe_rows": raw_dump,
-            "achievements_for_player_output": output_dump,
-            "row_achievements_for_player_card": row_dump,
-            "presence": presence,
-        },
-    )
-    _CPL_OPEN_FLOW_DEBUG_EMITTED = True
-
-
 def _resolve_favourite_map(meta: pd.DataFrame, player_key: str, default: str = "N/A") -> str:
     if meta.empty or not player_key:
         return default
@@ -333,7 +270,6 @@ def _render_roster_cards(
             ach_list, ach_hidden = achievements_for_player(achievements_df, str(row["player"]), cap=4, consumer="overview")
             merged["achievements"] = ach_list
             merged["achievements_hidden"] = ach_hidden
-            _debug_trace_cpl_open_flow(str(row["player"]), achievements_df, ach_list, merged["achievements"])
 
             with cols[c_idx]:
                 player_card(merged)
