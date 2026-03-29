@@ -320,9 +320,6 @@ def inject_styles(theme_name: str = "Dark"):
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 14%, transparent);
     }}
     .player-card-subdued {{ opacity: 0.88; filter: saturate(0.86); }}
-    .player-card-streamer { min-height: 220px; height: 220px; gap: 12px; }
-    .player-head-streamer { min-height: 0; align-items: center; }
-    .streamer-status { display:inline-flex; align-items:center; width:fit-content; margin-top:6px; padding:5px 9px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color: var(--text); border:1px solid color-mix(in srgb, var(--mid) 45%, var(--border)); background: color-mix(in srgb, var(--mid) 20%, transparent); }
     .achievement-tile.tier-S {{ border-color: color-mix(in srgb, #f5c542 58%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #f5c542 22%, transparent), 0 8px 18px rgba(0,0,0,0.24); }}
     .achievement-tile.tier-A {{ border-color: color-mix(in srgb, #9c6bff 58%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #9c6bff 22%, transparent), 0 8px 18px rgba(0,0,0,0.24); }}
     .achievement-tile.tier-B {{ border-color: color-mix(in srgb, #4f8dff 58%, var(--border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #4f8dff 20%, transparent), 0 8px 18px rgba(0,0,0,0.24); }}

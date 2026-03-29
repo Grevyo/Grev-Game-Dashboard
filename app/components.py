@@ -219,57 +219,32 @@ def player_card(row: dict):
     stats_block_html = "" if is_streamer_card else f"<div class='stats-grid'>{stats_html}</div>"
     tier_block_html = "" if is_streamer_card else tier_html
 
-    if is_streamer_card:
-        streamer_note = safe_player_note or "Competitive stats not yet tracked for this profile."
-        card_html = f"""
-        <div class='panel player-card player-card-streamer accent-{tone} player-card-subdued'>
-            <div class='player-head player-head-streamer'>
-              <div class='player-head-left'>
-                {profile_visual}
+    card_html = f"""
+    <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') in {'subdued', 'streamer'} else ''}'>
+        <div class='player-head'>
+          <div class='player-head-left'>
+            {profile_visual}
+          </div>
+          <div class='player-head-meta'>
+            <div class='player-head-title-row'>
+              <div class='player-name-row'>
+                <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
+                {trend_html}
               </div>
-              <div class='player-head-meta'>
-                <div class='player-head-title-row'>
-                  <div class='player-name-row'>
-                    <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
-                  </div>
-                  <div>{logo_visual}</div>
-                </div>
-                <p class='identity-line'>{safe_identity_line or 'Nationality N/A'}</p>
-                <p class='identity-line'>{safe_role_line}</p>
-                {fame_html}
-                <div class='streamer-status'>Streamer profile</div>
-              </div>
+              <div>{logo_visual}</div>
             </div>
-            <div class='player-card-bottom'><p class='player-card-note'>{streamer_note}</p></div>
+            <p class='identity-line'>{safe_identity_line}</p>
+            <p class='identity-line'>{safe_role_line}</p>
+            {fame_html}
+            {context_html}
+          </div>
         </div>
-        """
-    else:
-        card_html = f"""
-        <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') in {'subdued', 'streamer'} else ''}'>
-            <div class='player-head'>
-              <div class='player-head-left'>
-                {profile_visual}
-              </div>
-              <div class='player-head-meta'>
-                <div class='player-head-title-row'>
-                  <div class='player-name-row'>
-                    <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
-                    {trend_html}
-                  </div>
-                  <div>{logo_visual}</div>
-                </div>
-                <p class='identity-line'>{safe_identity_line}</p>
-                <p class='identity-line'>{safe_role_line}</p>
-                {fame_html}
-                {context_html}
-              </div>
-            </div>
-            {achievements_block_html}
-            {stats_block_html}
-            {tier_block_html}
-            <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
-        </div>
-        """
+        {achievements_block_html}
+        {stats_block_html}
+        {tier_block_html}
+        <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
+    </div>
+    """
     st.markdown(card_html, unsafe_allow_html=True)
 
 
