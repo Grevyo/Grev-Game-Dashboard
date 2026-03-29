@@ -121,27 +121,6 @@ def _tier_box_html(tier: str, score: float | None) -> str:
 
 
 def player_card(row: dict):
-    is_hunglow = "Hunglow" in str(row.get("player", ""))
-    hunglow_isolation_target = str(row.get("hunglow_isolation_target", ""))
-
-    def _render_hunglow_section(section: str) -> bool:
-        if not is_hunglow:
-            return True
-        target = hunglow_isolation_target.strip().lower()
-        if not target or target == "off":
-            return True
-        if target == "minimal":
-            return section == "head"
-        if target == "no-head":
-            return section != "head"
-        if target.startswith("only:"):
-            only_section = target.split(":", 1)[1].strip()
-            return section == only_section
-        if target.startswith("hide:"):
-            hidden_section = target.split(":", 1)[1].strip()
-            return section != hidden_section
-        return True
-
     grev = float(row.get("grevscore", 0) or 0)
     tone = _tone_from_score(grev)
     nationality = nationality_label(row.get("nationality") or row.get("country"))
@@ -208,34 +187,28 @@ def player_card(row: dict):
 
     card_html = f"""
     <div class='panel player-card accent-{tone}{' player-card-subdued' if row.get('card_variant') == 'subdued' else ''}'>
-        {
-            f'''
-            <div class='player-head'>
-              <div class='player-head-left'>
-                {profile_visual}
+        <div class='player-head'>
+          <div class='player-head-left'>
+            {profile_visual}
+          </div>
+          <div class='player-head-meta'>
+            <div class='player-head-title-row'>
+              <div class='player-name-row'>
+                <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
+                {trend_chip(row.get('trend', 'Stable'))}
               </div>
-              <div class='player-head-meta'>
-                <div class='player-head-title-row'>
-                  <div class='player-name-row'>
-                    <p class='player-name'>{html.escape(str(row.get('player', 'Unknown')))}</p>
-                    {trend_chip(row.get('trend', 'Stable'))}
-                  </div>
-                  <div>{logo_visual}</div>
-                </div>
-                <p class='identity-line'>{safe_identity_line}</p>
-                <p class='identity-line'>{safe_role_line}</p>
-                {fame_html}
-                <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Best side <strong>{safe_best_side}</strong></span></div>
-              </div>
+              <div>{logo_visual}</div>
             </div>
-            '''
-            if _render_hunglow_section("head")
-            else ""
-        }
-        {f"<div class='achievement-strip achievement-strip-featured'>{ach_html}</div>" if _render_hunglow_section("achievements") else ""}
-        {f"<div class='stats-grid'>{stats_html}</div>" if _render_hunglow_section("stats") else ""}
-        {tier_html if _render_hunglow_section("tiers") else ""}
-        {f"<div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>" if _render_hunglow_section("note") else ""}
+            <p class='identity-line'>{safe_identity_line}</p>
+            <p class='identity-line'>{safe_role_line}</p>
+            {fame_html}
+            <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Best side <strong>{safe_best_side}</strong></span></div>
+          </div>
+        </div>
+        <div class='achievement-strip achievement-strip-featured'>{ach_html}</div>
+        <div class='stats-grid'>{stats_html}</div>
+        {tier_html}
+        <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
     </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
