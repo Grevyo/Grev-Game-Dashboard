@@ -66,6 +66,7 @@ def render(ctx):
         .reset_index()
     )
     grp["win_rate"] = (grp["wins"] / grp["matches_played"].clip(lower=1) * 100).fillna(0)
+    grp["round_win_rate"] = (grp["round_wins"] / (grp["round_wins"] + grp["round_losses"]).clip(lower=1) * 100).fillna(0)
     grp["avg_round_diff_match"] = (grp["round_diff"] / grp["matches_played"].clip(lower=1)).fillna(0.0)
     grp["record"] = grp["wins"].astype(int).astype(str) + "-" + grp["losses"].astype(int).astype(str)
     grp["round_record"] = grp["round_wins"].astype(int).astype(str) + "-" + grp["round_losses"].astype(int).astype(str)
@@ -118,6 +119,40 @@ def render(ctx):
     view = grp if opp == "All" else grp[grp["opponent_team"] == opp].copy()
     view = view.sort_values(["win_rate", "round_diff", "matches_played"], ascending=[False, False, False]).copy()
 
+    map_view = match_level if opp == "All" else match_level[match_level["opponent_team"] == opp].copy()
+    map_match_breakdown = (
+        map_view.groupby(["opponent_team", "map"], dropna=False)
+        .agg(
+            matches_played=("match_id", "nunique"),
+            wins=("match_win", "sum"),
+            losses=("match_loss", "sum"),
+        )
+        .reset_index()
+    )
+    map_match_breakdown["match_win_rate"] = (
+        map_match_breakdown["wins"] / map_match_breakdown["matches_played"].clip(lower=1) * 100
+    ).fillna(0)
+    map_match_breakdown = map_match_breakdown.sort_values(
+        ["wins", "match_win_rate", "matches_played"], ascending=[False, False, False]
+    )
+
+    map_round_breakdown = (
+        map_view.groupby(["opponent_team", "map"], dropna=False)
+        .agg(
+            rounds_won=("round_wins", "sum"),
+            rounds_lost=("round_losses", "sum"),
+        )
+        .reset_index()
+    )
+    map_round_breakdown["round_win_rate"] = (
+        map_round_breakdown["rounds_won"]
+        / (map_round_breakdown["rounds_won"] + map_round_breakdown["rounds_lost"]).clip(lower=1)
+        * 100
+    ).fillna(0)
+    map_round_breakdown = map_round_breakdown.sort_values(
+        ["round_win_rate", "rounds_won"], ascending=[False, False]
+    )
+
     section_header("Match Record vs Teams ✓", "Primary view: full match wins/losses versus each opponent.")
     with st.container(border=True):
         st.dataframe(
@@ -127,29 +162,58 @@ def render(ctx):
                     "matches_played",
                     "wins",
                     "losses",
-                    "draws",
                     "win_rate",
-                    "latest",
-                    "maps_played",
-                    "round_diff",
-                    "avg_round_diff_match",
-                    "confidence",
+                    "round_wins",
+                    "round_losses",
+                    "round_win_rate",
                 ]
             ],
             use_container_width=True,
             hide_index=True,
             column_config={
                 "opponent_team": st.column_config.TextColumn("Opponent"),
-                "matches_played": st.column_config.NumberColumn("Matches", format="%d"),
+                "matches_played": st.column_config.NumberColumn("Matches Played", format="%d"),
                 "wins": st.column_config.NumberColumn("Wins", format="%d"),
                 "losses": st.column_config.NumberColumn("Losses", format="%d"),
-                "draws": st.column_config.NumberColumn("Draws", format="%d"),
-                "win_rate": st.column_config.ProgressColumn("Win %", min_value=0, max_value=100, format="%.1f%%"),
-                "latest": st.column_config.TextColumn("Latest Result"),
-                "maps_played": st.column_config.NumberColumn("Maps", format="%d"),
-                "round_diff": st.column_config.NumberColumn("Round Diff", format="%+d"),
-                "avg_round_diff_match": st.column_config.NumberColumn("Avg Rd Diff/Match", format="%+.2f"),
-                "confidence": st.column_config.TextColumn("Confidence"),
+                "win_rate": st.column_config.ProgressColumn("Match Win %", min_value=0, max_value=100, format="%.1f%%"),
+                "round_wins": st.column_config.NumberColumn("Rounds Won", format="%d"),
+                "round_losses": st.column_config.NumberColumn("Rounds Lost", format="%d"),
+                "round_win_rate": st.column_config.ProgressColumn("Round Win %", min_value=0, max_value=100, format="%.1f%%"),
+            },
+        )
+
+    section_header("Win/Lose by Map", "Full match outcome split by opponent and map.")
+    with st.container(border=True):
+        st.dataframe(
+            map_match_breakdown[
+                ["opponent_team", "map", "matches_played", "wins", "losses", "match_win_rate"]
+            ],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "opponent_team": st.column_config.TextColumn("Opponent"),
+                "map": st.column_config.TextColumn("Map"),
+                "matches_played": st.column_config.NumberColumn("Matches Played", format="%d"),
+                "wins": st.column_config.NumberColumn("Wins", format="%d"),
+                "losses": st.column_config.NumberColumn("Losses", format="%d"),
+                "match_win_rate": st.column_config.ProgressColumn("Match Win %", min_value=0, max_value=100, format="%.1f%%"),
+            },
+        )
+
+    section_header("Round Win/Lose by Map", "Round totals split by opponent and map.")
+    with st.container(border=True):
+        st.dataframe(
+            map_round_breakdown[
+                ["opponent_team", "map", "rounds_won", "rounds_lost", "round_win_rate"]
+            ],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "opponent_team": st.column_config.TextColumn("Opponent"),
+                "map": st.column_config.TextColumn("Map"),
+                "rounds_won": st.column_config.NumberColumn("Rounds Won", format="%d"),
+                "rounds_lost": st.column_config.NumberColumn("Rounds Lost", format="%d"),
+                "round_win_rate": st.column_config.ProgressColumn("Round Win %", min_value=0, max_value=100, format="%.1f%%"),
             },
         )
 
