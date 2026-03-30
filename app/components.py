@@ -104,6 +104,16 @@ def _player_note(row: dict) -> str:
     best_map = row.get("best_map", "N/A")
     return f"{trend} form. Best map: {best_map}. Baseline: {grev:.2f} GrevScore with {kpd:.2f} K/D in this scope."
 
+
+def _transferred_destination(row: dict) -> str:
+    raw_value = row.get("new_team", row.get("New_team", row.get("New_Team", "")))
+    if raw_value is None:
+        return ""
+    value = str(raw_value).strip()
+    if not value or value == "-":
+        return ""
+    return value
+
 def trend_chip(trend: str) -> str:
     key = str(trend or "Flat").strip().lower()
     tone = "mid"
@@ -287,6 +297,13 @@ def player_card(row: dict):
         else ""
     )
 
+    transfer_destination = _transferred_destination(row)
+    transferred_html = (
+        f"<div class='player-meta-row'><span class='muted'>Transferred to: <strong>{html.escape(transfer_destination)}</strong></span></div>"
+        if transfer_destination
+        else ""
+    )
+
     context_html = (
         "<div class='player-meta-row'><span class='muted'>Best map <strong>"
         f"{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
@@ -311,6 +328,7 @@ def player_card(row: dict):
             <p class='identity-line'>{safe_role_line}</p>
             {fame_html}
             {context_html}
+            {transferred_html}
           </div>
         </div>
         {achievements_block_html}

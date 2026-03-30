@@ -230,7 +230,9 @@ def _render_roster_cards(
                     }
                 )
             merged["favourite_map"] = _resolve_favourite_map(players_meta, key)
-            new_team = str(merged.get("new_team", merged.get("New_team", "")) or "").strip()
+            new_team = str(
+                merged.get("new_team", merged.get("New_team", merged.get("New_Team", ""))) or ""
+            ).strip()
             usage_row = player_match_counts[player_match_counts["player"].astype(str) == str(row["player"])]
             merged["appearance_share"] = float(usage_row.iloc[0]["appearance_share"]) if not usage_row.empty else 0.0
 
@@ -487,7 +489,7 @@ def render(ctx):
             st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
-        section_header("Transferred", "Historical Medisports players absent for more than two seasons")
+        section_header("Transferred", "Players marked with a transfer destination or historical transfer status")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
         _render_roster_cards(
             transferred_summary,
