@@ -225,7 +225,7 @@ def player_card(row: dict):
     safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
     last_match_title = "Last Match" if is_streamer_card else "Last Match ✓"
     last_match_html = _last_match_block_html(None, title=last_match_title) if is_streamer_card else _last_match_block_html(row.get("last_match"), title=last_match_title)
-    best_match_html = _last_match_block_html(None, title="Best Match", empty_text="No best match", block_variant="best") if is_streamer_card else _last_match_block_html(row.get("best_match"), title="Best Match", empty_text="No best match", block_variant="best")
+    best_match_html = _last_match_block_html(None, title="Best Match", empty_text="No best match", block_variant="best") if is_streamer_card else _last_match_block_html(row.get("best_match"), title="Best Match ✓", empty_text="No best match", block_variant="best")
 
     if is_streamer_card:
         streamer_card_html = f"""
