@@ -98,42 +98,47 @@ def _render_match_record_table(view: pd.DataFrame) -> None:
             "confidence",
         ]
     ].copy()
-    table_df["win_rate_match"] = table_df["win_rate_match"].map(lambda v: f"{float(v):.1f}%")
-    table_df["win_rate_rounds"] = table_df["win_rate_rounds"].map(lambda v: f"{float(v):.1f}%")
-    table_df["round_diff"] = table_df["round_diff"].map(lambda v: f"{int(v):+d}")
-
-    headers = [
-        ("Opponent", "opponent_team"),
-        ("Matches", "matches_played"),
-        ("Wins", "wins"),
-        ("Losses", "losses"),
-        ("Draws", "draws"),
-        ("Win% (Match)", "win_rate_match"),
-        ("Win% (Rounds)", "win_rate_rounds"),
-        ("Round Diff", "round_diff"),
-        ("Latest Result", "latest_result_label"),
-        ("Confidence", "confidence"),
-    ]
-
-    header_html = "".join(f"<th>{label}</th>" for label, _ in headers)
-    row_html = "".join(
-        "<tr class='breakdown-row {row_class}'>".format(row_class="even" if idx % 2 == 0 else "odd")
-        + "".join(
-            f"<td class='{'breakdown-key' if col_key == 'opponent_team' else 'breakdown-num' if col_key in {'matches_played','wins','losses','draws','win_rate_match','win_rate_rounds','round_diff'} else ''}'>{str(row.get(col_key, 'N/A'))}</td>"
-            for _, col_key in headers
-        )
-        + "</tr>"
-        for idx, row in table_df.iterrows()
-    )
-
     st.markdown(
         f"""
         <div class='panel map-performance-shell'>
           <div class='breakdown-table-wrap map-performance-table-wrap'>
-            <table class='breakdown-table map-performance-table'>
-              <thead><tr>{header_html}</tr></thead>
-              <tbody>{row_html}</tbody>
-            </table>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.dataframe(
+        table_df.rename(
+            columns={
+                "opponent_team": "Opponent",
+                "matches_played": "Matches",
+                "wins": "Wins",
+                "losses": "Losses",
+                "draws": "Draws",
+                "win_rate_match": "Win% (Match)",
+                "win_rate_rounds": "Win% (Rounds)",
+                "round_diff": "Round Diff",
+                "latest_result_label": "Latest Result",
+                "confidence": "Confidence",
+            }
+        ),
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Opponent": st.column_config.TextColumn("Opponent"),
+            "Matches": st.column_config.NumberColumn("Matches", format="%d"),
+            "Wins": st.column_config.NumberColumn("Wins", format="%d"),
+            "Losses": st.column_config.NumberColumn("Losses", format="%d"),
+            "Draws": st.column_config.NumberColumn("Draws", format="%d"),
+            "Win% (Match)": st.column_config.NumberColumn("Win% (Match)", format="%.1f%%"),
+            "Win% (Rounds)": st.column_config.NumberColumn("Win% (Rounds)", format="%.1f%%"),
+            "Round Diff": st.column_config.NumberColumn("Round Diff", format="%+d"),
+            "Latest Result": st.column_config.TextColumn("Latest Result"),
+            "Confidence": st.column_config.TextColumn("Confidence"),
+        },
+    )
+
+    st.markdown(
+        """
           </div>
         </div>
         """,
