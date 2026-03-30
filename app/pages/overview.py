@@ -10,6 +10,7 @@ from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo, resolve_transferred_logo
 from app.metrics import trend_label
 from app.transforms import best_contexts, summarize_player
+from app.match_summaries import build_best_match_summary, build_last_match_summary
 
 
 def _resolve_favourite_map(meta: pd.DataFrame, player_key: str, default: str = "N/A") -> str:
@@ -195,79 +196,6 @@ def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, fl
     return {str(tier).upper(): float(score) for tier, score in tier_summary.items()}
 
 
-def _resolve_match_result(
-    match_row: pd.Series,
-    tactics_context: pd.DataFrame,
-) -> str | None:
-    direct_result_candidates = ["result", "match_result", "outcome", "wl"]
-    for col in direct_result_candidates:
-        if col not in match_row.index:
-            continue
-        value = str(match_row.get(col, "") or "").strip().casefold()
-        if value in {"w", "win", "won", "victory"}:
-            return "Win"
-        if value in {"l", "loss", "lost", "defeat"}:
-            return "Loss"
-
-    if "win" in match_row.index:
-        win_value = match_row.get("win")
-        if isinstance(win_value, bool):
-            return "Win" if win_value else "Loss"
-
-    if tactics_context.empty or "match_id" not in tactics_context.columns:
-        return None
-    match_id = str(match_row.get("match_id", "") or "").strip()
-    if not match_id:
-        return None
-
-    tactic_rows = tactics_context[tactics_context["match_id"].astype(str) == match_id]
-    if tactic_rows.empty:
-        return None
-    if "wins" not in tactic_rows.columns or "losses" not in tactic_rows.columns:
-        return None
-
-    wins = pd.to_numeric(tactic_rows["wins"], errors="coerce").sum(min_count=1)
-    losses = pd.to_numeric(tactic_rows["losses"], errors="coerce").sum(min_count=1)
-    if pd.isna(wins) or pd.isna(losses) or wins == losses:
-        return None
-    return "Win" if wins > losses else "Loss"
-
-
-def build_last_match_summary(
-    df_context: pd.DataFrame,
-    tactics_context: pd.DataFrame,
-    player_name: str,
-) -> dict | None:
-    required_cols = {"player", "date", "opponent_team", "kpd", "grevscore"}
-    if df_context.empty or any(col not in df_context.columns for col in required_cols):
-        return None
-
-    subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
-    if subset.empty:
-        return None
-
-    sort_cols = [col for col in ["date", "time", "match_id"] if col in subset.columns]
-    subset = subset.sort_values(sort_cols, ascending=[False] * len(sort_cols), kind="mergesort")
-
-    for _, row in subset.iterrows():
-        opponent = str(row.get("opponent_team", "") or "").strip()
-        kpd = pd.to_numeric(row.get("kpd"), errors="coerce")
-        grevscore = pd.to_numeric(row.get("grevscore"), errors="coerce")
-        result = _resolve_match_result(row, tactics_context)
-
-        if opponent and result and pd.notna(kpd) and pd.notna(grevscore):
-            date_played = pd.to_datetime(row.get("date"), errors="coerce")
-            date_played_label = date_played.strftime("%b %d, %Y") if pd.notna(date_played) else ""
-            return {
-                "date_played": date_played_label,
-                "opponent_team": opponent,
-                "result": result,
-                "kpd": float(kpd),
-                "grevscore": float(grevscore),
-            }
-    return None
-
-
 def _render_roster_cards(
     summary: pd.DataFrame,
     df_context: pd.DataFrame,
@@ -323,6 +251,7 @@ def _render_roster_cards(
             merged["trend"] = _trend_for_player(df_context, str(row["player"])) if card_variant != "streamer" else ""
             merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"])) if card_variant != "streamer" else {}
             merged["last_match"] = None if card_variant == "streamer" else build_last_match_summary(df_context, tactics_context, str(row["player"]))
+            merged["best_match"] = None if card_variant == "streamer" else build_best_match_summary(df_context, tactics_context, str(row["player"]))
             photo = resolve_player_photo(str(row["player"]))
             merged["photo_uri"] = image_data_uri(photo.get("path"))
             if transferred_logo_fallback:
