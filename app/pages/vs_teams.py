@@ -1,8 +1,6 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-
-from app.components import section_header
 from app.metrics import confidence_from_sample
 
 
@@ -123,41 +121,35 @@ def _render_match_record_table(view: pd.DataFrame) -> None:
         <style>
           .match-record-premium-shell {
             margin-top: 8px;
-            border: 1px solid rgba(125, 150, 180, 0.30);
-            border-radius: 16px;
-            padding: 14px 14px 10px 14px;
+            border: 1px solid rgba(141, 168, 200, 0.34);
+            border-radius: 18px;
+            padding: 12px;
             background:
-              radial-gradient(1200px 180px at 50% -35%, rgba(93, 188, 255, 0.10), transparent 45%),
-              linear-gradient(160deg, rgba(8, 14, 24, 0.95) 0%, rgba(13, 21, 35, 0.92) 100%);
+              radial-gradient(1300px 220px at 50% -40%, rgba(110, 201, 255, 0.12), transparent 44%),
+              linear-gradient(170deg, rgba(7, 13, 22, 0.97) 0%, rgba(12, 20, 33, 0.94) 100%);
             box-shadow:
-              0 16px 38px rgba(0, 0, 0, 0.38),
-              inset 0 1px 0 rgba(224, 236, 255, 0.05);
-          }
-          .match-record-premium-shell .match-record-premium-caption {
-            margin: 0 0 10px 2px;
-            font-size: 0.78rem;
-            letter-spacing: 0.04em;
-            color: #a8b8ce;
-            text-transform: uppercase;
-            font-weight: 600;
+              0 18px 42px rgba(0, 0, 0, 0.40),
+              inset 0 1px 0 rgba(226, 237, 255, 0.07);
           }
           .match-record-premium-shell [data-testid="stDataFrame"] {
-            border: 1px solid rgba(130, 156, 187, 0.36);
-            border-radius: 12px;
+            border: 1px solid rgba(139, 165, 195, 0.38);
+            border-radius: 14px;
             overflow: hidden;
-            background: linear-gradient(180deg, rgba(10, 16, 28, 0.94) 0%, rgba(11, 18, 30, 0.90) 100%);
-          }
-          .match-record-premium-shell [data-testid="stDataFrame"] [role="grid"] {
-            background: transparent;
+            background: rgba(8, 14, 25, 0.72);
           }
           .match-record-premium-shell [data-testid="stDataFrame"] [data-testid="stElementToolbar"] {
-            background: rgba(10, 16, 27, 0.66);
-            border-bottom: 1px solid rgba(125, 150, 180, 0.30);
+            background: linear-gradient(180deg, rgba(16, 26, 41, 0.88), rgba(12, 21, 35, 0.82));
+            border-bottom: 1px solid rgba(135, 161, 192, 0.34);
+          }
+          .match-record-premium-shell [data-testid="stDataFrame"] [data-testid="stDataFrameGlideDataEditor"] {
+            padding: 4px;
+            background: transparent;
+          }
+          .match-record-premium-shell [data-testid="stDataFrame"] canvas {
+            border-radius: 10px;
           }
         </style>
         <div class='match-record-premium-shell'>
-          <div class='match-record-premium-caption'>Sortable Team Matchup Ledger</div>
-          <div class='breakdown-table-wrap'>
         """,
         unsafe_allow_html=True,
     )
@@ -181,13 +173,7 @@ def _render_match_record_table(view: pd.DataFrame) -> None:
         },
     )
 
-    st.markdown(
-        """
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 def _render_heatmap(
     pivot: pd.DataFrame,
@@ -324,7 +310,6 @@ def render(ctx):
 
     view = grp.sort_values(["win_rate_match", "round_diff", "matches_played"], ascending=[False, False, False]).copy()
 
-    section_header("Match Record vs Teams", "Primary view focused on full match outcomes.")
     _render_match_record_table(view)
 
     if view.empty:
