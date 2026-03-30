@@ -9,7 +9,7 @@ except ModuleNotFoundError:
     go = None
     PLOTLY_AVAILABLE = False
 
-from app.components import insight_card, section_header
+from app.components import data_section_shell, insight_card, section_header, style_refresh_note
 from app.descriptions import matchup_insight
 from app.filters import filter_panel_toggle
 from app.metrics import confidence_from_sample
@@ -17,7 +17,8 @@ from app.metrics import confidence_from_sample
 
 def render(ctx):
     tdf = ctx["tactics"]
-    st.title("Medisports vs Teams")
+    style_refresh_note()
+    section_header("Medisports vs Teams", "Opponent scouting and matchup health")
     if tdf.empty:
         st.warning("No tactics/opponent data after filters.")
         return
@@ -40,7 +41,7 @@ def render(ctx):
     opp = st.session_state.get("vs_teams_opponent", "All")
     view = grp if opp == "All" else grp[grp["opponent_team"] == opp]
 
-    section_header("Matchup Overview")
+    data_section_shell("Matchup Overview", "Win profile by opponent with confidence context", tone="mid")
     st.dataframe(view.sort_values("win_rate", ascending=False), use_container_width=True, hide_index=True)
 
     if not PLOTLY_AVAILABLE:
@@ -57,10 +58,10 @@ def render(ctx):
 
     weak = grp.nsmallest(3, "win_rate")
     strong = grp.nlargest(3, "win_rate")
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="small")
     with c1:
-        st.subheader("Strongest Matchups")
+        data_section_shell("Strongest Matchups", "Highest win-rate opponents in scope", tone="good")
         st.dataframe(strong[["opponent_team", "win_rate", "rounds", "confidence"]], use_container_width=True, hide_index=True)
     with c2:
-        st.subheader("Needs Fixing")
+        data_section_shell("Needs Fixing", "Lowest win-rate opponents in scope", tone="poor")
         st.dataframe(weak[["opponent_team", "win_rate", "rounds", "confidence"]], use_container_width=True, hide_index=True)

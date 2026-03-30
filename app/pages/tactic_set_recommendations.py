@@ -1,6 +1,6 @@
 import streamlit as st
 
-from app.components import insight_card, section_header, trend_chip
+from app.components import data_section_shell, insight_card, section_header, style_refresh_note, trend_chip
 from app.filters import filter_panel_toggle
 from app.tactics import recommend_set, tactic_summary
 
@@ -26,6 +26,7 @@ def render(ctx):
         st.warning("No tactic summary could be generated.")
         return
 
+    style_refresh_note()
     section_header("Tactical Set Recommendations", "Context-locked recommendation engine")
 
     map_options = sorted(summary["map"].dropna().unique().tolist())
@@ -84,7 +85,7 @@ def render(ctx):
         st.info("No candidates for this context and confidence floor yet.")
         return
 
-    section_header("Recommendation Summary Band")
+    data_section_shell("Recommendation Summary Band", "High-level recommendation mix for this context", tone="good")
     coverage = recs.groupby("category")["tactic_name"].count().to_dict()
     confidence_mix = recs["score"].map(_confidence_label).value_counts().to_dict()
     s1, s2, s3, s4 = st.columns(4, gap="small")
@@ -97,14 +98,14 @@ def render(ctx):
     with s4:
         insight_card("Context", f"{map_name} • {side} • min sample {min_sample}", "info")
 
-    section_header("Legend")
+    data_section_shell("Legend", "Score and confidence keys used across recommendations", tone="mid")
     st.markdown(
         "<div class='panel panel-tight'><span class='chip chip-good'>High</span><span class='chip chip-mid'>Medium</span><span class='chip chip-poor'>Low</span>"
         "<div class='muted'>Cards emphasize score, win rate, usage volume, and trend chips for quick scan.</div></div>",
         unsafe_allow_html=True,
     )
 
-    section_header("Tactic Cards", "Primary recommendation surface")
+    data_section_shell("Tactic Cards", "Primary recommendation surface", tone="mid")
     for _, r in recs.sort_values("score", ascending=False).iterrows():
         confidence = _confidence_label(float(r["score"]))
         tone = "good" if confidence == "High" else "mid" if confidence == "Medium" else "poor"
@@ -137,7 +138,7 @@ def render(ctx):
     tentative = remaining[(remaining["uses"] < min_sample) & (remaining["win_rate"] >= 55)].head(4)
 
     if include_tentative and (not near_miss.empty or not tentative.empty or not drop_candidates.empty):
-        section_header("Supporting Buckets", "Secondary compact sections")
+        data_section_shell("Supporting Buckets", "Secondary compact sections", tone="poor")
         x1, x2, x3 = st.columns(3, gap="small")
         with x1:
             st.markdown("#### Near Misses")
