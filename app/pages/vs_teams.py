@@ -19,7 +19,22 @@ def _summary_box(label: str, value: str, accent: str, bg: str) -> None:
     )
 
 
-def _render_heatmap(pivot: pd.DataFrame, title: str, color_label: str, zmin=None, zmax=None, scale="RdYlGn") -> None:
+HEATMAP_RED_GREEN_SCALE = [
+    [0.0, "#7f1d1d"],   # deep red (poor)
+    [0.5, "#3f4a3f"],   # muted dark midpoint (neutral)
+    [1.0, "#166534"],   # deep green (strong)
+]
+
+
+def _render_heatmap(
+    pivot: pd.DataFrame,
+    title: str,
+    color_label: str,
+    zmin=None,
+    zmax=None,
+    zmid=None,
+    scale=HEATMAP_RED_GREEN_SCALE,
+) -> None:
     if pivot.empty:
         st.info(f"No data available for {title}.")
         return
@@ -30,10 +45,12 @@ def _render_heatmap(pivot: pd.DataFrame, title: str, color_label: str, zmin=None
         color_continuous_scale=scale,
         zmin=zmin,
         zmax=zmax,
+        zmid=zmid,
         labels={"x": "Map", "y": "Team", "color": color_label},
         text_auto=".1f",
         title=title,
     )
+    heat.update_traces(textfont={"color": "#F5F7FA"})
     heat.update_layout(
         template="plotly_dark",
         height=max(420, 120 + 34 * len(pivot.index)),
@@ -268,6 +285,34 @@ def render(ctx):
     map_team["match_diff"] = map_team["match_wins"] - map_team["match_losses"]
     map_team["match_win_pct"] = (map_team["match_wins"] / map_team["matches"].clip(lower=1) * 100).fillna(0)
 
+    team_order = (
+        grp.sort_values(["matches_played", "wins", "round_diff", "opponent_team"], ascending=[False, False, False, True])[
+            "opponent_team"
+        ]
+        .tolist()
+    )
+    map_order = (
+        map_team.groupby("map", dropna=False)["matches"]
+        .sum()
+        .sort_values(ascending=False)
+        .index.tolist()
+    )
+
+    def _build_heatmap_pivot(value_col: str) -> pd.DataFrame:
+        return (
+            map_team.pivot(index="opponent_team", columns="map", values=value_col)
+            .reindex(index=team_order, columns=map_order)
+            .fillna(0)
+        )
+
+    round_diff_pivot = _build_heatmap_pivot("round_diff")
+    round_win_pct_pivot = _build_heatmap_pivot("round_win_pct")
+    match_diff_pivot = _build_heatmap_pivot("match_diff")
+    match_win_pct_pivot = _build_heatmap_pivot("match_win_pct")
+
+    round_diff_abs = float(round_diff_pivot.abs().to_numpy().max()) if not round_diff_pivot.empty else 0.0
+    match_diff_abs = float(match_diff_pivot.abs().to_numpy().max()) if not match_diff_pivot.empty else 0.0
+
     st.markdown("### Heatmaps")
     st.caption(
         "Metrics: Round Win/Lose uses round differential (rounds won - rounds lost). "
@@ -275,32 +320,36 @@ def render(ctx):
     )
 
     _render_heatmap(
-        map_team.pivot(index="opponent_team", columns="map", values="round_diff").sort_index().fillna(0),
+        round_diff_pivot,
         "Round Win/Lose by Team and Map",
         "Round Diff",
-        scale="RdBu",
+        zmin=-round_diff_abs if round_diff_abs else None,
+        zmax=round_diff_abs if round_diff_abs else None,
+        zmid=0,
     )
     _render_heatmap(
-        map_team.pivot(index="opponent_team", columns="map", values="round_win_pct").sort_index().fillna(0),
+        round_win_pct_pivot,
         "Round Win % by Team and Map",
         "Round Win %",
         zmin=0,
         zmax=100,
-        scale="RdYlGn",
+        zmid=50,
     )
     _render_heatmap(
-        map_team.pivot(index="opponent_team", columns="map", values="match_diff").sort_index().fillna(0),
+        match_diff_pivot,
         "Match Win/Lose by Team and Map",
         "Match Diff",
-        scale="RdBu",
+        zmin=-match_diff_abs if match_diff_abs else None,
+        zmax=match_diff_abs if match_diff_abs else None,
+        zmid=0,
     )
     _render_heatmap(
-        map_team.pivot(index="opponent_team", columns="map", values="match_win_pct").sort_index().fillna(0),
+        match_win_pct_pivot,
         "Match Win % by Team and Map",
         "Match Win %",
         zmin=0,
         zmax=100,
-        scale="RdYlGn",
+        zmid=50,
     )
 
     weak = grp.nsmallest(3, "win_rate_match")
