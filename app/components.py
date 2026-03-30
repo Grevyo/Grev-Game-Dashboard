@@ -104,6 +104,32 @@ def _player_note(row: dict) -> str:
     best_map = row.get("best_map", "N/A")
     return f"{trend} form. Best map: {best_map}. Baseline: {grev:.2f} GrevScore with {kpd:.2f} K/D in this scope."
 
+
+def _clean_transfer_destination(value) -> str:
+    text = _strip_tags_to_text(value)
+    if not text or text == "-":
+        return ""
+    return text
+
+
+def _last_game_html(row: dict) -> str:
+    last_game = row.get("last_game")
+    if not isinstance(last_game, dict) or not last_game:
+        return "<div class='last-game-strip'><div class='last-game-empty'>No recent match</div></div>"
+
+    date = html.escape(str(last_game.get("date", "N/A")))
+    kd = html.escape(str(last_game.get("kd", "N/A")))
+    result = html.escape(str(last_game.get("result", "N/A")))
+    opponent = html.escape(str(last_game.get("opponent", "N/A")))
+    tournament = html.escape(str(last_game.get("tournament", "N/A")))
+    return (
+        "<div class='last-game-strip'>"
+        "<div class='last-game-title'>Last Game</div>"
+        f"<div class='last-game-line'><span>{date}</span><span>{result}</span><span>KD {kd}</span></div>"
+        f"<div class='last-game-sub'>vs {opponent} · {tournament}</div>"
+        "</div>"
+    )
+
 def trend_chip(trend: str) -> str:
     key = str(trend or "Flat").strip().lower()
     tone = "mid"
@@ -184,6 +210,9 @@ def player_card(row: dict):
     safe_player_note = html.escape(str(_player_note(row) or ""))
     safe_best_map = html.escape(str(row.get("best_map", "N/A")))
     safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
+    transfer_destination = _clean_transfer_destination(row.get("new_team", row.get("New_team", "")))
+    transfer_line_html = f"<p class='identity-line transfer-line'>Transferred to: <strong>{html.escape(transfer_destination)}</strong></p>" if transfer_destination else ""
+    last_game_html = _last_game_html(row)
 
     if is_streamer_card:
         streamer_card_html = f"""
@@ -201,10 +230,12 @@ def player_card(row: dict):
                     </div>
                     <p class='identity-line'>{safe_identity_line}</p>
                     <p class='identity-line'>{safe_role_line}</p>
+                    {transfer_line_html}
                     {fame_html}
                     <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong></span></div>
                 </div>
             </div>
+            {last_game_html}
             <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
         </div>
         """
@@ -267,10 +298,12 @@ def player_card(row: dict):
             </div>
             <p class='identity-line'>{safe_identity_line}</p>
             <p class='identity-line'>{safe_role_line}</p>
+            {transfer_line_html}
             {fame_html}
             {context_html}
           </div>
         </div>
+        {last_game_html}
         {achievements_block_html}
         {stats_block_html}
         {tier_block_html}
