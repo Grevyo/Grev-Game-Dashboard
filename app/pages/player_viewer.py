@@ -23,7 +23,7 @@ from app.image_helpers import (
     resolve_player_photo,
 )
 from app.transforms import best_contexts
-from app.match_summaries import build_best_n_matches, build_last_n_matches
+from app.match_summaries import build_best_n_matches, build_last_n_matches, resolve_match_result
 from app.presentation_helpers import nationality_label
 
 
@@ -41,6 +41,25 @@ def _form_delta(p):
     early = tail.head(half).mean()
     recent = tail.tail(half).mean()
     return float(recent - early)
+
+
+def _true_record(df_scope: pd.DataFrame, tactics_scope: pd.DataFrame) -> tuple[int, int]:
+    if df_scope.empty:
+        return 0, 0
+
+    wins = 0
+    losses = 0
+    per_match = df_scope.copy()
+    if "match_id" in per_match.columns:
+        per_match = per_match.sort_values([c for c in ["date", "time"] if c in per_match.columns]).drop_duplicates("match_id", keep="last")
+
+    for _, row in per_match.iterrows():
+        result = resolve_match_result(row, tactics_scope)
+        if result == "Win":
+            wins += 1
+        elif result == "Loss":
+            losses += 1
+    return wins, losses
 
 
 
@@ -153,8 +172,13 @@ def render(ctx):
 
     delta_10 = _form_delta(p)
     trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
-    streak = f"{int((p['grevscore'] >= p['grevscore'].mean()).tail(5).sum())}/5 solid"
-    record_value = f"{int((p['grevscore'] >= 1.0).sum())}-{int((p['grevscore'] < 1.0).sum())}"
+    tactics_scope = ctx.get("tactics", pd.DataFrame())
+    if not tactics_scope.empty and "match_id" in p.columns and "match_id" in tactics_scope.columns:
+        match_ids = p["match_id"].dropna().astype(str).unique().tolist()
+        tactics_scope = tactics_scope[tactics_scope["match_id"].astype(str).isin(match_ids)].copy()
+    wins, losses = _true_record(p, tactics_scope)
+    record_value = f"{wins}-{losses}"
+    adr = p["damage"].sum() / p["rounds_played"].sum() if p["rounds_played"].sum() > 0 else 0.0
 
     player_photo_match = resolve_player_photo(player)
     player_photo = image_data_uri(player_photo_match.get("path"))
@@ -186,10 +210,12 @@ def render(ctx):
             <div style='min-width:340px;flex:1;'>
               <div style='display:flex;justify-content:flex-end;margin-bottom:8px;'>{hero_logo}</div>
               <div class='subtle-grid'>
-                <div class='panel panel-tight accent-mid'><div class='metric-title'>Team Rank</div><div class='metric-value'>{int((df.groupby('player')['grevscore'].mean().rank(ascending=False, method='min').get(player, 0)))}</div></div>
                 <div class='panel panel-tight accent-good'><div class='metric-title'>Record</div><div class='metric-value'>{record_value}</div></div>
-                <div class='panel panel-tight accent-mid'><div class='metric-title'>Recent Streak</div><div class='metric-value'>{streak}</div></div>
-                <div class='panel panel-tight accent-{'good' if delta_10 >= 0 else 'bad'}'><div class='metric-title'>Last 10 Δ</div><div class='metric-value'>{delta_10:+.1f}</div></div>
+                <div class='panel panel-tight accent-mid'><div class='metric-title'>KD</div><div class='metric-value'>{p['kpd'].mean():.2f}</div></div>
+                <div class='panel panel-tight accent-mid'><div class='metric-title'>GrevScore</div><div class='metric-value'>{p['grevscore'].mean():.2f}</div></div>
+                <div class='panel panel-tight accent-mid'><div class='metric-title'>Impact</div><div class='metric-value'>{p['impact'].mean():.1f}</div></div>
+                <div class='panel panel-tight accent-mid'><div class='metric-title'>ADR</div><div class='metric-value'>{adr:.1f}</div></div>
+                <div class='panel panel-tight accent-mid'><div class='metric-title'>KPR</div><div class='metric-value'>{p['kpr'].mean():.2f}</div></div>
               </div>
             </div>
           </div>
