@@ -120,8 +120,44 @@ def _render_match_record_table(view: pd.DataFrame) -> None:
     # so users can sort by clicking headers in the visible table.
     st.markdown(
         """
-        <div class='panel map-performance-shell'>
-          <div class='breakdown-table-wrap map-performance-table-wrap'>
+        <style>
+          .match-record-premium-shell {
+            margin-top: 8px;
+            border: 1px solid rgba(125, 150, 180, 0.30);
+            border-radius: 16px;
+            padding: 14px 14px 10px 14px;
+            background:
+              radial-gradient(1200px 180px at 50% -35%, rgba(93, 188, 255, 0.10), transparent 45%),
+              linear-gradient(160deg, rgba(8, 14, 24, 0.95) 0%, rgba(13, 21, 35, 0.92) 100%);
+            box-shadow:
+              0 16px 38px rgba(0, 0, 0, 0.38),
+              inset 0 1px 0 rgba(224, 236, 255, 0.05);
+          }
+          .match-record-premium-shell .match-record-premium-caption {
+            margin: 0 0 10px 2px;
+            font-size: 0.78rem;
+            letter-spacing: 0.04em;
+            color: #a8b8ce;
+            text-transform: uppercase;
+            font-weight: 600;
+          }
+          .match-record-premium-shell [data-testid="stDataFrame"] {
+            border: 1px solid rgba(130, 156, 187, 0.36);
+            border-radius: 12px;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(10, 16, 28, 0.94) 0%, rgba(11, 18, 30, 0.90) 100%);
+          }
+          .match-record-premium-shell [data-testid="stDataFrame"] [role="grid"] {
+            background: transparent;
+          }
+          .match-record-premium-shell [data-testid="stDataFrame"] [data-testid="stElementToolbar"] {
+            background: rgba(10, 16, 27, 0.66);
+            border-bottom: 1px solid rgba(125, 150, 180, 0.30);
+          }
+        </style>
+        <div class='match-record-premium-shell'>
+          <div class='match-record-premium-caption'>Sortable Team Matchup Ledger</div>
+          <div class='breakdown-table-wrap'>
         """,
         unsafe_allow_html=True,
     )
