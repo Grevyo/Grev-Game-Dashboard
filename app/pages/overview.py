@@ -3,13 +3,13 @@ import pandas as pd
 
 from app.components import insight_card, player_card, section_header, stat_card
 from app.achievements import achievements_for_player
-from app.data_loader import get_medisports_player_names, get_medisports_roster_df, normalize_player_key, normalize_side_label
+from app.data_loader import get_medisports_player_names, get_medisports_roster_df, normalize_player_key
 from app.descriptions import player_description
 from app.roster_split import split_roster_active_benched_streamer_transferred
 from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo, resolve_transferred_logo
 from app.metrics import trend_label
-from app.transforms import best_contexts, summarize_player
+from app.transforms import best_contexts, best_side_from_wins, summarize_player
 from app.match_summaries import build_best_match_summary, build_last_match_summary
 
 
@@ -109,68 +109,7 @@ def _best_side_for_player(
     player_name: str,
     default: str = "N/A",
 ) -> str:
-    """Return the side with the highest aggregate GrevScore for a player."""
-    if df_context.empty or "player" not in df_context.columns or "grevscore" not in df_context.columns:
-        return default
-
-    player_subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
-    if player_subset.empty:
-        return default
-
-    side_candidates = ["side", "team_side", "player_side", "starting_side"]
-    player_side_col = next((c for c in side_candidates if c in player_subset.columns), None)
-
-    if player_side_col:
-        side_rows = player_subset[["grevscore", player_side_col]].rename(columns={player_side_col: "side_raw"}).copy()
-    else:
-        if tactics_context.empty or "match_id" not in tactics_context.columns or "match_id" not in player_subset.columns:
-            return default
-        tactic_side_col = next((c for c in side_candidates if c in tactics_context.columns), None)
-        if tactic_side_col is None:
-            return default
-
-        player_rows = player_subset[["match_id", "grevscore"]].copy()
-        player_rows["match_id"] = player_rows["match_id"].astype(str)
-
-        tactic_rows = tactics_context[["match_id", tactic_side_col]].copy()
-        tactic_rows["match_id"] = tactic_rows["match_id"].astype(str)
-        tactic_rows = tactic_rows.rename(columns={tactic_side_col: "side_raw"})
-
-        side_rows = player_rows.merge(tactic_rows, on="match_id", how="inner")
-
-    if side_rows.empty:
-        return default
-
-    side_rows["grevscore"] = pd.to_numeric(side_rows["grevscore"], errors="coerce")
-    side_rows["side_raw"] = side_rows["side_raw"].astype(str).str.strip()
-    side_rows = side_rows[(side_rows["side_raw"] != "") & side_rows["grevscore"].notna()].copy()
-    if side_rows.empty:
-        return default
-
-    side_rows["side_norm"] = side_rows["side_raw"].map(normalize_side_label)
-    side_rows = side_rows[side_rows["side_norm"].astype(str).str.strip() != ""].copy()
-    if side_rows.empty:
-        return default
-
-    playable_sides = side_rows["side_norm"].value_counts().index.tolist()
-    if len(playable_sides) < 2:
-        return default
-    playable_sides = playable_sides[:2]
-
-    usable = side_rows[side_rows["side_norm"].isin(playable_sides)].copy()
-    grouped = (
-        usable.groupby("side_norm", dropna=False)
-        .agg(grevscore=("grevscore", "mean"), rows=("side_norm", "size"))
-        .reset_index()
-    )
-    if grouped.empty or grouped["side_norm"].nunique() < 2:
-        return default
-
-    best = grouped.sort_values(["grevscore", "rows"], ascending=[False, False]).head(1)
-    if best.empty:
-        return default
-
-    return str(best.iloc[0]["side_norm"])
+    return best_side_from_wins(df_context, tactics_context, player_name, default=default, tie_label="Even")
 
 
 def _trend_for_player(df, player_name: str) -> str:

@@ -33,6 +33,30 @@ def stat_card(label: str, value, help_text: str = "", quality_override: str | No
     )
 
 
+def grevscore_dial_html(value: float, max_value: float = 2.5, caption: str = "Scoped GrevScore") -> str:
+    score = max(0.0, float(value or 0.0))
+    upper = max(float(max_value or 1.0), 0.1)
+    ratio = min(score / upper, 1.0)
+    angle = int(round(ratio * 180))
+    if ratio >= 0.66:
+        tone = "good"
+    elif ratio >= 0.4:
+        tone = "mid"
+    else:
+        tone = "poor"
+
+    return (
+        f"<div class='panel panel-tight grevscore-dial-wrap accent-{tone}'>"
+        f"<div class='grevscore-dial' style='--dial-angle:{angle}deg;'>"
+        f"<div class='grevscore-dial-core'>"
+        f"<div class='grevscore-dial-value'>{score:.2f}</div>"
+        f"<div class='grevscore-dial-caption'>{html.escape(caption)}</div>"
+        "</div></div>"
+        f"<div class='grevscore-dial-scale'><span>0.00</span><span>{upper:.2f}</span></div>"
+        "</div>"
+    )
+
+
 def _clean_card_meta_value(value):
     if value is None:
         return None
