@@ -329,6 +329,22 @@ def player_card(row: dict):
     st.markdown(card_html, unsafe_allow_html=True)
 
 
+
+def style_refresh_note():
+    st.markdown("<div class='style-refresh-note'>Style Refresh ✓</div>", unsafe_allow_html=True)
+
+
+def data_section_shell(title: str, subtitle: str = "", tone: str = "mid"):
+    st.markdown(
+        f"""
+        <div class='panel data-section-shell accent-{tone}'>
+          <div class='section-title data-shell-title'>{title}</div>
+          {f"<div class='section-subtitle data-shell-subtitle'>{subtitle}</div>" if subtitle else ""}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 def insight_card(title: str, body: str, level: str = "info"):
     tone = {"info": "mid", "warn": "poor", "good": "good", "bad": "bad"}.get(level, "mid")
     icon = {"info": "ℹ", "warn": "⚠", "good": "▲", "bad": "▼"}.get(level, "ℹ")
