@@ -64,6 +64,30 @@ def inject_styles(theme_name: str = "Dark"):
     .accent-poor {{ border-top: 3px solid var(--poor); }}
     .accent-bad {{ border-top: 3px solid var(--bad); }}
 
+    .priority-chart-card {{
+      background:
+        radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 42%),
+        linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff 8%), color-mix(in srgb, var(--surface) 98%, #000 2%));
+      border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+      border-radius: 16px;
+      padding: 14px 14px 6px 14px;
+      margin: 10px 0 14px 0;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.2), inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+    }}
+    .priority-chart-title {{
+      font-size: 0.98rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #eef4ff;
+      margin-bottom: 2px;
+    }}
+    .priority-chart-note {{
+      font-size: 0.8rem;
+      color: color-mix(in srgb, var(--muted) 90%, #dbe8ff 10%);
+      margin-bottom: 8px;
+      line-height: 1.35;
+    }}
+
     .hero-band {{
       padding: var(--space-5);
       border-radius: var(--radius-l);

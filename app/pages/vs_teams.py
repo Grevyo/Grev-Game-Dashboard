@@ -30,17 +30,17 @@ def _apply_priority_chart_style(fig, *, height: int = 500):
     fig.update_layout(
         template="plotly_dark",
         height=height,
-        margin=dict(l=78, r=36, t=84, b=128),
-        title=dict(font=dict(size=20, color="#EAF2FF"), x=0.02, xanchor="left"),
+        margin=dict(l=88, r=42, t=92, b=132),
+        title=dict(font=dict(size=21, color="#EAF2FF"), x=0.01, xanchor="left", y=0.98),
         legend=dict(
-            title_font=dict(size=13),
-            font=dict(size=12),
+            title_font=dict(size=13, color="#EAF2FF"),
+            font=dict(size=12, color="#DCE7F5"),
             orientation="h",
             yanchor="bottom",
-            y=1.02,
+            y=1.03,
             xanchor="left",
             x=0.0,
-            bgcolor="rgba(16,22,34,0.35)",
+            bgcolor="rgba(10,16,29,0.56)",
             bordercolor="rgba(123,144,168,0.32)",
             borderwidth=1,
         ),
@@ -49,22 +49,23 @@ def _apply_priority_chart_style(fig, *, height: int = 500):
         hoverlabel=dict(
             bgcolor="rgba(14,20,31,0.96)",
             bordercolor="rgba(123,144,168,0.65)",
-            font=dict(color="#F5F8FF", size=12),
+            font=dict(color="#F5F8FF", size=13),
         ),
         font=dict(color="#D6DFEA"),
     )
     fig.update_xaxes(
-        tickangle=-32,
+        tickangle=-28,
         automargin=True,
-        tickfont=dict(size=11),
-        title_font=dict(size=13),
+        tickfont=dict(size=12),
+        title_font=dict(size=14),
+        ticklabelposition="outside",
         showgrid=False,
         zeroline=False,
     )
     fig.update_yaxes(
         automargin=True,
-        tickfont=dict(size=11),
-        title_font=dict(size=13),
+        tickfont=dict(size=12),
+        title_font=dict(size=14),
         gridcolor="rgba(123,144,168,0.22)",
         griddash="dot",
         zeroline=False,
@@ -72,9 +73,14 @@ def _apply_priority_chart_style(fig, *, height: int = 500):
     return fig
 
 
-def _render_priority_chart_card(fig):
-    with st.container(border=True):
+def _render_priority_chart_card(fig, heading: str, note: str = ""):
+    st.markdown("<div class='priority-chart-card'>", unsafe_allow_html=True)
+    st.markdown(f"<div class='priority-chart-title'>{heading}</div>", unsafe_allow_html=True)
+    if note:
+        st.markdown(f"<div class='priority-chart-note'>{note}</div>", unsafe_allow_html=True)
+    with st.container():
         st.plotly_chart(fig, use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_heatmap(
@@ -277,7 +283,11 @@ def render(ctx):
         marker_line_width=1,
         hovertemplate="<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>",
     )
-    _render_priority_chart_card(_apply_priority_chart_style(fig_wl, height=500))
+    _render_priority_chart_card(
+        _apply_priority_chart_style(fig_wl, height=520),
+        "Wins / Losses / Draws by Team",
+        "Grouped bars retain the same result colors as Match Record vs Teams for quick scanning.",
+    )
 
     fig_wr = px.bar(
         view.sort_values("win_rate_match", ascending=False),
@@ -301,7 +311,11 @@ def render(ctx):
         marker_line_width=1,
         hovertemplate="<b>%{x}</b><br>Match Win %: %{y:.1f}%<br>Matches: %{marker.color}<extra></extra>",
     )
-    _render_priority_chart_card(_apply_priority_chart_style(fig_wr, height=500))
+    _render_priority_chart_card(
+        _apply_priority_chart_style(fig_wr, height=520),
+        "Match Win % by Team",
+        "External value labels and larger axis text improve readability across longer opponent names.",
+    )
 
     bubble = px.scatter(
         view,
@@ -331,7 +345,11 @@ def render(ctx):
         ),
     )
     bubble.update_yaxes(range=[0, 100], ticksuffix="%")
-    _render_priority_chart_card(_apply_priority_chart_style(bubble, height=560))
+    _render_priority_chart_card(
+        _apply_priority_chart_style(bubble, height=580),
+        "Sample Depth vs Win Efficiency",
+        "Point outlines, hover contrast, and spacing were tuned for cleaner interpretation.",
+    )
 
     map_team = (
         match_level.groupby(["opponent_team", "map"], dropna=False)
