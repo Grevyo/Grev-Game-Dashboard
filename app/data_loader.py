@@ -7,7 +7,7 @@ from typing import Iterable
 import pandas as pd
 import streamlit as st
 
-from app.config import FILES
+from app.config import FILES, REQUIRED_FILES
 from app.grouping import build_season_resolution_debug_table, normalize_competitions
 
 SYNONYMS = {
@@ -209,6 +209,33 @@ def _safe_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     return df
 
 
+def _required_file_keys() -> tuple[str, ...]:
+    return REQUIRED_FILES
+
+
+def _validate_required_files() -> None:
+    missing_files: list[Path] = []
+    for file_key in _required_file_keys():
+        file_path = FILES[file_key]
+        if not file_path.exists():
+            missing_files.append(file_path)
+    if missing_files:
+        missing_details = "\n".join(f"- {path}" for path in missing_files)
+        raise FileNotFoundError(
+            "Required data file(s) missing. Restore the files under the configured data/ directory:\n"
+            f"{missing_details}"
+        )
+
+
+def _build_file_signature() -> tuple[tuple[str, str, int, int], ...]:
+    signatures: list[tuple[str, str, int, int]] = []
+    for file_key in _required_file_keys():
+        file_path = FILES[file_key]
+        stat = file_path.stat()
+        signatures.append((file_key, str(file_path), stat.st_mtime_ns, stat.st_size))
+    return tuple(signatures)
+
+
 
 def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
@@ -250,7 +277,7 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def load_data() -> dict[str, pd.DataFrame]:
+def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) -> dict[str, pd.DataFrame]:
     player_matches = _derive_core(_read_flexible_csv(FILES["player_matches"]))
     tactics = _derive_core(_read_flexible_csv(FILES["tactics"]))
     achievements = _derive_core(_read_flexible_csv(FILES["achievements"]))
@@ -329,6 +356,12 @@ def load_data() -> dict[str, pd.DataFrame]:
         "achievements": achievements,
         "players": players,
     }
+
+
+def load_data() -> dict[str, pd.DataFrame]:
+    _validate_required_files()
+    file_signature = _build_file_signature()
+    return _load_data_cached(file_signature)
 
 
 def detect_our_team(player_matches: pd.DataFrame, tactics: pd.DataFrame) -> str:
