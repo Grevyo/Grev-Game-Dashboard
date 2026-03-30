@@ -151,6 +151,36 @@ def _tier_box_html(tier: str, score: float | None) -> str:
     )
 
 
+def _last_match_block_html(last_match: dict | None) -> str:
+    if not last_match:
+        return (
+            "<div class='last-match-block'>"
+            "<div class='last-match-title'>Last Match</div>"
+            "<div class='last-match-line muted'>No recent match</div>"
+            "</div>"
+        )
+
+    opponent = html.escape(str(last_match.get("opponent_team", "")).strip())
+    result = html.escape(str(last_match.get("result", "")).strip())
+    kpd = last_match.get("kpd")
+    grevscore = last_match.get("grevscore")
+    if not opponent or not result or not isinstance(kpd, (int, float)) or not isinstance(grevscore, (int, float)):
+        return (
+            "<div class='last-match-block'>"
+            "<div class='last-match-title'>Last Match</div>"
+            "<div class='last-match-line muted'>No recent match</div>"
+            "</div>"
+        )
+
+    return (
+        "<div class='last-match-block'>"
+        "<div class='last-match-title'>Last Match</div>"
+        f"<div class='last-match-line'>vs <strong>{opponent}</strong> • <strong>{result}</strong></div>"
+        f"<div class='last-match-line muted'>KD: <strong>{kpd:.2f}</strong> • GrevScore: <strong>{grevscore:.2f}</strong></div>"
+        "</div>"
+    )
+
+
 def player_card(row: dict):
     roster_bucket = str(row.get("roster_bucket", "") or "").strip().casefold()
     card_variant = str(row.get("card_variant", "") or "").strip().casefold()
@@ -184,6 +214,7 @@ def player_card(row: dict):
     safe_player_note = html.escape(str(_player_note(row) or ""))
     safe_best_map = html.escape(str(row.get("best_map", "N/A")))
     safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
+    last_match_html = _last_match_block_html(row.get("last_match"))
 
     if is_streamer_card:
         streamer_card_html = f"""
@@ -203,6 +234,7 @@ def player_card(row: dict):
                     <p class='identity-line'>{safe_role_line}</p>
                     {fame_html}
                     <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong></span></div>
+                    {last_match_html}
                 </div>
             </div>
             <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
@@ -269,6 +301,7 @@ def player_card(row: dict):
             <p class='identity-line'>{safe_role_line}</p>
             {fame_html}
             {context_html}
+            {last_match_html}
           </div>
         </div>
         {achievements_block_html}

@@ -212,6 +212,30 @@ def inject_styles(theme_name: str = "Dark"):
     .fame-stars {{ font-size: 13px; letter-spacing: 0.08em; color: color-mix(in srgb, var(--mid) 70%, #fff 30%); }}
     .fame-value {{ color: var(--muted); font-size: 10px; }}
     .player-meta-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }}
+    .last-match-block {{
+      margin-top: 2px;
+      padding: 5px 7px;
+      border-radius: 8px;
+      border: 1px solid color-mix(in srgb, var(--border) 82%, #fff 18%);
+      background: color-mix(in srgb, var(--surface) 88%, #fff 12%);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }}
+    .last-match-title {{
+      color: var(--muted);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      line-height: 1.1;
+    }}
+    .last-match-line {{
+      font-size: 10px;
+      line-height: 1.25;
+      color: var(--text);
+      margin: 0;
+    }}
+    .last-match-line strong {{ font-weight: 700; }}
     .achievement-strip {{
       display:flex;
       flex-direction: row;
