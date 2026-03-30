@@ -2,6 +2,75 @@ import numpy as np
 import pandas as pd
 
 
+GREVSCORE_CAP = 2.5
+GREVSCORE_WEIGHTS = {
+    "kd": 0.24,
+    "kda": 0.22,
+    "kpd": 0.18,
+    "mvps": 0.14,
+    "accuracy_pct": 0.07,
+    "hs_pct": 0.05,
+    "damage": 0.10,
+}
+
+
+def _metric_series(df: pd.DataFrame, column: str, fallback: str | None = None) -> pd.Series:
+    if column in df.columns:
+        return pd.to_numeric(df[column], errors="coerce")
+    if fallback and fallback in df.columns:
+        return pd.to_numeric(df[fallback], errors="coerce")
+    return pd.Series(0.0, index=df.index, dtype=float)
+
+
+def _normalize_by_dataset_mean(series: pd.Series, cap: float = GREVSCORE_CAP) -> pd.Series:
+    baseline = max(float(series.mean(skipna=True) or 1.0), 0.01)
+    return np.clip(series.fillna(0.0) / baseline, 0.0, cap)
+
+
+def compute_grevscore(df: pd.DataFrame) -> pd.Series:
+    """
+    Source-of-truth GrevScore built ONLY from trusted stats.
+
+    GrevScore =
+      0.24 * norm(kd)
+    + 0.22 * norm(kda)
+    + 0.18 * norm(kpd)
+    + 0.14 * norm(mvps)
+    + 0.07 * norm(accuracy_pct)
+    + 0.05 * norm(hs_pct)
+    + 0.10 * norm(damage)
+
+    Normalization method (same for every metric):
+      norm(x) = clip(x / dataset_mean(x), 0.0, 2.5)
+    """
+    kd = _metric_series(df, "kd", fallback="kpd")
+
+    if "kda" in df.columns:
+        kda = _metric_series(df, "kda")
+    elif {"kills", "deaths", "assists"}.issubset(df.columns):
+        kills = _metric_series(df, "kills")
+        deaths = _metric_series(df, "deaths").replace(0, np.nan)
+        assists = _metric_series(df, "assists")
+        kda = (kills + assists) / deaths
+    else:
+        kda = kd.copy()
+
+    normalized = {
+        "kd": _normalize_by_dataset_mean(kd),
+        "kda": _normalize_by_dataset_mean(kda),
+        "kpd": _normalize_by_dataset_mean(_metric_series(df, "kpd", fallback="kd")),
+        "mvps": _normalize_by_dataset_mean(_metric_series(df, "mvps")),
+        "accuracy_pct": _normalize_by_dataset_mean(_metric_series(df, "accuracy_pct")),
+        "hs_pct": _normalize_by_dataset_mean(_metric_series(df, "hs_pct")),
+        "damage": _normalize_by_dataset_mean(_metric_series(df, "damage")),
+    }
+
+    score = sum(normalized[k] * w for k, w in GREVSCORE_WEIGHTS.items())
+    dataset_anchor = max(float(sum(normalized[k].mean(skipna=True) * w for k, w in GREVSCORE_WEIGHTS.items()) or 1.0), 0.01)
+    score = score / dataset_anchor
+    return pd.Series(np.clip(score, 0.0, GREVSCORE_CAP), index=df.index)
+
+
 def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
@@ -9,20 +78,9 @@ def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
     out["kpr"] = np.where(out.get("rounds_played", 0) > 0, out.get("kills", 0) / out.get("rounds_played", 1), np.nan)
     out["mvp_rate"] = np.where(out.get("rounds_played", 0) > 0, out.get("mvps", 0) / out.get("rounds_played", 1) * 30, np.nan)
 
-    baseline_kpd = max(float(out.get("kpd", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
-    baseline_kpr = max(float(out.get("kpr", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
-    baseline_acc = max(float(out.get("accuracy_pct", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
-    baseline_hs = max(float(out.get("hs_pct", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
-    baseline_mvp = max(float(out.get("mvp_rate", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
+    out["grevscore"] = compute_grevscore(out)
 
-    normalized = (
-        np.clip(out.get("kpd", 0).fillna(0) / baseline_kpd, 0, 2.5) * 0.38
-        + np.clip(out.get("kpr", 0).fillna(0) / baseline_kpr, 0, 2.5) * 0.24
-        + np.clip(out.get("accuracy_pct", 0).fillna(0) / baseline_acc, 0, 2.2) * 0.16
-        + np.clip(out.get("hs_pct", 0).fillna(0) / baseline_hs, 0, 2.5) * 0.12
-        + np.clip(out.get("mvp_rate", 0).fillna(0) / baseline_mvp, 0, 2.5) * 0.10
-    )
-    out["grevscore"] = np.clip(np.power(np.clip(normalized, 0, None), 1.08) * 1.12, 0, None)
+    baseline_kpr = max(float(out.get("kpr", pd.Series(dtype=float)).mean(skipna=True) or 1.0), 0.01)
     out["rating"] = (
         out.get("kpd", 0).fillna(0) * 0.65
         + (out.get("kpr", 0).fillna(0) / baseline_kpr) * 0.35
