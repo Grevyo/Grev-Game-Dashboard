@@ -599,6 +599,74 @@ def inject_styles(theme_name: str = "Dark"):
       padding: 10px 12px 4px 12px;
       margin-bottom: 12px;
     }}
+    .lower-analytics-shell {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }}
+    .lower-card {{
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 93%, #fff 7%), color-mix(in srgb, var(--surface) 98%, #000 2%));
+      border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: 0 10px 22px rgba(0,0,0,0.16);
+      height: 100%;
+    }}
+    .lower-breakdown-title {{
+      margin: 0 0 4px 0;
+      font-size: 0.92rem;
+      font-weight: 740;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }}
+    .lower-breakdown-subtitle {{
+      font-size: 11px;
+      margin-bottom: 8px;
+    }}
+    .breakdown-table-wrap {{
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--surface) 95%, #fff 5%);
+    }}
+    .breakdown-table {{
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12px;
+    }}
+    .breakdown-table th {{
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: color-mix(in srgb, var(--text) 86%, #fff 14%);
+      padding: 9px 10px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), color-mix(in srgb, var(--surface) 97%, #000 3%));
+      border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    }}
+    .breakdown-table th:not(:first-child),
+    .breakdown-table td.breakdown-num {{
+      text-align: right;
+    }}
+    .breakdown-table td {{
+      padding: 8px 10px;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
+      color: var(--text);
+    }}
+    .breakdown-table tr:last-child td {{
+      border-bottom: 0;
+    }}
+    .breakdown-row.even td {{
+      background: color-mix(in srgb, var(--surface) 96%, #fff 4%);
+    }}
+    .breakdown-row.odd td {{
+      background: color-mix(in srgb, var(--surface) 90%, #fff 10%);
+    }}
+    .breakdown-key {{
+      font-weight: 640;
+      letter-spacing: 0.01em;
+    }}
 
     .subtle-grid {{ display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:10px; }}
 
