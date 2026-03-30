@@ -75,7 +75,8 @@ def _apply_priority_chart_style(fig, *, height: int = 500):
 
 def _render_chart_panel(fig, heading: str, note: str = ""):
     st.markdown("<div class='panel'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section-title' style='margin-bottom:4px'>{heading}</div>", unsafe_allow_html=True)
+    if heading:
+        st.markdown(f"<div class='section-title' style='margin-bottom:4px'>{heading}</div>", unsafe_allow_html=True)
     if note:
         st.markdown(f"<div class='section-subtitle' style='margin-bottom:10px'>{note}</div>", unsafe_allow_html=True)
     st.plotly_chart(fig, use_container_width=True)
@@ -281,8 +282,6 @@ def render(ctx):
         st.info("No team matchup rows available for charting.")
         return
 
-    section_header("Full-Match Priority Charts")
-
     wl_long = view.melt(
         id_vars=["opponent_team"],
         value_vars=["wins", "losses", "draws"],
@@ -310,8 +309,8 @@ def render(ctx):
     )
     _render_chart_panel(
         _apply_priority_chart_style(fig_wl, height=520),
-        "Wins / Losses / Draws by Team",
-        "Grouped bars retain the same result colors as Match Record vs Teams for quick scanning.",
+        "",
+        "",
     )
 
     fig_wr = px.bar(
@@ -338,8 +337,8 @@ def render(ctx):
     )
     _render_chart_panel(
         _apply_priority_chart_style(fig_wr, height=520),
-        "Match Win % by Team",
-        "External value labels and larger axis text improve readability across longer opponent names.",
+        "",
+        "",
     )
 
     bubble = px.scatter(
@@ -372,8 +371,8 @@ def render(ctx):
     bubble.update_yaxes(range=[0, 100], ticksuffix="%")
     _render_chart_panel(
         _apply_priority_chart_style(bubble, height=580),
-        "Sample Depth vs Win Efficiency",
-        "Point outlines, hover contrast, and spacing were tuned for cleaner interpretation.",
+        "",
+        "",
     )
 
     map_team = (
