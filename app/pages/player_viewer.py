@@ -10,8 +10,8 @@ except ModuleNotFoundError:
     px = None
     PLOTLY_AVAILABLE = False
 
-from app.components import section_header, stat_card
-from app.achievements import achievements_for_player, normalize_season_label
+from app.components import render_achievement_mini_tile, section_header, stat_card
+from app.achievements import achievements_for_player
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.filters import filter_panel_toggle
@@ -22,9 +22,9 @@ from app.image_helpers import (
     image_data_uri,
     resolve_player_photo,
 )
-from app.styles import achievement_tier_badge
 from app.transforms import best_contexts
 from app.match_summaries import build_best_n_matches, build_last_n_matches
+from app.presentation_helpers import nationality_label
 
 
 def _player_key(name: str) -> str:
@@ -141,6 +141,9 @@ def render(ctx):
     meta_source = players.get("player_clean", players.get("player", players.get("name", ""))).astype(str).map(_player_key)
     meta = players[meta_source == _player_key(player)]
     country = str(meta.iloc[0].get("country", "")).strip() if not meta.empty else ""
+    nationality = str(meta.iloc[0].get("nationality", "")).strip() if not meta.empty else ""
+    nation_value = nationality or country
+    nation_label = nationality_label(nation_value) or "Nationality N/A"
     role = str(meta.iloc[0].get("role", "")).strip() if not meta.empty else ""
 
     best_map = best_contexts(p, "map").head(1)
@@ -164,15 +167,15 @@ def render(ctx):
 
     st.markdown(
         f"""
-        <div class='hero-band'>
+        <div class='hero-band player-viewer-hero'>
           <div style='display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;'>
-            <div style='flex:1;min-width:300px;display:flex;align-items:flex-start;gap:14px;'>
+            <div class='player-viewer-head-main'>
               {hero_photo}
               <div>
                 <div class='section-title' style='margin-top:0'>{player}</div>
-                <div class='section-subtitle'>{country + ' • ' if country else ''}{role if role else 'Core Roster'} • {team_name}</div>
+                <div class='section-subtitle'>{nation_label} • {role if role else 'Core Roster'} • {team_name}</div>
                 <span class='chip'>Role: {role if role else 'N/A'}</span>
-                <span class='chip'>Country: {country if country else 'N/A'}</span>
+                <span class='chip'>Nationality: {nation_label}</span>
                 <span class='chip chip-good'>Best Map: {best_map_label}</span>
                 <span class='chip chip-mid'>Best Side: {best_side_label}</span>
                 <div class='muted' style='margin-top:8px;'>Current form summary: {player} is {trend.lower()} with a {p['grevscore'].mean():.1f} GrevScore baseline in this scope.</div>
@@ -194,19 +197,12 @@ def render(ctx):
     )
 
     section_header("Achievements ✓", "Newest-to-oldest by season, aligned with overview card logic")
-    ach_items, ach_hidden = achievements_for_player(achievements, player, cap=6)
+    ach_items, ach_hidden = achievements_for_player(achievements, player, cap=6, consumer="overview")
     if not ach_items:
         st.caption("No achievements linked for selected player.")
     else:
-        cols = st.columns(min(3, max(1, len(ach_items))), gap="small")
-        for idx, a in enumerate(ach_items):
-            img_html = f"<img class='achievement-thumb' src='{a.get('image_uri')}' alt='Achievement image'/>" if a.get("image_uri") else ""
-            with cols[idx % len(cols)]:
-                st.markdown(
-                    f"<div class='panel panel-tight accent-mid'>{img_html}<strong>{a.get('name','Achievement')}</strong><br>"
-                    f"<span class='muted'>{a.get('position','')} • {a.get('season_label') or normalize_season_label(a.get('season','-'))}</span><br>{achievement_tier_badge(a.get('tier','-'))}</div>",
-                    unsafe_allow_html=True,
-                )
+        ach_html = "".join(render_achievement_mini_tile(a, size_variant="viewer") for a in ach_items)
+        st.markdown(f"<div class='achievement-strip achievement-strip-viewer'>{ach_html}</div>", unsafe_allow_html=True)
         if ach_hidden:
             st.markdown(f"<div class='muted'>+{ach_hidden} more achievements not shown here.</div>", unsafe_allow_html=True)
 
