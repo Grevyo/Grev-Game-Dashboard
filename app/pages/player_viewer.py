@@ -25,6 +25,7 @@ from app.image_helpers import (
 from app.transforms import best_contexts
 from app.match_summaries import build_best_n_matches, build_last_n_matches, resolve_match_result
 from app.presentation_helpers import nationality_label
+from app.pages.overview import _best_map_for_player
 
 
 def _player_key(name: str) -> str:
@@ -203,8 +204,7 @@ def render(ctx):
     nation_label = nationality_label(nation_value) or "Nationality N/A"
     role = str(meta.iloc[0].get("role", "")).strip() if not meta.empty else ""
 
-    best_map = best_contexts(p, "map").head(1)
-    best_map_label = str(best_map.iloc[0]["map"]) if not best_map.empty else "N/A"
+    best_map_label = _best_map_for_player(p, player)
 
     delta_10 = _form_delta(p)
     trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
