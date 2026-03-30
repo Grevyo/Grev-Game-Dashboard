@@ -25,7 +25,6 @@ from app.image_helpers import (
 from app.transforms import best_contexts
 from app.match_summaries import build_best_n_matches, build_last_n_matches, resolve_match_result
 from app.presentation_helpers import nationality_label
-from app.pages.overview import _overview_player_context
 
 
 def _player_key(name: str) -> str:
@@ -204,57 +203,32 @@ def render(ctx):
     nation_label = nationality_label(nation_value) or "Nationality N/A"
     role = str(meta.iloc[0].get("role", "")).strip() if not meta.empty else ""
 
-    overview_scope_df, _ = _overview_player_context(
-        get_medisports_roster_df(ctx["player_matches"], player_col="player"),
-        filters,
-    )
-    best_map_value = "N/A"
-    if not overview_scope_df.empty and "player" in overview_scope_df.columns and "map" in overview_scope_df.columns:
-        best_map_subset = overview_scope_df[overview_scope_df["player"].astype(str) == str(player)].copy()
-        if not best_map_subset.empty:
-            best_map_subset["map"] = best_map_subset["map"].astype(str).str.strip()
-            best_map_subset = best_map_subset[best_map_subset["map"] != ""]
-            if not best_map_subset.empty:
-                best_map_metric_col = next(
-                    (col for col in ["grevscore", "rating", "impact", "kpd", "kpr"] if col in best_map_subset.columns),
-                    None,
-                )
-                if best_map_metric_col is not None:
-                    best_map_sample_col = "match_id" if "match_id" in best_map_subset.columns else None
-                    if best_map_sample_col is None:
-                        best_map_sample_col = next(
-                            (
-                                col
-                                for col in ["date", "opponent_team", "competition", "raw_competition_name"]
-                                if col in best_map_subset.columns
-                            ),
-                            None,
-                        )
-                    best_map_sample_agg = (best_map_sample_col, "nunique") if best_map_sample_col else ("map", "size")
-                    best_map_grouped = (
-                        best_map_subset.groupby("map", dropna=False)
-                        .agg(score=(best_map_metric_col, "mean"), samples=best_map_sample_agg)
-                        .query("samples > 0")
-                        .reset_index()
-                    )
-                    if not best_map_grouped.empty:
-                        best_map_eligible = best_map_grouped[best_map_grouped["samples"] >= 2]
-                        if best_map_eligible.empty:
-                            best_map_max_samples = best_map_grouped["samples"].max()
-                            best_map_eligible = best_map_grouped[best_map_grouped["samples"] == best_map_max_samples]
-                        if not best_map_eligible.empty:
-                            best_map_choice = best_map_eligible.sort_values(["score", "samples"], ascending=[False, False]).head(1)
-                            if not best_map_choice.empty:
-                                best_map_candidate = str(best_map_choice.iloc[0]["map"]).strip()
-                                if best_map_candidate:
-                                    best_map_value = best_map_candidate
-
-    delta_10 = _form_delta(p)
-    trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
     tactics_scope = ctx.get("tactics", pd.DataFrame())
     if not tactics_scope.empty and "match_id" in p.columns and "match_id" in tactics_scope.columns:
         match_ids = p["match_id"].dropna().astype(str).unique().tolist()
         tactics_scope = tactics_scope[tactics_scope["match_id"].astype(str).isin(match_ids)].copy()
+
+    best_map_value = "N/A"
+    if not tactics_scope.empty and {"map", "side", "wins"}.issubset(tactics_scope.columns):
+        best_map_subset = tactics_scope.copy()
+        best_map_subset["map"] = best_map_subset["map"].astype(str).str.strip()
+        best_map_subset["side"] = best_map_subset["side"].astype(str).str.strip()
+        best_map_subset["wins"] = pd.to_numeric(best_map_subset["wins"], errors="coerce").fillna(0)
+        best_map_subset = best_map_subset[(best_map_subset["map"] != "") & (best_map_subset["side"].isin(["Red", "Blue"]))]
+        if not best_map_subset.empty:
+            best_map_grouped = (
+                best_map_subset.groupby(["map", "side"], dropna=False)["wins"]
+                .sum()
+                .unstack(fill_value=0)
+                .reindex(columns=["Red", "Blue"], fill_value=0)
+            )
+            best_map_grouped["total_wins"] = best_map_grouped["Red"] + best_map_grouped["Blue"]
+            best_map_grouped = best_map_grouped[best_map_grouped["total_wins"] > 0]
+            if not best_map_grouped.empty:
+                best_map_value = str(best_map_grouped["total_wins"].idxmax()).strip() or "N/A"
+
+    delta_10 = _form_delta(p)
+    trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
     wins, losses = _true_record(p, tactics_scope)
     best_side_label = _best_side_from_wins(p, tactics_scope)
     record_value = f"{wins}-{losses}"
@@ -284,7 +258,7 @@ def render(ctx):
                 <div class='player-viewer-chip-row'>
                   <span class='chip'>Role: {role if role else 'N/A'}</span>
                   <span class='chip'>Record: {record_value}</span>
-                  <span class='chip'>Best Map (Overview): {best_map_value}</span>
+                  <span class='chip'>Best Map FIXED: {best_map_value}</span>
                   <span class='chip chip-good'>Best Map FIXED (Viewer): {best_map_value}</span>
                   <span class='chip chip-mid'>Best Side: {best_side_label}</span>
                 </div>
