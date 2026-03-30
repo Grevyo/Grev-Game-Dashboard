@@ -264,6 +264,18 @@ def inject_styles(theme_name: str = "Dark"):
       color: color-mix(in srgb, var(--text) 88%, #ffffff 12%);
       font-weight: 760;
     }}
+
+    .best-match-block {{
+      margin-top: 2px;
+      padding: 5px 7px;
+      border-radius: 8px;
+      border: 1px solid color-mix(in srgb, var(--good) 24%, var(--border));
+      border-left: 3px solid color-mix(in srgb, var(--good) 60%, #d9ffe9 40%);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--good) 10%, var(--surface)), color-mix(in srgb, var(--surface) 94%, #fff 6%));
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }}
     .achievement-strip {{
       display:flex;
       flex-direction: row;
@@ -481,6 +493,35 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .subtle-grid {{ display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:10px; }}
+
+
+    .match-list-wrap {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }}
+    .match-list-item {{
+      border: 1px solid var(--border);
+      border-left: 3px solid color-mix(in srgb, var(--mid) 58%, var(--border));
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: color-mix(in srgb, var(--surface) 92%, #fff 8%);
+    }}
+    .match-list-item.best {{ border-left-color: color-mix(in srgb, var(--good) 62%, var(--border)); }}
+    .match-list-head {{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size:11px; }}
+    .match-list-line {{ font-size:11px; color: var(--muted); margin-top: 3px; }}
+    .match-outcome {{
+      border-radius: 999px;
+      padding: 1px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+    }}
+    .match-outcome.win {{ color: var(--good); border-color: color-mix(in srgb, var(--good) 44%, transparent); background: color-mix(in srgb, var(--good) 18%, transparent); }}
+    .match-outcome.loss {{ color: var(--bad); border-color: color-mix(in srgb, var(--bad) 44%, transparent); background: color-mix(in srgb, var(--bad) 18%, transparent); }}
+    .match-outcome.neutral {{ color: var(--mid); border-color: color-mix(in srgb, var(--mid) 44%, transparent); background: color-mix(in srgb, var(--mid) 18%, transparent); }}
+    .match-grev {{ font-weight: 780; color: color-mix(in srgb, var(--text) 90%, #fff 10%); }}
 
     .muted {{ color: var(--muted); font-size:12px; }}
     .stat-good {{ color:var(--good); }} .stat-mid {{ color:var(--mid); }}

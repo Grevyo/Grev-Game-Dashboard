@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import re
 
 try:
@@ -23,6 +24,7 @@ from app.image_helpers import (
 )
 from app.styles import achievement_tier_badge
 from app.transforms import best_contexts
+from app.match_summaries import build_best_n_matches, build_last_n_matches
 
 
 def _player_key(name: str) -> str:
@@ -40,6 +42,33 @@ def _form_delta(p):
     recent = tail.tail(half).mean()
     return float(recent - early)
 
+
+
+
+def _render_match_list(title: str, matches: list[dict], empty_text: str, block_variant: str = "last"):
+    section_header(title)
+    if not matches:
+        st.markdown(f"<div class='panel panel-tight'><span class='muted'>{empty_text}</span></div>", unsafe_allow_html=True)
+        return
+
+    item_class = "match-list-item best" if block_variant == "best" else "match-list-item"
+    rows = []
+    for item in matches:
+        result = str(item.get("result", "")).strip()
+        result_key = result.casefold()
+        result_tone = "win" if "win" in result_key or result_key == "w" else "loss" if "loss" in result_key or result_key == "l" else "neutral"
+        date_label = str(item.get("date_played", "")).strip() or "Unknown date"
+        opponent = str(item.get("opponent_team", "")).strip() or "Unknown opponent"
+        tournament = str(item.get("tournament", "")).strip()
+        rows.append(
+            f"<div class='{item_class}'>"
+            f"<div class='match-list-head'><span>Played: <strong>{date_label}</strong></span>"
+            f"<span class='match-outcome {result_tone}'>{result or 'N/A'}</span></div>"
+            f"<div class='match-list-line'>vs <strong>{opponent}</strong>{(' • ' + tournament) if tournament else ''}</div>"
+            f"<div class='match-list-line'>KD: <strong>{float(item.get('kpd', 0)):.2f}</strong> • GrevScore: <strong class='match-grev'>{float(item.get('grevscore', 0)):.2f}</strong></div>"
+            "</div>"
+        )
+    st.markdown(f"<div class='match-list-wrap'>{''.join(rows)}</div>", unsafe_allow_html=True)
 
 def render(ctx):
     df = get_medisports_roster_df(ctx["player_matches"], player_col="player")
@@ -97,7 +126,7 @@ def render(ctx):
 
     mask = df["player"] == player
     if show_recent and "date" in df.columns:
-        cutoff = df["date"].max() - __import__("pandas").Timedelta(days=30)
+        cutoff = df["date"].max() - pd.Timedelta(days=30)
         mask &= df["date"] >= cutoff
     if map_focus and "map" in df.columns:
         mask &= df["map"].isin(map_focus)
@@ -164,7 +193,7 @@ def render(ctx):
         unsafe_allow_html=True,
     )
 
-    section_header("Achievements Ribbon", "Compact accolade strip with local images")
+    section_header("Achievements", "Newest-to-oldest by season, aligned with overview card logic")
     ach_items, ach_hidden = achievements_for_player(achievements, player, cap=6)
     if not ach_items:
         st.caption("No achievements linked for selected player.")
@@ -179,7 +208,16 @@ def render(ctx):
                     unsafe_allow_html=True,
                 )
         if ach_hidden:
-            st.markdown(f"<div class='muted'>+{ach_hidden} more achievements not shown in ribbon.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='muted'>+{ach_hidden} more achievements not shown here.</div>", unsafe_allow_html=True)
+
+    section_header("Match Summary", "Expanded match context from the overview cards")
+    last_five_matches = build_last_n_matches(df, ctx.get("tactics", pd.DataFrame()), player, n=5)
+    best_five_matches = build_best_n_matches(df, ctx.get("tactics", pd.DataFrame()), player, n=5)
+    m1, m2 = st.columns(2, gap="small")
+    with m1:
+        _render_match_list("Last 5 Matches", last_five_matches, "No recent matches in this scope", block_variant="last")
+    with m2:
+        _render_match_list("Best 5 Matches", best_five_matches, "No best matches in this scope", block_variant="best")
 
     section_header("Performance Core", "GrevScore feature and headline cards")
     left, right = st.columns([1.3, 1], gap="small")

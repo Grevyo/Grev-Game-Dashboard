@@ -151,13 +151,15 @@ def _tier_box_html(tier: str, score: float | None) -> str:
     )
 
 
-def _last_match_block_html(last_match: dict | None, title: str = "Last Match") -> str:
+def _last_match_block_html(last_match: dict | None, title: str = "Last Match", empty_text: str = "No recent match", block_variant: str = "last") -> str:
     safe_title = html.escape(str(title))
+    safe_empty_text = html.escape(str(empty_text))
+    variant_class = "best-match-block" if block_variant == "best" else "last-match-block"
     if not last_match:
         return (
-            "<div class='last-match-block'>"
+            f"<div class='{variant_class}'>"
             f"<div class='last-match-title'>{safe_title}</div>"
-            "<div class='last-match-line muted'>No recent match</div>"
+            f"<div class='last-match-line muted'>{safe_empty_text}</div>"
             "</div>"
         )
 
@@ -168,9 +170,9 @@ def _last_match_block_html(last_match: dict | None, title: str = "Last Match") -
     grevscore = last_match.get("grevscore")
     if not opponent or not result or not isinstance(kpd, (int, float)) or not isinstance(grevscore, (int, float)):
         return (
-            "<div class='last-match-block'>"
+            f"<div class='{variant_class}'>"
             f"<div class='last-match-title'>{safe_title}</div>"
-            "<div class='last-match-line muted'>No recent match</div>"
+            f"<div class='last-match-line muted'>{safe_empty_text}</div>"
             "</div>"
         )
 
@@ -179,7 +181,7 @@ def _last_match_block_html(last_match: dict | None, title: str = "Last Match") -
 
     date_line = f"<div class='last-match-line muted'>Played: <strong>{date_played}</strong></div>" if date_played else ""
     return (
-        "<div class='last-match-block'>"
+        f"<div class='{variant_class}'>"
         f"<div class='last-match-title'>{safe_title}</div>"
         f"{date_line}"
         f"<div class='last-match-line'>vs <strong>{opponent}</strong> • <strong class='last-match-result last-match-result-{result_tone}'>{result}</strong></div>"
@@ -223,6 +225,7 @@ def player_card(row: dict):
     safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
     last_match_title = "Last Match" if is_streamer_card else "Last Match ✓"
     last_match_html = _last_match_block_html(None, title=last_match_title) if is_streamer_card else _last_match_block_html(row.get("last_match"), title=last_match_title)
+    best_match_html = _last_match_block_html(None, title="Best Match", empty_text="No best match", block_variant="best") if is_streamer_card else _last_match_block_html(row.get("best_match"), title="Best Match", empty_text="No best match", block_variant="best")
 
     if is_streamer_card:
         streamer_card_html = f"""
@@ -243,6 +246,7 @@ def player_card(row: dict):
                     {fame_html}
                     <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong></span></div>
                     {last_match_html}
+                    {best_match_html}
                 </div>
             </div>
             <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
@@ -311,6 +315,7 @@ def player_card(row: dict):
         </div>
         {achievements_block_html}
         {last_match_html}
+        {best_match_html}
         {stats_block_html}
         {tier_block_html}
         <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
