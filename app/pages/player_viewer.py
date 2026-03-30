@@ -10,7 +10,7 @@ except ModuleNotFoundError:
     px = None
     PLOTLY_AVAILABLE = False
 
-from app.components import render_achievement_mini_tile, section_header, stat_card
+from app.components import grevscore_dial_html, render_achievement_mini_tile, section_header, stat_card
 from app.achievements import achievements_for_player
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
@@ -22,7 +22,7 @@ from app.image_helpers import (
     image_data_uri,
     resolve_player_photo,
 )
-from app.transforms import best_contexts
+from app.transforms import best_contexts, best_side_from_wins
 from app.match_summaries import build_best_n_matches, build_last_n_matches, resolve_match_result
 from app.presentation_helpers import nationality_label
 
@@ -166,9 +166,7 @@ def render(ctx):
     role = str(meta.iloc[0].get("role", "")).strip() if not meta.empty else ""
 
     best_map = best_contexts(p, "map").head(1)
-    best_side = best_contexts(p, "side").head(1)
     best_map_label = str(best_map.iloc[0]["map"]) if not best_map.empty else "N/A"
-    best_side_label = str(best_side.iloc[0]["side"]) if not best_side.empty else "N/A"
 
     delta_10 = _form_delta(p)
     trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
@@ -176,9 +174,11 @@ def render(ctx):
     if not tactics_scope.empty and "match_id" in p.columns and "match_id" in tactics_scope.columns:
         match_ids = p["match_id"].dropna().astype(str).unique().tolist()
         tactics_scope = tactics_scope[tactics_scope["match_id"].astype(str).isin(match_ids)].copy()
+    best_side_label = best_side_from_wins(p, tactics_scope, player, default="N/A", tie_label="Even")
     wins, losses = _true_record(p, tactics_scope)
     record_value = f"{wins}-{losses}"
     adr = p["damage"].sum() / p["rounds_played"].sum() if p["rounds_played"].sum() > 0 else 0.0
+    scoped_grevscore = float(p["grevscore"].mean())
 
     player_photo_match = resolve_player_photo(player)
     player_photo = image_data_uri(player_photo_match.get("path"))
@@ -189,6 +189,7 @@ def render(ctx):
         else f"<div class='hero-player-photo-frame'><div class='player-avatar fallback-avatar'>No Photo ({player_photo_match.get('reason', 'not found')})</div></div>"
     )
     hero_logo = f"<img class='hero-logo' src='{team_logo}' alt='Medisports logo'/>" if team_logo else ""
+    grevscore_dial = grevscore_dial_html(scoped_grevscore, caption="Filtered GrevScore")
 
     st.markdown(
         f"""
@@ -200,19 +201,19 @@ def render(ctx):
                 <div class='section-title' style='margin-top:0'>{player}</div>
                 <div class='section-subtitle'>{nation_label} • {role if role else 'Core Roster'} • {team_name}</div>
                 <span class='chip'>Role: {role if role else 'N/A'}</span>
-                <span class='chip'>Nationality: {nation_label}</span>
                 <span class='chip'>Record: {record_value}</span>
                 <span class='chip chip-good'>Best Map: {best_map_label}</span>
                 <span class='chip chip-mid'>Best Side: {best_side_label}</span>
-                <div class='muted' style='margin-top:8px;'>Current form summary: {player} is {trend.lower()} with a {p['grevscore'].mean():.1f} GrevScore baseline in this scope.</div>
+                <div class='muted' style='margin-top:8px;'>Current form summary: {player} is {trend.lower()} with a {scoped_grevscore:.1f} GrevScore baseline in this scope.</div>
               </div>
             </div>
             <div style='min-width:340px;flex:1;'>
               <div style='display:flex;justify-content:flex-end;margin-bottom:8px;'>{hero_logo}</div>
-              <div class='subtle-grid'>
+              {grevscore_dial}
+              <div class='subtle-grid' style='margin-top:10px;'>
                 <div class='panel panel-tight accent-good'><div class='metric-title'>Record</div><div class='metric-value'>{record_value}</div></div>
                 <div class='panel panel-tight accent-mid'><div class='metric-title'>KD</div><div class='metric-value'>{p['kpd'].mean():.2f}</div></div>
-                <div class='panel panel-tight accent-mid'><div class='metric-title'>GrevScore</div><div class='metric-value'>{p['grevscore'].mean():.2f}</div></div>
+                <div class='panel panel-tight accent-mid'><div class='metric-title'>GrevScore</div><div class='metric-value'>{scoped_grevscore:.2f}</div></div>
                 <div class='panel panel-tight accent-mid'><div class='metric-title'>Impact</div><div class='metric-value'>{p['impact'].mean():.1f}</div></div>
                 <div class='panel panel-tight accent-mid'><div class='metric-title'>ADR</div><div class='metric-value'>{adr:.1f}</div></div>
                 <div class='panel panel-tight accent-mid'><div class='metric-title'>KPR</div><div class='metric-value'>{p['kpr'].mean():.2f}</div></div>
