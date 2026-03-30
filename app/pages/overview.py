@@ -256,7 +256,10 @@ def build_last_match_summary(
         result = _resolve_match_result(row, tactics_context)
 
         if opponent and result and pd.notna(kpd) and pd.notna(grevscore):
+            date_played = pd.to_datetime(row.get("date"), errors="coerce")
+            date_played_label = date_played.strftime("%b %d, %Y") if pd.notna(date_played) else ""
             return {
+                "date_played": date_played_label,
                 "opponent_team": opponent,
                 "result": result,
                 "kpd": float(kpd),
@@ -319,7 +322,7 @@ def _render_roster_cards(
             ) if card_variant != "streamer" else "N/A"
             merged["trend"] = _trend_for_player(df_context, str(row["player"])) if card_variant != "streamer" else ""
             merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"])) if card_variant != "streamer" else {}
-            merged["last_match"] = build_last_match_summary(df_context, tactics_context, str(row["player"]))
+            merged["last_match"] = None if card_variant == "streamer" else build_last_match_summary(df_context, tactics_context, str(row["player"]))
             photo = resolve_player_photo(str(row["player"]))
             merged["photo_uri"] = image_data_uri(photo.get("path"))
             if transferred_logo_fallback:
