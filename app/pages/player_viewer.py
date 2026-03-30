@@ -87,6 +87,74 @@ def _render_match_list(title: str, matches: list[dict], empty_text: str, block_v
         )
     st.markdown(f"<div class='match-list-wrap'>{''.join(rows)}</div>", unsafe_allow_html=True)
 
+
+def _kd_breakdown(df_scope: pd.DataFrame, group_col: str, label: str) -> pd.DataFrame:
+    if df_scope.empty or group_col not in df_scope.columns:
+        return pd.DataFrame(columns=[label, "KD", "Matches", "Rounds"])
+
+    working = df_scope.copy()
+    working[group_col] = working[group_col].astype(str).str.strip()
+    working = working[working[group_col] != ""]
+    if working.empty:
+        return pd.DataFrame(columns=[label, "KD", "Matches", "Rounds"])
+
+    rows = []
+    for group_name, g in working.groupby(group_col, dropna=False):
+        matches = int(g["match_id"].nunique()) if "match_id" in g.columns else int(len(g))
+        rounds = int(pd.to_numeric(g.get("rounds_played", 0), errors="coerce").fillna(0).sum()) if "rounds_played" in g.columns else 0
+
+        kills_available = "kills" in g.columns
+        deaths_available = "deaths" in g.columns
+        if kills_available and deaths_available:
+            kills = float(pd.to_numeric(g["kills"], errors="coerce").fillna(0).sum())
+            deaths = float(pd.to_numeric(g["deaths"], errors="coerce").fillna(0).sum())
+            kd_value = (kills / deaths) if deaths > 0 else kills
+        else:
+            kd_value = float(pd.to_numeric(g.get("kpd", 0), errors="coerce").fillna(0).mean())
+
+        rows.append({label: str(group_name), "KD": round(kd_value, 2), "Matches": matches, "Rounds": rounds})
+
+    out = pd.DataFrame(rows)
+    out = out.sort_values(["KD", "Matches"], ascending=[False, False], na_position="last").reset_index(drop=True)
+    return out
+
+
+def _render_breakdown_table(title: str, subtitle: str, df_view: pd.DataFrame, key_col: str, empty_text: str):
+    st.markdown(f"<div class='lower-breakdown-title'>{title}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='muted lower-breakdown-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
+    if df_view.empty:
+        st.markdown(f"<div class='panel panel-tight'><span class='muted'>{empty_text}</span></div>", unsafe_allow_html=True)
+        return
+
+    rows = []
+    for idx, row in df_view.iterrows():
+        zebra = "odd" if idx % 2 else "even"
+        rows.append(
+            "<tr class='breakdown-row {zebra}'>"
+            "<td class='breakdown-key'>{key}</td>"
+            "<td class='breakdown-num'>{kd:.2f}</td>"
+            "<td class='breakdown-num'>{matches}</td>"
+            "<td class='breakdown-num'>{rounds}</td>"
+            "</tr>".format(
+                zebra=zebra,
+                key=str(row.get(key_col, "N/A")),
+                kd=float(row.get("KD", 0)),
+                matches=int(row.get("Matches", 0)),
+                rounds=int(row.get("Rounds", 0)),
+            )
+        )
+    table_html = (
+        "<div class='breakdown-table-wrap'>"
+        "<table class='breakdown-table'>"
+        "<thead><tr>"
+        f"<th>{key_col}</th><th>KD</th><th>Matches</th><th>Rounds</th>"
+        "</tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody>"
+        "</table>"
+        "</div>"
+    )
+    st.markdown(table_html, unsafe_allow_html=True)
+
 def render(ctx):
     df = get_medisports_roster_df(ctx["player_matches"], player_col="player")
     achievements = ctx["achievements"]
@@ -324,30 +392,76 @@ def render(ctx):
     with s4:
         stat_card("MVPs", int(p.get("mvps", 0).sum()), "Total MVPs captured")
 
-    section_header("Lower Analytics", "Map, side, and competition context")
-    c1, c2, c3 = st.columns(3, gap="small")
-    with c1:
-        st.markdown("#### By Map")
-        st.dataframe(best_contexts(p, "map").head(8), use_container_width=True, hide_index=True)
+    section_header("Lower Analytics", "Refined breakdown tables with map and tournament KD context")
+    st.markdown("<div class='lower-analytics-shell'>", unsafe_allow_html=True)
+    overview_col, side_col = st.columns([1.5, 1], gap="small")
+    with overview_col:
+        st.markdown("<div class='lower-card'>", unsafe_allow_html=True)
+        st.markdown("<div class='lower-breakdown-title'>Performance Snapshot</div>", unsafe_allow_html=True)
+        st.markdown("<div class='muted lower-breakdown-subtitle'>Cleaned context table for maps, sides, and tournaments in this scope.</div>", unsafe_allow_html=True)
+        snapshot = best_contexts(p, "map").head(8).copy()
+        if not snapshot.empty:
+            st.dataframe(snapshot, use_container_width=True, hide_index=True)
+        else:
+            st.markdown("<div class='panel panel-tight'><span class='muted'>No map context in this scope.</span></div>", unsafe_allow_html=True)
         if best_map_value != "N/A":
             map_uri = image_data_uri(find_map_image(best_map_value))
             if map_uri:
                 st.markdown(f"<img class='map-thumb' src='{map_uri}' alt='Map image'/>", unsafe_allow_html=True)
-    with c2:
-        st.markdown("#### By Side")
-        st.dataframe(best_contexts(p, "side").head(8), use_container_width=True, hide_index=True)
-    with c3:
-        st.markdown("#### By Competition")
-        by_comp_key = get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))
-        by_comp = best_contexts(p, by_comp_key).head(8)
-        st.dataframe(by_comp, use_container_width=True, hide_index=True)
-        if not by_comp.empty:
-            logo_cols = st.columns(min(3, len(by_comp)), gap="small")
-            for idx, (_, comp_row) in enumerate(by_comp.head(3).iterrows()):
-                top_comp = str(comp_row[by_comp_key])
+        st.markdown("</div>", unsafe_allow_html=True)
+    with side_col:
+        st.markdown("<div class='lower-card'>", unsafe_allow_html=True)
+        _render_breakdown_table(
+            "KD by Side",
+            "Quick side split from the same filtered player rows.",
+            _kd_breakdown(p, "side", "Side").head(8),
+            "Side",
+            "No side data in this scope.",
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    by_comp_key = get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))
+    kd_by_map = _kd_breakdown(p, "map", "Map").head(10)
+    kd_by_tournament = _kd_breakdown(p, by_comp_key, "Tournament").head(10)
+
+    b1, b2 = st.columns(2, gap="small")
+    with b1:
+        st.markdown("<div class='lower-card'>", unsafe_allow_html=True)
+        _render_breakdown_table(
+            "KD by Map",
+            "Sorted by KD (high to low), using current Player Stats Viewer filters.",
+            kd_by_map,
+            "Map",
+            "No map KD rows available for this player in scope.",
+        )
+        if PLOTLY_AVAILABLE and not kd_by_map.empty:
+            map_fig = px.bar(kd_by_map.head(8), x="Map", y="KD", color="KD", color_continuous_scale="Teal")
+            map_fig.update_layout(margin=dict(l=10, r=10, t=12, b=10), height=250, coloraxis_showscale=False)
+            st.plotly_chart(map_fig, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with b2:
+        st.markdown("<div class='lower-card'>", unsafe_allow_html=True)
+        _render_breakdown_table(
+            "KD by Tournament",
+            "Competition naming follows current grouped/ungrouped mode and active filters.",
+            kd_by_tournament,
+            "Tournament",
+            "No tournament KD rows available for this player in scope.",
+        )
+        if PLOTLY_AVAILABLE and not kd_by_tournament.empty:
+            comp_fig = px.bar(kd_by_tournament.head(8), x="Tournament", y="KD", color="KD", color_continuous_scale="Blues")
+            comp_fig.update_layout(margin=dict(l=10, r=10, t=12, b=10), height=250, coloraxis_showscale=False)
+            st.plotly_chart(comp_fig, use_container_width=True)
+        if not kd_by_tournament.empty:
+            logo_cols = st.columns(min(3, len(kd_by_tournament)), gap="small")
+            for idx, (_, comp_row) in enumerate(kd_by_tournament.head(3).iterrows()):
+                top_comp = str(comp_row["Tournament"])
                 comp_uri = image_data_uri(find_competition_logo(top_comp))
                 with logo_cols[idx % len(logo_cols)]:
                     if comp_uri:
                         st.markdown(f"<img class='competition-thumb' src='{comp_uri}' alt='Competition logo'/><div class='muted'>{top_comp}</div>", unsafe_allow_html=True)
                     else:
                         st.markdown(f"<div class='panel panel-tight'><div class='muted'>{top_comp}</div></div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
