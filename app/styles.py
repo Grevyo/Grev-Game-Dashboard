@@ -212,47 +212,6 @@ def inject_styles(theme_name: str = "Dark"):
     .fame-stars {{ font-size: 13px; letter-spacing: 0.08em; color: color-mix(in srgb, var(--mid) 70%, #fff 30%); }}
     .fame-value {{ color: var(--muted); font-size: 10px; }}
     .player-meta-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }}
-    .transfer-line strong {{ color: color-mix(in srgb, var(--bad) 70%, #fff 30%); }}
-    .last-game-strip {{
-      border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-      border-radius: 9px;
-      padding: 7px 8px;
-      background: color-mix(in srgb, var(--surface) 88%, #0a1220 12%);
-      display:flex;
-      flex-direction:column;
-      gap: 3px;
-      min-height: 58px;
-    }}
-    .last-game-title {{
-      font-size: 9px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-weight: 700;
-    }}
-    .last-game-line {{
-      display:flex;
-      justify-content: space-between;
-      gap: 6px;
-      font-size: 11px;
-      font-weight: 660;
-      color: var(--text);
-      flex-wrap: wrap;
-    }}
-    .last-game-sub {{
-      font-size: 10px;
-      color: var(--muted);
-      line-height: 1.2;
-      word-break: break-word;
-    }}
-    .last-game-empty {{
-      color: var(--muted);
-      font-size: 11px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      min-height: 42px;
-    }}
     .achievement-strip {{
       display:flex;
       flex-direction: row;
