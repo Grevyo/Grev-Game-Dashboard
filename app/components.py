@@ -117,9 +117,10 @@ def trend_chip(trend: str) -> str:
     return f"<span class='chip chip-{tone}'>{icon} {trend}</span>"
 
 
-def render_achievement_mini_tile(achievement: dict) -> str:
+def render_achievement_mini_tile(achievement: dict, size_variant: str = "overview") -> str:
     tier = str(achievement.get("tier", "")).strip().upper()
     tier = tier if tier in {"S", "A", "B", "C"} else "C"
+    variant_class = "achievement-tile-lg" if str(size_variant).strip().casefold() == "viewer" else ""
     image_value = achievement.get("image_uri")
     has_image_branch = bool(image_value)
     thumb = (
@@ -130,7 +131,7 @@ def render_achievement_mini_tile(achievement: dict) -> str:
     season_label = str(achievement.get("season_label", "")).strip()
     event_title = str(achievement.get("name", "")).strip()
     card_html = (
-        f"<div class='achievement-tile tier-{tier}'>"
+        f"<div class='achievement-tile {variant_class} tier-{tier}'>"
         f"{thumb}"
         f"<div class='achievement-season-top'>{season_label}</div>"
         f"<div class='achievement-tile-overlay'>"

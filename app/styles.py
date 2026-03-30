@@ -72,6 +72,18 @@ def inject_styles(theme_name: str = "Dark"):
         radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 35%),
         linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, #fff 10%), var(--surface));
     }}
+    .player-viewer-hero {{
+      border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+      box-shadow: 0 14px 28px rgba(0,0,0,0.2), inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+    }}
+    .player-viewer-head-main {{
+      flex: 1;
+      min-width: 320px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 2px;
+    }}
 
     .metric-title {{ color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }}
     .metric-value {{ font-size: 25px; line-height: 1.15; font-weight: 760; margin-top: 3px; }}
@@ -287,6 +299,15 @@ def inject_styles(theme_name: str = "Dark"):
       overflow: visible;
     }}
     .achievement-strip-featured {{ margin-top: 0; }}
+    .achievement-strip-viewer {{
+      gap: 10px;
+      min-height: 86px;
+      padding: 10px 12px;
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+      border-radius: 12px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff 8%), color-mix(in srgb, var(--surface) 98%, #000 2%));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+    }}
     .achievement-empty {{
       display:flex;
       align-items:center;
@@ -307,6 +328,12 @@ def inject_styles(theme_name: str = "Dark"):
       overflow: visible;
       background: color-mix(in srgb, var(--surface) 88%, #fff 12%);
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }}
+    .achievement-tile-lg {{
+      flex-basis: 78px;
+      width: 78px;
+      height: 82px;
+      border-radius: 10px;
     }}
     .achievement-tile-thumb {{
       width: 100%;
@@ -368,6 +395,18 @@ def inject_styles(theme_name: str = "Dark"):
       word-break: break-word;
       overflow-wrap: anywhere;
       text-wrap: wrap;
+    }}
+    .achievement-tile-lg .achievement-season-top {{
+      min-width: 64px;
+      font-size: 9px;
+    }}
+    .achievement-tile-lg .achievement-tier {{
+      font-size: 9px;
+      padding: 0 5px;
+    }}
+    .achievement-tile-lg .achievement-event-title {{
+      font-size: 8.5px;
+      line-height: 1.2;
     }}
     .achievement-overflow {{
       flex: 0 0 70px;
