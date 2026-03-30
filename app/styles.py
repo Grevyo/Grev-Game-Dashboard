@@ -287,8 +287,8 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-tile {{
       position: relative;
-      flex: 0 0 68px;
-      width: 68px;
+      flex: 0 0 72px;
+      width: 72px;
       height: 76px;
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -324,18 +324,20 @@ def inject_styles(theme_name: str = "Dark"):
       top: 4px;
       left: 50%;
       transform: translateX(-50%);
-      max-width: calc(100% - 10px);
-      padding: 1px 6px;
+      max-width: calc(100% - 8px);
+      min-width: 56px;
+      padding: 2px 7px;
       border-radius: 999px;
       border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
       background: color-mix(in srgb, rgba(7,12,24,0.9) 86%, #9fb8ff 14%);
       color: #f5f8ff;
       font-size: 8px;
-      line-height: 1.1;
+      line-height: 1;
       font-weight: 700;
       letter-spacing: 0.02em;
-      white-space: normal;
-      overflow-wrap: anywhere;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       text-align: center;
       text-shadow: 0 1px 2px rgba(0,0,0,0.55);
       z-index: 2;
@@ -346,18 +348,18 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-event-title {{
       color: #eef2ff;
-      font-size: 8px;
+      font-size: 8.5px;
       line-height: 1.15;
-      font-weight: 600;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+      font-weight: 760;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.78);
       display: block;
       word-break: break-word;
       overflow-wrap: anywhere;
       text-wrap: wrap;
     }}
     .achievement-overflow {{
-      flex: 0 0 68px;
-      width: 68px;
+      flex: 0 0 72px;
+      width: 72px;
       height: 76px;
       display:flex;
       align-items:center;
