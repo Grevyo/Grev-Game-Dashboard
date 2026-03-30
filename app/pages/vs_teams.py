@@ -2,7 +2,6 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.components import section_header
 from app.metrics import confidence_from_sample
 
 
@@ -10,9 +9,10 @@ def _summary_box(label: str, value: str, accent: str, bg: str) -> None:
     st.markdown(
         f"""
         <div style=\"background:{bg}; border:1px solid {accent}; border-left:6px solid {accent};
-                    border-radius:12px; padding:10px 12px; min-height:82px;\">
-            <div style=\"font-size:0.78rem; color:#b8c2d0; margin-bottom:4px;\">{label}</div>
-            <div style=\"font-size:1.35rem; font-weight:700; color:#f5f7fa; line-height:1.2;\">{value}</div>
+                    border-radius:14px; padding:12px 14px; min-height:90px;
+                    box-shadow:0 8px 18px rgba(0,0,0,0.16), inset 0 0 0 1px rgba(255,255,255,0.02);\">
+            <div style=\"font-size:0.74rem; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:#b8c2d0; margin-bottom:6px;\">{label}</div>
+            <div style=\"font-size:1.4rem; font-weight:760; color:#f5f7fa; line-height:1.15;\">{value}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -28,23 +28,23 @@ HEATMAP_RED_GREEN_SCALE = [
 
 def _apply_priority_chart_style(fig, *, height: int = 500):
     fig.update_layout(
-        template="plotly_dark",
+        template="plotly",
         height=height,
-        margin=dict(l=56, r=24, t=64, b=84),
+        margin=dict(l=62, r=36, t=92, b=96),
         title=dict(font=dict(size=17, color="#EAF2FF"), x=0.0, xanchor="left"),
         legend=dict(
             title_font=dict(size=12, color="#EAF2FF"),
             font=dict(size=11, color="#DCE7F5"),
             orientation="h",
             yanchor="bottom",
-            y=1.02,
+            y=1.08,
             xanchor="left",
             x=0.0,
-            bgcolor="rgba(10,16,29,0.45)",
+            bgcolor="rgba(10,16,29,0.28)",
             bordercolor="rgba(123,144,168,0.26)",
             borderwidth=1,
         ),
-        plot_bgcolor="rgba(9,13,22,0.82)",
+        plot_bgcolor="rgba(21,28,42,0.72)",
         paper_bgcolor="rgba(0,0,0,0)",
         hoverlabel=dict(
             bgcolor="rgba(14,20,31,0.96)",
@@ -74,11 +74,11 @@ def _apply_priority_chart_style(fig, *, height: int = 500):
 
 
 def _render_chart_panel(fig, heading: str, note: str = ""):
-    st.markdown("<div class='panel'>", unsafe_allow_html=True)
+    st.markdown("<div class='priority-chart-card'>", unsafe_allow_html=True)
     if heading:
-        st.markdown(f"<div class='section-title' style='margin-bottom:4px'>{heading}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='priority-chart-title'>{heading}</div>", unsafe_allow_html=True)
     if note:
-        st.markdown(f"<div class='section-subtitle' style='margin-bottom:10px'>{note}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='priority-chart-note'>{note}</div>", unsafe_allow_html=True)
     st.plotly_chart(fig, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -245,13 +245,7 @@ def render(ctx):
         .rename(columns={"date": "latest_date", "map": "latest_map"})
     )
     grp = grp.merge(latest, on="opponent_team", how="left")
-    grp["latest_result_label"] = (
-        grp["latest_result"].fillna("-")
-        + " • "
-        + grp["latest_date"].fillna("n/a")
-        + " • "
-        + grp["latest_map"].fillna("n/a")
-    )
+    grp["latest_result_label"] = grp["latest_result"].fillna("-")
 
     overall_matches = int(grp["matches_played"].sum())
     overall_wins = int(grp["wins"].sum())
@@ -260,7 +254,7 @@ def render(ctx):
     overall_rounds = int(grp["rounds"].sum())
     overall_win_rate = (overall_wins / max(1, overall_matches)) * 100
 
-    st.subheader("Total Vs Teams")
+    st.markdown("<div class='section-title' style='font-size:1.1rem;'>Total Vs Teams</div>", unsafe_allow_html=True)
     c1, c2, c3, c4, c5 = st.columns(5, gap="small")
     with c1:
         _summary_box("Opponents", f"{int(grp['opponent_team'].nunique())}", "#5BC0EB", "rgba(91,192,235,0.10)")
@@ -275,7 +269,7 @@ def render(ctx):
 
     view = grp.sort_values(["win_rate_match", "round_diff", "matches_played"], ascending=[False, False, False]).copy()
 
-    section_header("Match Record vs Teams", "Primary view focused on full match outcomes.")
+    st.markdown("<div class='section-title'>Match Record vs Teams</div>", unsafe_allow_html=True)
     _render_match_record_table(view)
 
     if view.empty:
@@ -295,20 +289,20 @@ def render(ctx):
         color="Result",
         barmode="group",
         color_discrete_map={"wins": "#3ECF8E", "losses": "#FF6B6B", "draws": "#7AA2FF"},
-        title="Wins, Losses, and Draws by Team",
+        title="Wins / Losses / Draws by Team",
         labels={"opponent_team": "Opponent"},
     )
     fig_wl.update_layout(
         legend_title_text="Result",
         bargap=0.25,
-        margin=dict(t=110, b=110),
-        title=dict(pad=dict(t=18, b=8)),
+        margin=dict(t=130, b=116),
+        title=dict(pad=dict(t=20, b=12)),
         legend=dict(
             orientation="h",
-            yanchor="top",
-            y=-0.22,
-            xanchor="center",
-            x=0.5,
+            yanchor="bottom",
+            y=1.10,
+            xanchor="left",
+            x=0.0,
             traceorder="normal",
         ),
     )
@@ -345,11 +339,7 @@ def render(ctx):
         marker_line_width=1,
         hovertemplate="<b>%{x}</b><br>Match Win %: %{y:.1f}%<br>Matches: %{marker.color}<extra></extra>",
     )
-    _render_chart_panel(
-        _apply_priority_chart_style(fig_wr, height=520),
-        "",
-        "",
-    )
+    _render_chart_panel(_apply_priority_chart_style(fig_wr, height=520), "", "")
 
     bubble = px.scatter(
         view,
@@ -371,11 +361,12 @@ def render(ctx):
     bubble.update_traces(
         textposition="top center",
         cliponaxis=False,
-        textfont=dict(size=11, color="#EAF2FF"),
+        textfont=dict(size=10, color="#F2F7FF"),
         marker=dict(
-            line=dict(color="rgba(233,242,255,0.55)", width=1.5),
-            opacity=0.88,
-            sizemin=9,
+            line=dict(color="rgba(233,242,255,0.78)", width=1.6),
+            opacity=0.84,
+            sizemin=10,
+            sizemode="diameter",
         ),
         hovertemplate=(
             "<b>%{hovertext}</b><br>Tracked Rounds: %{x}<br>"
@@ -383,11 +374,11 @@ def render(ctx):
         ),
     )
     bubble.update_layout(
-        margin=dict(l=70, r=42, t=96, b=86),
-        title=dict(x=0.02, xanchor="left", font=dict(size=21, color="#F2F7FF"), pad=dict(t=8, b=10)),
+        margin=dict(l=74, r=54, t=110, b=98),
+        title=dict(x=0.02, xanchor="left", font=dict(size=20, color="#F2F7FF"), pad=dict(t=10, b=12)),
         coloraxis_colorbar=dict(
             title="Round Diff",
-            len=0.72,
+            len=0.78,
             thickness=14,
             ticks="outside",
             tickfont=dict(size=11),
@@ -400,6 +391,7 @@ def render(ctx):
         showline=True,
         linewidth=1,
         linecolor="rgba(152,173,197,0.35)",
+        gridcolor="rgba(152,173,197,0.18)",
     )
     bubble.update_yaxes(
         range=[0, 100],
@@ -408,19 +400,7 @@ def render(ctx):
         title_font=dict(size=14),
         gridcolor="rgba(152,173,197,0.24)",
     )
-    st.markdown(
-        """
-        <div style="padding:14px 16px 6px; border:1px solid rgba(120,145,172,0.30); border-radius:14px; 
-                    background:linear-gradient(180deg, rgba(15,22,35,0.95) 0%, rgba(10,15,25,0.88) 100%);">
-        """,
-        unsafe_allow_html=True,
-    )
-    _render_chart_panel(
-        _apply_priority_chart_style(bubble, height=590),
-        "",
-        "",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+    _render_chart_panel(_apply_priority_chart_style(bubble, height=590), "", "")
 
     map_team = (
         match_level.groupby(["opponent_team", "map"], dropna=False)
@@ -506,21 +486,3 @@ def render(ctx):
         zmax=100,
         zmid=50,
     )
-
-    weak = grp.nsmallest(3, "win_rate_match")
-    strong = grp.nlargest(3, "win_rate_match")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("Strongest Matchups")
-        st.dataframe(
-            strong[["opponent_team", "matches_played", "wins", "losses", "win_rate_match", "confidence"]],
-            use_container_width=True,
-            hide_index=True,
-        )
-    with c2:
-        st.subheader("Needs Fixing")
-        st.dataframe(
-            weak[["opponent_team", "matches_played", "wins", "losses", "win_rate_match", "confidence"]],
-            use_container_width=True,
-            hide_index=True,
-        )
