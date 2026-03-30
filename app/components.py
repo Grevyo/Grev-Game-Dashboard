@@ -160,6 +160,7 @@ def _last_match_block_html(last_match: dict | None) -> str:
             "</div>"
         )
 
+    date_played = html.escape(str(last_match.get("date_played", "")).strip())
     opponent = html.escape(str(last_match.get("opponent_team", "")).strip())
     result = html.escape(str(last_match.get("result", "")).strip())
     kpd = last_match.get("kpd")
@@ -172,9 +173,11 @@ def _last_match_block_html(last_match: dict | None) -> str:
             "</div>"
         )
 
+    date_line = f"<div class='last-match-line muted'>Played: <strong>{date_played}</strong></div>" if date_played else ""
     return (
         "<div class='last-match-block'>"
         "<div class='last-match-title'>Last Match</div>"
+        f"{date_line}"
         f"<div class='last-match-line'>vs <strong>{opponent}</strong> • <strong>{result}</strong></div>"
         f"<div class='last-match-line muted'>KD: <strong>{kpd:.2f}</strong> • GrevScore: <strong>{grevscore:.2f}</strong></div>"
         "</div>"
@@ -214,7 +217,7 @@ def player_card(row: dict):
     safe_player_note = html.escape(str(_player_note(row) or ""))
     safe_best_map = html.escape(str(row.get("best_map", "N/A")))
     safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
-    last_match_html = _last_match_block_html(row.get("last_match"))
+    last_match_html = _last_match_block_html(None) if is_streamer_card else _last_match_block_html(row.get("last_match"))
 
     if is_streamer_card:
         streamer_card_html = f"""
@@ -301,10 +304,10 @@ def player_card(row: dict):
             <p class='identity-line'>{safe_role_line}</p>
             {fame_html}
             {context_html}
-            {last_match_html}
           </div>
         </div>
         {achievements_block_html}
+        {last_match_html}
         {stats_block_html}
         {tier_block_html}
         <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
