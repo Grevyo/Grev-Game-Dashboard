@@ -299,9 +299,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-tile {{
       position: relative;
-      flex: 0 0 70px;
-      width: 70px;
-      height: 74px;
+      flex: 0 0 68px;
+      width: 68px;
+      height: 72px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: visible;
