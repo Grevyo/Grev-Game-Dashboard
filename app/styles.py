@@ -462,19 +462,6 @@ def inject_styles(theme_name: str = "Dark"):
       padding: 10px 10px 2px 10px;
       margin-bottom: 14px;
     }}
-    .roster-section .achievement-strip {{
-      min-height: 74px;
-    }}
-    .roster-section .achievement-tile {{
-      flex: 0 0 70px;
-      width: 70px;
-      height: 74px;
-    }}
-    .roster-section .achievement-overflow {{
-      flex: 0 0 70px;
-      width: 70px;
-      height: 74px;
-    }}
     .roster-section-main {{
       background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, #fff 6%), color-mix(in srgb, var(--surface) 99%, #000 1%));
       border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
