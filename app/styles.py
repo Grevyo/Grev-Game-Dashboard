@@ -667,6 +667,25 @@ def inject_styles(theme_name: str = "Dark"):
       font-weight: 640;
       letter-spacing: 0.01em;
     }}
+    .map-performance-shell {{
+      margin-top: 6px;
+    }}
+    .map-performance-table-wrap {{
+      border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+      box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+    }}
+    .map-performance-table th {{
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }}
+    .map-performance-table td {{
+      white-space: nowrap;
+    }}
+    .map-performance-table tr:hover td {{
+      background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+    }}
     .map-breakdown-shell {{
       display: flex;
       flex-direction: column;
