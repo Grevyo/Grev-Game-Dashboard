@@ -299,9 +299,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-tile {{
       position: relative;
-      flex: 0 0 72px;
-      width: 72px;
-      height: 76px;
+      flex: 0 0 70px;
+      width: 70px;
+      height: 74px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: visible;
@@ -370,9 +370,9 @@ def inject_styles(theme_name: str = "Dark"):
       text-wrap: wrap;
     }}
     .achievement-overflow {{
-      flex: 0 0 72px;
-      width: 72px;
-      height: 76px;
+      flex: 0 0 70px;
+      width: 70px;
+      height: 74px;
       display:flex;
       align-items:center;
       justify-content:center;
