@@ -84,30 +84,23 @@ def _render_chart_panel(fig, heading: str, note: str = ""):
 
 
 def _render_match_record_table(view: pd.DataFrame) -> None:
-    table_df = view[
-        [
-            "opponent_team",
-            "matches_played",
-            "wins",
-            "losses",
-            "draws",
-            "win_rate_match",
-            "win_rate_rounds",
-            "round_diff",
-            "latest_result_label",
-            "confidence",
+    sortable_df = (
+        view[
+            [
+                "opponent_team",
+                "matches_played",
+                "wins",
+                "losses",
+                "draws",
+                "win_rate_match",
+                "win_rate_rounds",
+                "round_diff",
+                "latest_result_label",
+                "confidence",
+            ]
         ]
-    ].copy()
-    st.markdown(
-        f"""
-        <div class='panel map-performance-shell'>
-          <div class='breakdown-table-wrap map-performance-table-wrap'>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.dataframe(
-        table_df.rename(
+        .copy()
+        .rename(
             columns={
                 "opponent_team": "Opponent",
                 "matches_played": "Matches",
@@ -120,9 +113,24 @@ def _render_match_record_table(view: pd.DataFrame) -> None:
                 "latest_result_label": "Latest Result",
                 "confidence": "Confidence",
             }
-        ),
+        )
+    )
+
+    # Keep this rendered as a native Streamlit dataframe (not styled HTML)
+    # so users can sort by clicking headers in the visible table.
+    st.markdown(
+        """
+        <div class='panel map-performance-shell'>
+          <div class='breakdown-table-wrap map-performance-table-wrap'>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.dataframe(
+        sortable_df,
         hide_index=True,
         use_container_width=True,
+        key="match_record_vs_teams_table",
         column_config={
             "Opponent": st.column_config.TextColumn("Opponent"),
             "Matches": st.column_config.NumberColumn("Matches", format="%d"),
