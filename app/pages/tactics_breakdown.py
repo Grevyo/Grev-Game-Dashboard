@@ -9,15 +9,14 @@ except ModuleNotFoundError:
     go = None
     PLOTLY_AVAILABLE = False
 
-from app.components import data_section_shell, insight_card, section_header, style_refresh_note
+from app.components import insight_card, section_header
 from app.filters import filter_panel_toggle
 from app.tactics import tactic_bucket, tactic_summary
 
 
 def render(ctx):
     tdf = ctx["tactics"]
-    style_refresh_note()
-    section_header("Tactics Breakdown (Map + Side Strict)", "Context-locked route performance and tactical quality")
+    st.title("Tactics Breakdown (Map + Side Strict)")
     if tdf.empty:
         st.warning("No tactics data after filters.")
         return
@@ -47,7 +46,7 @@ def render(ctx):
     view = summary[(summary["map"] == map_name) & (summary["side"] == side)].copy()
     view["bucket"] = view.apply(tactic_bucket, axis=1)
 
-    data_section_shell("Context-locked tactic buckets", f"Showing exact context: {map_name} + {side}", tone="mid")
+    section_header("Context-locked tactic buckets", f"Showing exact context: {map_name} + {side}")
     st.dataframe(view.sort_values("score", ascending=False), use_container_width=True, hide_index=True)
 
     if not PLOTLY_AVAILABLE:

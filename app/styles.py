@@ -239,33 +239,6 @@ def inject_styles(theme_name: str = "Dark"):
       padding: 10px 12px;
       margin-bottom: 14px;
     }}
-    .style-refresh-note {
-      display: inline-flex;
-      align-items: center;
-      margin-bottom: 8px;
-      padding: 5px 10px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--good) 42%, var(--border));
-      background: color-mix(in srgb, var(--good) 14%, var(--surface));
-      color: color-mix(in srgb, var(--text) 86%, #fff 14%);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .data-section-shell {
-      margin-bottom: 8px;
-      padding: 12px 13px;
-      box-shadow: 0 8px 18px rgba(0,0,0,0.14);
-    }
-    .data-shell-title {
-      margin: 0;
-      font-size: 0.96rem;
-    }
-    .data-shell-subtitle {
-      margin-bottom: 0;
-      font-size: 0.78rem;
-    }
 
     .player-card {{
       min-height: 690px;
