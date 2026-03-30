@@ -39,17 +39,26 @@ def _render_heatmap(
         st.info(f"No data available for {title}.")
         return
 
-    heat = px.imshow(
-        pivot,
-        aspect="auto",
-        color_continuous_scale=scale,
-        zmin=zmin,
-        zmax=zmax,
-        zmid=zmid,
-        labels={"x": "Map", "y": "Team", "color": color_label},
-        text_auto=".1f",
-        title=title,
-    )
+    numeric_pivot = pivot.apply(pd.to_numeric, errors="coerce")
+    if numeric_pivot.empty or numeric_pivot.notna().sum().sum() == 0:
+        st.info(f"No numeric data available for {title}.")
+        return
+
+    imshow_kwargs = {
+        "img": numeric_pivot,
+        "aspect": "auto",
+        "color_continuous_scale": scale,
+        "labels": {"x": "Map", "y": "Team", "color": color_label},
+        "text_auto": ".1f",
+        "title": title,
+    }
+
+    if zmin is not None or zmax is not None:
+        imshow_kwargs["range_color"] = [zmin, zmax]
+    if zmid is not None:
+        imshow_kwargs["color_continuous_midpoint"] = zmid
+
+    heat = px.imshow(**imshow_kwargs)
     heat.update_traces(textfont={"color": "#F5F7FA"})
     heat.update_layout(
         template="plotly_dark",
