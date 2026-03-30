@@ -212,47 +212,6 @@ def inject_styles(theme_name: str = "Dark"):
     .fame-stars {{ font-size: 13px; letter-spacing: 0.08em; color: color-mix(in srgb, var(--mid) 70%, #fff 30%); }}
     .fame-value {{ color: var(--muted); font-size: 10px; }}
     .player-meta-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }}
-    .transfer-line strong {{ color: color-mix(in srgb, var(--bad) 70%, #fff 30%); }}
-    .last-game-strip {{
-      border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-      border-radius: 9px;
-      padding: 7px 8px;
-      background: color-mix(in srgb, var(--surface) 88%, #0a1220 12%);
-      display:flex;
-      flex-direction:column;
-      gap: 3px;
-      min-height: 58px;
-    }}
-    .last-game-title {{
-      font-size: 9px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-weight: 700;
-    }}
-    .last-game-line {{
-      display:flex;
-      justify-content: space-between;
-      gap: 6px;
-      font-size: 11px;
-      font-weight: 660;
-      color: var(--text);
-      flex-wrap: wrap;
-    }}
-    .last-game-sub {{
-      font-size: 10px;
-      color: var(--muted);
-      line-height: 1.2;
-      word-break: break-word;
-    }}
-    .last-game-empty {{
-      color: var(--muted);
-      font-size: 11px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      min-height: 42px;
-    }}
     .achievement-strip {{
       display:flex;
       flex-direction: row;
@@ -274,58 +233,57 @@ def inject_styles(theme_name: str = "Dark"):
       color: var(--muted);
       font-size: 10px;
     }}
-    .player-card.overview-player-card .achievement-tile {{
+    .achievement-tile {{
       position: relative;
-      flex: 0 0 86px;
-      width: 86px;
-      height: 94px;
+      flex: 0 0 68px;
+      width: 68px;
+      height: 76px;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: visible;
       background: color-mix(in srgb, var(--surface) 88%, #fff 12%);
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }}
-    .player-card.overview-player-card .achievement-tile-thumb {{
+    .achievement-tile-thumb {{
       width: 100%;
       height: 100%;
       object-fit: cover;
       filter: saturate(1.05);
     }}
-    .player-card.overview-player-card .achievement-tile-thumb-fallback {{
+    .achievement-tile-thumb-fallback {{
       display:flex;
       align-items:center;
       justify-content:center;
       font-size: 8px;
       color: var(--muted);
     }}
-    .player-card.overview-player-card .achievement-tile-overlay {{
+    .achievement-tile-overlay {{
       position: absolute;
       left: 0; right: 0; bottom: 0;
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      padding: 6px 6px 5px;
-      gap: 2px;
+      padding: 4px 4px 3px;
+      gap: 1px;
       background: linear-gradient(180deg, transparent 0%, rgba(8,12,20,0.58) 100%);
     }}
-    .player-card.overview-player-card .achievement-season-top {{
+    .achievement-season-top {{
       position: absolute;
-      top: 5px;
+      top: 4px;
       left: 50%;
       transform: translateX(-50%);
-      max-width: calc(100% - 8px);
-      padding: 1px 7px;
+      max-width: calc(100% - 10px);
+      padding: 1px 6px;
       border-radius: 999px;
       border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
       background: color-mix(in srgb, rgba(7,12,24,0.9) 86%, #9fb8ff 14%);
       color: #f5f8ff;
       font-size: 8px;
-      line-height: 1.15;
+      line-height: 1.1;
       font-weight: 700;
       letter-spacing: 0.02em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal;
+      overflow-wrap: anywhere;
       text-align: center;
       text-shadow: 0 1px 2px rgba(0,0,0,0.55);
       z-index: 2;
@@ -336,19 +294,19 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-event-title {{
       color: #eef2ff;
-      font-size: 8.5px;
+      font-size: 8px;
       line-height: 1.15;
-      font-weight: 750;
+      font-weight: 600;
       text-shadow: 0 1px 2px rgba(0,0,0,0.6);
       display: block;
       word-break: break-word;
       overflow-wrap: anywhere;
       text-wrap: wrap;
     }}
-    .player-card.overview-player-card .achievement-overflow {{
-      flex: 0 0 86px;
-      width: 86px;
-      height: 94px;
+    .achievement-overflow {{
+      flex: 0 0 68px;
+      width: 68px;
+      height: 76px;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -395,21 +353,12 @@ def inject_styles(theme_name: str = "Dark"):
       padding: 7px 8px;
       background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 86%, #0a1220 14%), color-mix(in srgb, var(--surface) 95%, #05080f 5%));
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
     }}
     .grev-tier-label {{ font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 5px; }}
-    .grev-tier-row {{
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 6px;
-      width: 100%;
-      align-items: stretch;
-    }}
+    .grev-tier-row {{ display:flex; align-items:stretch; gap: 5px; }}
     .grev-tier-box {{
-      width: 100%;
-      min-height: 42px;
+      width: 40px;
+      min-height: 34px;
       border-radius: 6px;
       border: 1px solid color-mix(in srgb, var(--border) 86%, #fff 14%);
       display:flex;
@@ -420,7 +369,7 @@ def inject_styles(theme_name: str = "Dark"):
       color: color-mix(in srgb, var(--muted) 84%, #fff 16%);
       background: color-mix(in srgb, var(--surface) 89%, #fff 11%);
       gap: 1px;
-      padding: 4px 2px;
+      padding: 2px 1px;
     }}
     .tier-name {{ font-size: 8px; line-height: 1; font-weight: 700; }}
     .tier-score {{ font-size: 11.5px; line-height: 1.05; font-weight: 780; color: var(--text); }}
