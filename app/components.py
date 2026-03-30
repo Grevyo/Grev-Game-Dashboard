@@ -115,7 +115,7 @@ def _clean_transfer_destination(value) -> str:
 def _last_game_html(row: dict) -> str:
     last_game = row.get("last_game")
     if not isinstance(last_game, dict) or not last_game:
-        return "<div class='last-game-inline'><span class='last-game-fallback'>No recent match</span></div>"
+        return "<div class='last-game-strip'><div class='last-game-empty'>No recent match</div></div>"
 
     date = html.escape(str(last_game.get("date", "N/A")))
     kd = html.escape(str(last_game.get("kd", "N/A")))
@@ -123,8 +123,9 @@ def _last_game_html(row: dict) -> str:
     opponent = html.escape(str(last_game.get("opponent", "N/A")))
     tournament = html.escape(str(last_game.get("tournament", "N/A")))
     return (
-        "<div class='last-game-inline'>"
-        f"<div class='last-game-top'><span class='last-game-label'>Last Game</span><span>{date}</span><span>{result}</span><span>KD {kd}</span></div>"
+        "<div class='last-game-strip'>"
+        "<div class='last-game-title'>Last Game</div>"
+        f"<div class='last-game-line'><span>{date}</span><span>{result}</span><span>KD {kd}</span></div>"
         f"<div class='last-game-sub'>vs {opponent} · {tournament}</div>"
         "</div>"
     )
@@ -300,9 +301,9 @@ def player_card(row: dict):
             {transfer_line_html}
             {fame_html}
             {context_html}
-            {last_game_html}
           </div>
         </div>
+        {last_game_html}
         {achievements_block_html}
         {stats_block_html}
         {tier_block_html}
