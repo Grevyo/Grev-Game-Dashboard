@@ -151,11 +151,12 @@ def _tier_box_html(tier: str, score: float | None) -> str:
     )
 
 
-def _last_match_block_html(last_match: dict | None) -> str:
+def _last_match_block_html(last_match: dict | None, title: str = "Last Match") -> str:
+    safe_title = html.escape(str(title))
     if not last_match:
         return (
             "<div class='last-match-block'>"
-            "<div class='last-match-title'>Last Match</div>"
+            f"<div class='last-match-title'>{safe_title}</div>"
             "<div class='last-match-line muted'>No recent match</div>"
             "</div>"
         )
@@ -168,7 +169,7 @@ def _last_match_block_html(last_match: dict | None) -> str:
     if not opponent or not result or not isinstance(kpd, (int, float)) or not isinstance(grevscore, (int, float)):
         return (
             "<div class='last-match-block'>"
-            "<div class='last-match-title'>Last Match</div>"
+            f"<div class='last-match-title'>{safe_title}</div>"
             "<div class='last-match-line muted'>No recent match</div>"
             "</div>"
         )
@@ -176,7 +177,7 @@ def _last_match_block_html(last_match: dict | None) -> str:
     date_line = f"<div class='last-match-line muted'>Played: <strong>{date_played}</strong></div>" if date_played else ""
     return (
         "<div class='last-match-block'>"
-        "<div class='last-match-title'>Last Match</div>"
+        f"<div class='last-match-title'>{safe_title}</div>"
         f"{date_line}"
         f"<div class='last-match-line'>vs <strong>{opponent}</strong> • <strong>{result}</strong></div>"
         f"<div class='last-match-line muted'>KD: <strong>{kpd:.2f}</strong> • GrevScore: <strong>{grevscore:.2f}</strong></div>"
@@ -217,7 +218,8 @@ def player_card(row: dict):
     safe_player_note = html.escape(str(_player_note(row) or ""))
     safe_best_map = html.escape(str(row.get("best_map", "N/A")))
     safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
-    last_match_html = _last_match_block_html(None) if is_streamer_card else _last_match_block_html(row.get("last_match"))
+    last_match_title = "Last Match" if is_streamer_card else "Last Match ✓"
+    last_match_html = _last_match_block_html(None, title=last_match_title) if is_streamer_card else _last_match_block_html(row.get("last_match"), title=last_match_title)
 
     if is_streamer_card:
         streamer_card_html = f"""
