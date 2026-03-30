@@ -667,6 +667,79 @@ def inject_styles(theme_name: str = "Dark"):
       font-weight: 640;
       letter-spacing: 0.01em;
     }}
+    .map-breakdown-shell {{
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 6px;
+    }}
+    .map-breakdown-card {{
+      position: relative;
+      border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+      border-radius: 14px;
+      overflow: hidden;
+      background: linear-gradient(135deg, color-mix(in srgb, #0a121b 78%, var(--surface) 22%), color-mix(in srgb, #13283f 72%, var(--surface) 28%));
+      background-size: cover;
+      background-position: center;
+      box-shadow: 0 14px 28px rgba(0,0,0,0.24);
+    }}
+    .map-breakdown-overlay {{
+      position: relative;
+      z-index: 1;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(4, 10, 17, 0.56) 0%, rgba(4, 9, 15, 0.78) 72%, rgba(4, 8, 14, 0.86) 100%);
+      backdrop-filter: blur(1px);
+    }}
+    .map-breakdown-header {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }}
+    .map-breakdown-title {{
+      margin: 0;
+      font-size: 1rem;
+    }}
+    .map-breakdown-logo {{
+      width: 68px;
+      height: 68px;
+      object-fit: contain;
+      border-radius: 10px;
+      padding: 8px;
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+      background: color-mix(in srgb, var(--surface) 82%, transparent);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.28);
+    }}
+    .map-breakdown-grid {{
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    }}
+    .map-breakdown-stat {{
+      border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: color-mix(in srgb, var(--surface) 72%, transparent);
+      min-height: 54px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+    }}
+    .map-breakdown-stat-label {{
+      font-size: 10px;
+      color: color-mix(in srgb, var(--text) 76%, #fff 24%);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 650;
+    }}
+    .map-breakdown-stat-value {{
+      font-size: 16px;
+      color: var(--text);
+      font-weight: 740;
+      line-height: 1.1;
+    }}
 
     .subtle-grid {{ display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:10px; }}
 
