@@ -301,6 +301,16 @@ def render(ctx):
     fig_wl.update_layout(
         legend_title_text="Result",
         bargap=0.25,
+        margin=dict(t=110, b=110),
+        title=dict(pad=dict(t=18, b=8)),
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.22,
+            xanchor="center",
+            x=0.5,
+            traceorder="normal",
+        ),
     )
     fig_wl.update_traces(
         marker_line_color="rgba(240,245,255,0.20)",
@@ -361,19 +371,56 @@ def render(ctx):
     bubble.update_traces(
         textposition="top center",
         cliponaxis=False,
-        textfont=dict(size=11),
-        marker=dict(line=dict(color="rgba(240,245,255,0.24)", width=1.1), opacity=0.9),
+        textfont=dict(size=11, color="#EAF2FF"),
+        marker=dict(
+            line=dict(color="rgba(233,242,255,0.55)", width=1.5),
+            opacity=0.88,
+            sizemin=9,
+        ),
         hovertemplate=(
             "<b>%{hovertext}</b><br>Tracked Rounds: %{x}<br>"
             "Match Win %: %{y:.1f}%<br>Matches: %{marker.size}<br>Round Diff: %{marker.color}<extra></extra>"
         ),
     )
-    bubble.update_yaxes(range=[0, 100], ticksuffix="%")
+    bubble.update_layout(
+        margin=dict(l=70, r=42, t=96, b=86),
+        title=dict(x=0.02, xanchor="left", font=dict(size=21, color="#F2F7FF"), pad=dict(t=8, b=10)),
+        coloraxis_colorbar=dict(
+            title="Round Diff",
+            len=0.72,
+            thickness=14,
+            ticks="outside",
+            tickfont=dict(size=11),
+        ),
+    )
+    bubble.update_xaxes(
+        title_text="Tracked Rounds",
+        tickfont=dict(size=12),
+        title_font=dict(size=14),
+        showline=True,
+        linewidth=1,
+        linecolor="rgba(152,173,197,0.35)",
+    )
+    bubble.update_yaxes(
+        range=[0, 100],
+        ticksuffix="%",
+        tickfont=dict(size=12),
+        title_font=dict(size=14),
+        gridcolor="rgba(152,173,197,0.24)",
+    )
+    st.markdown(
+        """
+        <div style="padding:14px 16px 6px; border:1px solid rgba(120,145,172,0.30); border-radius:14px; 
+                    background:linear-gradient(180deg, rgba(15,22,35,0.95) 0%, rgba(10,15,25,0.88) 100%);">
+        """,
+        unsafe_allow_html=True,
+    )
     _render_chart_panel(
-        _apply_priority_chart_style(bubble, height=580),
+        _apply_priority_chart_style(bubble, height=590),
         "",
         "",
     )
+    st.markdown("</div>", unsafe_allow_html=True)
 
     map_team = (
         match_level.groupby(["opponent_team", "map"], dropna=False)
