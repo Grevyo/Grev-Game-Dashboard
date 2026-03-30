@@ -62,46 +62,6 @@ def _true_record(df_scope: pd.DataFrame, tactics_scope: pd.DataFrame) -> tuple[i
     return wins, losses
 
 
-def _best_side_from_wins(df_scope: pd.DataFrame, tactics_scope: pd.DataFrame) -> str:
-    if df_scope.empty or "side" not in df_scope.columns:
-        return "N/A"
-
-    side_totals: dict[str, dict[str, int]] = {}
-    per_side = df_scope.copy()
-    if "match_id" in per_side.columns:
-        sort_cols = [c for c in ["date", "time"] if c in per_side.columns]
-        if sort_cols:
-            per_side = per_side.sort_values(sort_cols)
-        per_side = per_side.drop_duplicates(["match_id", "side"], keep="last")
-
-    for _, row in per_side.iterrows():
-        side_name = str(row.get("side", "") or "").strip()
-        if not side_name:
-            continue
-        result = resolve_match_result(row, tactics_scope)
-        if result not in {"Win", "Loss"}:
-            continue
-        bucket = side_totals.setdefault(side_name, {"wins": 0, "losses": 0})
-        if result == "Win":
-            bucket["wins"] += 1
-        else:
-            bucket["losses"] += 1
-
-    if not side_totals:
-        return "N/A"
-
-    ranked = sorted(
-        side_totals.items(),
-        key=lambda item: (item[1]["wins"], -item[1]["losses"], item[0].casefold()),
-        reverse=True,
-    )
-    if len(ranked) > 1 and ranked[0][1]["wins"] == ranked[1][1]["wins"]:
-        return "Even"
-    return ranked[0][0]
-
-
-
-
 def _render_match_list(title: str, matches: list[dict], empty_text: str, block_variant: str = "last"):
     section_header(title)
     if not matches:
@@ -227,10 +187,30 @@ def render(ctx):
             if not best_map_grouped.empty:
                 best_map_value = str(best_map_grouped["total_wins"].idxmax()).strip() or "N/A"
 
+    best_side_label = "N/A"
+    if not tactics_scope.empty and {"side", "wins"}.issubset(tactics_scope.columns):
+        best_side_subset = tactics_scope.copy()
+        best_side_subset["side"] = best_side_subset["side"].astype(str).str.strip()
+        best_side_subset["wins"] = pd.to_numeric(best_side_subset["wins"], errors="coerce").fillna(0)
+        best_side_subset = best_side_subset[best_side_subset["side"].isin(["Red", "Blue"])]
+        if not best_side_subset.empty:
+            side_wins = (
+                best_side_subset.groupby("side", dropna=False)["wins"]
+                .sum()
+                .reindex(["Red", "Blue"], fill_value=0)
+            )
+            red_wins = float(side_wins.get("Red", 0))
+            blue_wins = float(side_wins.get("Blue", 0))
+            if red_wins > blue_wins:
+                best_side_label = "Red"
+            elif blue_wins > red_wins:
+                best_side_label = "Blue"
+            elif red_wins > 0 or blue_wins > 0:
+                best_side_label = "Even"
+
     delta_10 = _form_delta(p)
     trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
     wins, losses = _true_record(p, tactics_scope)
-    best_side_label = _best_side_from_wins(p, tactics_scope)
     record_value = f"{wins}-{losses}"
     adr = p["damage"].sum() / p["rounds_played"].sum() if p["rounds_played"].sum() > 0 else 0.0
     grev_avg = float(p["grevscore"].mean())
@@ -258,8 +238,7 @@ def render(ctx):
                 <div class='player-viewer-chip-row'>
                   <span class='chip'>Role: {role if role else 'N/A'}</span>
                   <span class='chip'>Record: {record_value}</span>
-                  <span class='chip'>Best Map FIXED: {best_map_value}</span>
-                  <span class='chip chip-good'>Best Map FIXED (Viewer): {best_map_value}</span>
+                  <span class='chip chip-good'>Best Map: {best_map_value}</span>
                   <span class='chip chip-mid'>Best Side: {best_side_label}</span>
                 </div>
                 <div class='muted player-viewer-form-note'>Current form summary: {player} is {trend.lower()} with a {grev_avg:.1f} GrevScore baseline in this scope.</div>
@@ -293,7 +272,7 @@ def render(ctx):
         """,
         unsafe_allow_html=True,
     )
-    st.markdown(f"<div class='muted'>Best Map FIXED (Viewer): {best_map_value} ({player})</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='muted'>Best Map: {best_map_value} ({player})</div>", unsafe_allow_html=True)
 
     section_header("Achievements ✓", "Newest-to-oldest by season, aligned with overview card logic")
     ach_items, ach_hidden = achievements_for_player(achievements, player, cap=6, consumer="overview")
