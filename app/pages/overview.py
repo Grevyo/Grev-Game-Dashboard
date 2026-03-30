@@ -91,6 +91,14 @@ def _best_map_for_player(
     return value if value else default
 
 
+def _overview_best_map_payload(df_context: pd.DataFrame, player_name: str) -> dict[str, str]:
+    best_map_value = _best_map_for_player(df_context, player_name)
+    return {
+        "best_map": best_map_value,
+        "best_map_label": f"Best Map (Overview): {best_map_value}",
+    }
+
+
 def _overview_player_context(df_base: pd.DataFrame, filters: dict | None = None) -> tuple[pd.DataFrame, str | None]:
     df_context = df_base.copy()
     selected_seasons = (filters or {}).get("season") or []
@@ -254,8 +262,7 @@ def _render_roster_cards(
             else:
                 merged["roster_bucket"] = ""
                 merged["desc"] = player_description(merged)
-            merged["best_map"] = _best_map_for_player(df_context, str(row["player"]))
-            merged["best_map_label"] = f"Best Map (Overview): {merged['best_map']}"
+            merged.update(_overview_best_map_payload(df_context, str(row["player"])))
             merged["best_side"] = _best_side_for_player(
                 df_context,
                 tactics_context,
@@ -456,6 +463,9 @@ def render(ctx):
     if active_summary.empty:
         st.info("No players currently qualify for Active Roster in this filter context.")
     else:
+        proof_player = str(active_summary.iloc[0]["player"])
+        proof_best_map = _overview_best_map_payload(df, proof_player)["best_map"]
+        st.markdown(f"<div class='muted'>Best Map (Overview): {proof_best_map} ({proof_player})</div>", unsafe_allow_html=True)
         st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
         _render_roster_cards(active_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
