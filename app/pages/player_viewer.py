@@ -25,7 +25,7 @@ from app.image_helpers import (
 from app.transforms import best_contexts
 from app.match_summaries import build_best_n_matches, build_last_n_matches, resolve_match_result
 from app.presentation_helpers import nationality_label
-from app.pages.overview import _best_map_for_player, _overview_player_context
+from app.pages.overview import _overview_best_map_payload, _overview_player_context
 
 
 def _player_key(name: str) -> str:
@@ -208,7 +208,8 @@ def render(ctx):
         get_medisports_roster_df(ctx["player_matches"], player_col="player"),
         filters,
     )
-    best_map_label = _best_map_for_player(overview_scope_df, player)
+    overview_best_map_payload = _overview_best_map_payload(overview_scope_df, player)
+    best_map_value = overview_best_map_payload["best_map"]
 
     delta_10 = _form_delta(p)
     trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
@@ -245,7 +246,8 @@ def render(ctx):
                 <div class='player-viewer-chip-row'>
                   <span class='chip'>Role: {role if role else 'N/A'}</span>
                   <span class='chip'>Record: {record_value}</span>
-                  <span class='chip chip-good'>Best Map (Viewer): {best_map_label}</span>
+                  <span class='chip'>Best Map (Overview): {best_map_value}</span>
+                  <span class='chip chip-good'>Best Map (Viewer): {best_map_value}</span>
                   <span class='chip chip-mid'>Best Side: {best_side_label}</span>
                 </div>
                 <div class='muted player-viewer-form-note'>Current form summary: {player} is {trend.lower()} with a {grev_avg:.1f} GrevScore baseline in this scope.</div>
@@ -279,6 +281,7 @@ def render(ctx):
         """,
         unsafe_allow_html=True,
     )
+    st.markdown(f"<div class='muted'>Best Map (Viewer): {best_map_value} ({player})</div>", unsafe_allow_html=True)
 
     section_header("Achievements ✓", "Newest-to-oldest by season, aligned with overview card logic")
     ach_items, ach_hidden = achievements_for_player(achievements, player, cap=6, consumer="overview")
@@ -335,8 +338,8 @@ def render(ctx):
     with c1:
         st.markdown("#### By Map")
         st.dataframe(best_contexts(p, "map").head(8), use_container_width=True, hide_index=True)
-        if best_map_label != "N/A":
-            map_uri = image_data_uri(find_map_image(best_map_label))
+        if best_map_value != "N/A":
+            map_uri = image_data_uri(find_map_image(best_map_value))
             if map_uri:
                 st.markdown(f"<img class='map-thumb' src='{map_uri}' alt='Map image'/>", unsafe_allow_html=True)
     with c2:
