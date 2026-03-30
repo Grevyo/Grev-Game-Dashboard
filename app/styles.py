@@ -216,8 +216,9 @@ def inject_styles(theme_name: str = "Dark"):
       margin-top: 2px;
       padding: 5px 7px;
       border-radius: 8px;
-      border: 1px solid color-mix(in srgb, var(--border) 82%, #fff 18%);
-      background: color-mix(in srgb, var(--surface) 88%, #fff 12%);
+      border: 1px solid color-mix(in srgb, var(--mid) 26%, var(--border));
+      border-left: 3px solid color-mix(in srgb, var(--mid) 62%, #b4ccff 38%);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--mid) 12%, var(--surface)), color-mix(in srgb, var(--surface) 94%, #fff 6%));
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -236,6 +237,33 @@ def inject_styles(theme_name: str = "Dark"):
       margin: 0;
     }}
     .last-match-line strong {{ font-weight: 700; }}
+    .last-match-result {{
+      padding: 0 5px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 9px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }}
+    .last-match-result-win {{
+      color: color-mix(in srgb, var(--good) 86%, #f4fff8 14%);
+      background: color-mix(in srgb, var(--good) 22%, transparent);
+      border-color: color-mix(in srgb, var(--good) 48%, transparent);
+    }}
+    .last-match-result-loss {{
+      color: color-mix(in srgb, var(--bad) 86%, #fff4f4 14%);
+      background: color-mix(in srgb, var(--bad) 22%, transparent);
+      border-color: color-mix(in srgb, var(--bad) 48%, transparent);
+    }}
+    .last-match-result-neutral {{
+      color: color-mix(in srgb, var(--mid) 82%, #f4f8ff 18%);
+      background: color-mix(in srgb, var(--mid) 20%, transparent);
+      border-color: color-mix(in srgb, var(--mid) 42%, transparent);
+    }}
+    .last-match-metric {{
+      color: color-mix(in srgb, var(--text) 88%, #ffffff 12%);
+      font-weight: 760;
+    }}
     .achievement-strip {{
       display:flex;
       flex-direction: row;
