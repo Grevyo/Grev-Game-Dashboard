@@ -84,6 +84,74 @@ def inject_styles(theme_name: str = "Dark"):
       gap: 16px;
       padding: 2px;
     }}
+    .player-viewer-hero-grid {{
+      display:grid;
+      grid-template-columns: minmax(0, 1.9fr) minmax(260px, 1fr);
+      gap: 14px;
+      align-items: stretch;
+    }}
+    .player-viewer-head-body {{ min-width: 0; }}
+    .player-viewer-chip-row {{
+      display:flex;
+      flex-wrap: wrap;
+      gap: 2px 4px;
+      margin-top: 2px;
+    }}
+    .player-viewer-form-note {{ margin-top: 6px; }}
+    .player-viewer-gauge-panel {{
+      border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+      border-radius: 12px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 84%, #fff 16%), color-mix(in srgb, var(--surface) 94%, #000 6%));
+      padding: 10px 12px;
+      min-height: 220px;
+      display:flex;
+      flex-direction: column;
+      gap: 10px;
+    }}
+    .player-viewer-gauge-header {{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 8px;
+    }}
+    .player-viewer-mini-title {{
+      font-size: 0.92rem;
+      margin: 0;
+    }}
+    .player-viewer-gauge-wrap {{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      flex: 1;
+    }}
+    .grev-gauge {{
+      --gauge-pct: 50%;
+      width: 170px;
+      height: 170px;
+      border-radius: 50%;
+      background: conic-gradient(from -90deg, var(--good) 0 var(--gauge-pct), color-mix(in srgb, var(--border) 70%, #101827 30%) var(--gauge-pct) 100%);
+      display:grid;
+      place-items:center;
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent), 0 10px 18px rgba(0,0,0,0.26);
+    }}
+    .grev-gauge-inner {{
+      width: 124px;
+      height: 124px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--surface) 82%, #fff 18%), color-mix(in srgb, var(--surface) 96%, #000 4%));
+      border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      gap: 2px;
+    }}
+    .player-viewer-top-metrics {{
+      margin-top: 12px;
+      display:grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+    }}
 
     .metric-title {{ color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }}
     .metric-value {{ font-size: 25px; line-height: 1.15; font-weight: 760; margin-top: 3px; }}
@@ -533,6 +601,24 @@ def inject_styles(theme_name: str = "Dark"):
     }}
 
     .subtle-grid {{ display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:10px; }}
+
+    @media (max-width: 1100px) {{
+      .player-viewer-hero-grid {{
+        grid-template-columns: 1fr;
+      }}
+      .player-viewer-top-metrics {{
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }}
+    }}
+    @media (max-width: 760px) {{
+      .player-viewer-head-main {{
+        min-width: 0;
+        flex-direction: column;
+      }}
+      .player-viewer-top-metrics {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }}
+    }}
 
 
     .match-list-wrap {{
