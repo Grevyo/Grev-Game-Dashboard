@@ -26,6 +26,57 @@ HEATMAP_RED_GREEN_SCALE = [
 ]
 
 
+def _apply_priority_chart_style(fig, *, height: int = 500):
+    fig.update_layout(
+        template="plotly_dark",
+        height=height,
+        margin=dict(l=78, r=36, t=84, b=128),
+        title=dict(font=dict(size=20, color="#EAF2FF"), x=0.02, xanchor="left"),
+        legend=dict(
+            title_font=dict(size=13),
+            font=dict(size=12),
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0.0,
+            bgcolor="rgba(16,22,34,0.35)",
+            bordercolor="rgba(123,144,168,0.32)",
+            borderwidth=1,
+        ),
+        plot_bgcolor="rgba(9,13,22,0.92)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        hoverlabel=dict(
+            bgcolor="rgba(14,20,31,0.96)",
+            bordercolor="rgba(123,144,168,0.65)",
+            font=dict(color="#F5F8FF", size=12),
+        ),
+        font=dict(color="#D6DFEA"),
+    )
+    fig.update_xaxes(
+        tickangle=-32,
+        automargin=True,
+        tickfont=dict(size=11),
+        title_font=dict(size=13),
+        showgrid=False,
+        zeroline=False,
+    )
+    fig.update_yaxes(
+        automargin=True,
+        tickfont=dict(size=11),
+        title_font=dict(size=13),
+        gridcolor="rgba(123,144,168,0.22)",
+        griddash="dot",
+        zeroline=False,
+    )
+    return fig
+
+
+def _render_priority_chart_card(fig):
+    with st.container(border=True):
+        st.plotly_chart(fig, use_container_width=True)
+
+
 def _render_heatmap(
     pivot: pd.DataFrame,
     title: str,
@@ -198,7 +249,8 @@ def render(ctx):
         st.info("No team matchup rows available for charting.")
         return
 
-    st.markdown("### Full-Match Priority Charts")
+    st.markdown("### Full-Match Priority Charts ✓")
+    st.caption("Full-match chart styling refreshed for readability while preserving the existing result colour language.")
 
     wl_long = view.melt(
         id_vars=["opponent_team"],
@@ -217,14 +269,15 @@ def render(ctx):
         labels={"opponent_team": "Opponent"},
     )
     fig_wl.update_layout(
-        template="plotly_dark",
-        height=470,
-        margin=dict(l=70, r=35, t=70, b=140),
         legend_title_text="Result",
-        xaxis=dict(tickangle=-35, automargin=True),
-        yaxis=dict(automargin=True),
+        bargap=0.25,
     )
-    st.plotly_chart(fig_wl, use_container_width=True)
+    fig_wl.update_traces(
+        marker_line_color="rgba(240,245,255,0.20)",
+        marker_line_width=1,
+        hovertemplate="<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>",
+    )
+    _render_priority_chart_card(_apply_priority_chart_style(fig_wl, height=500))
 
     fig_wr = px.bar(
         view.sort_values("win_rate_match", ascending=False),
@@ -237,16 +290,18 @@ def render(ctx):
         labels={"opponent_team": "Opponent", "win_rate_match": "Match Win %", "matches_played": "Matches"},
     )
     fig_wr.update_layout(
-        template="plotly_dark",
-        height=470,
-        margin=dict(l=70, r=35, t=70, b=140),
-        xaxis=dict(tickangle=-35, automargin=True),
-        yaxis=dict(automargin=True),
         coloraxis_colorbar=dict(title="Matches"),
     )
     fig_wr.update_yaxes(range=[0, 100], ticksuffix="%")
-    fig_wr.update_traces(textposition="outside", cliponaxis=False)
-    st.plotly_chart(fig_wr, use_container_width=True)
+    fig_wr.update_traces(
+        textposition="outside",
+        cliponaxis=False,
+        textfont=dict(size=11, color="#ECF3FF"),
+        marker_line_color="rgba(240,245,255,0.22)",
+        marker_line_width=1,
+        hovertemplate="<b>%{x}</b><br>Match Win %: %{y:.1f}%<br>Matches: %{marker.color}<extra></extra>",
+    )
+    _render_priority_chart_card(_apply_priority_chart_style(fig_wr, height=500))
 
     bubble = px.scatter(
         view,
@@ -265,16 +320,18 @@ def render(ctx):
             "round_diff": "Round Diff",
         },
     )
-    bubble.update_layout(
-        template="plotly_dark",
-        height=520,
-        margin=dict(l=80, r=40, t=80, b=90),
-        xaxis=dict(automargin=True),
-        yaxis=dict(automargin=True),
+    bubble.update_traces(
+        textposition="top center",
+        cliponaxis=False,
+        textfont=dict(size=11),
+        marker=dict(line=dict(color="rgba(240,245,255,0.24)", width=1.1), opacity=0.9),
+        hovertemplate=(
+            "<b>%{hovertext}</b><br>Tracked Rounds: %{x}<br>"
+            "Match Win %: %{y:.1f}%<br>Matches: %{marker.size}<br>Round Diff: %{marker.color}<extra></extra>"
+        ),
     )
-    bubble.update_traces(textposition="top center", cliponaxis=False)
     bubble.update_yaxes(range=[0, 100], ticksuffix="%")
-    st.plotly_chart(bubble, use_container_width=True)
+    _render_priority_chart_card(_apply_priority_chart_style(bubble, height=560))
 
     map_team = (
         match_level.groupby(["opponent_team", "map"], dropna=False)
