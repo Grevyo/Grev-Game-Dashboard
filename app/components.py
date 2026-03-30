@@ -222,7 +222,7 @@ def player_card(row: dict):
     safe_identity_line = html.escape(str(identity_line))
     safe_role_line = html.escape(str(role_line))
     safe_player_note = html.escape(str(_player_note(row) or ""))
-    safe_best_map = html.escape(str(row.get("best_map", "N/A")))
+    safe_best_map_label = html.escape(str(row.get("best_map_label", f"Best Map: {row.get('best_map', 'N/A')}")))
     safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
     last_match_title = "Last Match" if is_streamer_card else "Last Match ✓"
     last_match_html = _last_match_block_html(None, title=last_match_title) if is_streamer_card else _last_match_block_html(row.get("last_match"), title=last_match_title)
@@ -245,7 +245,7 @@ def player_card(row: dict):
                     <p class='identity-line'>{safe_identity_line}</p>
                     <p class='identity-line'>{safe_role_line}</p>
                     {fame_html}
-                    <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong></span></div>
+                    <div class='player-meta-row'><span class='muted'><strong>{safe_best_map_label}</strong> · Favourite map <strong>{safe_favourite_map}</strong></span></div>
                     {last_match_html}
                     {best_match_html}
                 </div>
@@ -293,8 +293,8 @@ def player_card(row: dict):
     )
 
     context_html = (
-        "<div class='player-meta-row'><span class='muted'>Best map <strong>"
-        f"{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
+        "<div class='player-meta-row'><span class='muted'><strong>"
+        f"{safe_best_map_label}</strong> · Favourite map <strong>{safe_favourite_map}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
     )
     stats_block_html = f"<div class='stats-grid'>{stats_html}</div>"
     tier_block_html = tier_html
