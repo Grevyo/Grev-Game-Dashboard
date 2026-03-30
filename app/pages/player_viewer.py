@@ -154,6 +154,7 @@ def render(ctx):
     delta_10 = _form_delta(p)
     trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
     streak = f"{int((p['grevscore'] >= p['grevscore'].mean()).tail(5).sum())}/5 solid"
+    record_value = f"{int((p['grevscore'] >= 1.0).sum())}-{int((p['grevscore'] < 1.0).sum())}"
 
     player_photo_match = resolve_player_photo(player)
     player_photo = image_data_uri(player_photo_match.get("path"))
@@ -176,6 +177,7 @@ def render(ctx):
                 <div class='section-subtitle'>{nation_label} • {role if role else 'Core Roster'} • {team_name}</div>
                 <span class='chip'>Role: {role if role else 'N/A'}</span>
                 <span class='chip'>Nationality: {nation_label}</span>
+                <span class='chip'>Record: {record_value}</span>
                 <span class='chip chip-good'>Best Map: {best_map_label}</span>
                 <span class='chip chip-mid'>Best Side: {best_side_label}</span>
                 <div class='muted' style='margin-top:8px;'>Current form summary: {player} is {trend.lower()} with a {p['grevscore'].mean():.1f} GrevScore baseline in this scope.</div>
@@ -185,7 +187,7 @@ def render(ctx):
               <div style='display:flex;justify-content:flex-end;margin-bottom:8px;'>{hero_logo}</div>
               <div class='subtle-grid'>
                 <div class='panel panel-tight accent-mid'><div class='metric-title'>Team Rank</div><div class='metric-value'>{int((df.groupby('player')['grevscore'].mean().rank(ascending=False, method='min').get(player, 0)))}</div></div>
-                <div class='panel panel-tight accent-good'><div class='metric-title'>Record</div><div class='metric-value'>{int((p['grevscore'] >= 1.0).sum())}-{int((p['grevscore'] < 1.0).sum())}</div></div>
+                <div class='panel panel-tight accent-good'><div class='metric-title'>Record</div><div class='metric-value'>{record_value}</div></div>
                 <div class='panel panel-tight accent-mid'><div class='metric-title'>Recent Streak</div><div class='metric-value'>{streak}</div></div>
                 <div class='panel panel-tight accent-{'good' if delta_10 >= 0 else 'bad'}'><div class='metric-title'>Last 10 Δ</div><div class='metric-value'>{delta_10:+.1f}</div></div>
               </div>
