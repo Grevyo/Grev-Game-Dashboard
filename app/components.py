@@ -174,13 +174,16 @@ def _last_match_block_html(last_match: dict | None, title: str = "Last Match") -
             "</div>"
         )
 
+    result_key = result.strip().casefold()
+    result_tone = "win" if "win" in result_key or result_key == "w" else "loss" if "loss" in result_key or result_key == "l" else "neutral"
+
     date_line = f"<div class='last-match-line muted'>Played: <strong>{date_played}</strong></div>" if date_played else ""
     return (
         "<div class='last-match-block'>"
         f"<div class='last-match-title'>{safe_title}</div>"
         f"{date_line}"
-        f"<div class='last-match-line'>vs <strong>{opponent}</strong> • <strong>{result}</strong></div>"
-        f"<div class='last-match-line muted'>KD: <strong>{kpd:.2f}</strong> • GrevScore: <strong>{grevscore:.2f}</strong></div>"
+        f"<div class='last-match-line'>vs <strong>{opponent}</strong> • <strong class='last-match-result last-match-result-{result_tone}'>{result}</strong></div>"
+        f"<div class='last-match-line muted'>KD: <strong class='last-match-metric'>{kpd:.2f}</strong> • GrevScore: <strong class='last-match-metric'>{grevscore:.2f}</strong></div>"
         "</div>"
     )
 
@@ -280,7 +283,6 @@ def player_card(row: dict):
         else ""
     )
 
-    trend_html = trend_chip(row.get("trend", "Stable"))
     context_html = (
         "<div class='player-meta-row'><span class='muted'>Best map <strong>"
         f"{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong> · Best side <strong>{html.escape(str(row.get('best_side', 'N/A')))}</strong></span></div>"
@@ -298,7 +300,6 @@ def player_card(row: dict):
             <div class='player-head-title-row'>
               <div class='player-name-row'>
                 <p class='player-name'>{safe_player_name}</p>
-                {trend_html}
               </div>
               <div>{logo_visual}</div>
             </div>

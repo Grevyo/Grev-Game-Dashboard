@@ -96,7 +96,7 @@ def achievements_for_player(
     tier_priority = pool.get("achievement_tier", "").astype(str).str.upper().map(TIER_PRIORITY).fillna(20)
 
     pool = pool.assign(_season=season_num, _pos=pos_priority, _tier=tier_priority)
-    pool = pool.sort_values(["_pos", "_tier", "_season"], ascending=[False, False, False])
+    pool = pool.sort_values(["_season", "_pos", "_tier"], ascending=[False, False, False])
 
     if cap is None:
         top = pool
