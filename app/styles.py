@@ -319,20 +319,20 @@ def inject_styles(theme_name: str = "Dark"):
       gap: 1px;
       background: linear-gradient(180deg, transparent 0%, rgba(8,12,20,0.58) 100%);
     }}
-    .player-card .achievement-strip-featured .achievement-season-top {{
+    .achievement-season-top {{
       position: absolute;
       top: 4px;
       left: 50%;
       transform: translateX(-50%);
       max-width: calc(100% - 8px);
-      min-width: 0;
-      padding: 2px 8px;
+      min-width: 56px;
+      padding: 2px 7px;
       border-radius: 999px;
       border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
-      background: color-mix(in srgb, rgba(7,12,24,0.94) 82%, #9fb8ff 18%);
+      background: color-mix(in srgb, rgba(7,12,24,0.9) 86%, #9fb8ff 14%);
       color: #f5f8ff;
       font-size: 8px;
-      line-height: 1.2;
+      line-height: 1;
       font-weight: 700;
       letter-spacing: 0.02em;
       white-space: nowrap;
@@ -346,11 +346,11 @@ def inject_styles(theme_name: str = "Dark"):
       padding: 0 4px; border-radius: 999px; font-size: 8px; font-weight: 750; letter-spacing: 0.03em;
       border: 1px solid currentColor; align-self: flex-start;
     }}
-    .player-card .achievement-strip-featured .achievement-event-title {{
+    .achievement-event-title {{
       color: #eef2ff;
-      font-size: 10px;
+      font-size: 8.5px;
       line-height: 1.15;
-      font-weight: 900;
+      font-weight: 760;
       text-shadow: 0 1px 3px rgba(0,0,0,0.78);
       display: block;
       word-break: break-word;
