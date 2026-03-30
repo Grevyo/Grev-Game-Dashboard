@@ -193,7 +193,7 @@ def render(ctx):
         unsafe_allow_html=True,
     )
 
-    section_header("Achievements", "Newest-to-oldest by season, aligned with overview card logic")
+    section_header("Achievements ✓", "Newest-to-oldest by season, aligned with overview card logic")
     ach_items, ach_hidden = achievements_for_player(achievements, player, cap=6)
     if not ach_items:
         st.caption("No achievements linked for selected player.")
@@ -215,9 +215,9 @@ def render(ctx):
     best_five_matches = build_best_n_matches(df, ctx.get("tactics", pd.DataFrame()), player, n=5)
     m1, m2 = st.columns(2, gap="small")
     with m1:
-        _render_match_list("Last 5 Matches", last_five_matches, "No recent matches in this scope", block_variant="last")
+        _render_match_list("Last 5 Matches ✓", last_five_matches, "No recent matches in this scope", block_variant="last")
     with m2:
-        _render_match_list("Best 5 Matches", best_five_matches, "No best matches in this scope", block_variant="best")
+        _render_match_list("Best 5 Matches ✓", best_five_matches, "No best matches in this scope", block_variant="best")
 
     section_header("Performance Core", "GrevScore feature and headline cards")
     left, right = st.columns([1.3, 1], gap="small")
