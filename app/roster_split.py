@@ -64,39 +64,6 @@ def _extract_metadata_streamer_keys(players_meta: pd.DataFrame) -> set[str]:
     return set(streamer_meta[key_col].map(_player_key).tolist())
 
 
-def _extract_metadata_transferred_keys(players_meta: pd.DataFrame) -> set[str]:
-    """Players with a non-empty New_Team value other than '-' are hard-transferred."""
-    if players_meta.empty:
-        return set()
-
-    name_col = None
-    for candidate in ["player_clean", "player", "name"]:
-        if candidate in players_meta.columns:
-            name_col = candidate
-            break
-    if name_col is None:
-        return set()
-
-    new_team_col = None
-    for candidate in ["New_Team", "new_team", "New_team"]:
-        if candidate in players_meta.columns:
-            new_team_col = candidate
-            break
-    if new_team_col is None:
-        return set()
-
-    meta = players_meta[[name_col, new_team_col]].copy()
-    meta[name_col] = meta[name_col].astype(str).str.strip()
-    values = meta[new_team_col]
-    cleaned = values.where(values.notna(), "").astype(str).str.strip()
-    transferred_mask = cleaned.ne("") & cleaned.ne("-")
-    transferred_meta = meta[transferred_mask]
-    if transferred_meta.empty:
-        return set()
-
-    return set(transferred_meta[name_col].map(_player_key).tolist())
-
-
 def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
     if df.empty:
         return pd.Series(dtype=float)
@@ -247,7 +214,6 @@ def split_roster_active_benched_streamer_transferred(
     roster_names = set(merged.get("player", pd.Series(dtype=object)).dropna().astype(str).tolist())
     meta_players = _extract_metadata_players(players_meta)
     streamer_keys = _extract_metadata_streamer_keys(players_meta)
-    transferred_keys = _extract_metadata_transferred_keys(players_meta)
 
     usage = (
         full_medisports_matches[["player", "match_id"]].copy()
@@ -283,17 +249,12 @@ def split_roster_active_benched_streamer_transferred(
         player_key = _player_key(player)
         in_metadata = player_key in meta_by_key
 
-        # 2) Hard transfer rule: any New_Team value other than '-' (after trim) is transferred.
-        if player_key in transferred_keys:
-            classified[player] = "transferred"
-            continue
-
-        # 3) Streamer: explicit role in players metadata.
+        # 2) Streamer: explicit role in players metadata.
         if player_key in streamer_keys:
             classified[player] = "streamer"
             continue
 
-        # 4/5/6) Centralized classification; historical transferred requires safety guard + resolved seasons.
+        # 3/4/5) Centralized classification; transferred requires safety guard + resolved seasons.
         appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
         appearance_share = float(appearance.iloc[0]) if not appearance.empty else 0.0
         classified[player] = classify_roster_bucket(
