@@ -30,58 +30,114 @@ def _apply_priority_chart_style(fig, *, height: int = 500):
     fig.update_layout(
         template="plotly_dark",
         height=height,
-        margin=dict(l=88, r=42, t=92, b=132),
-        title=dict(font=dict(size=21, color="#EAF2FF"), x=0.01, xanchor="left", y=0.98),
+        margin=dict(l=56, r=24, t=64, b=84),
+        title=dict(font=dict(size=17, color="#EAF2FF"), x=0.0, xanchor="left"),
         legend=dict(
-            title_font=dict(size=13, color="#EAF2FF"),
-            font=dict(size=12, color="#DCE7F5"),
+            title_font=dict(size=12, color="#EAF2FF"),
+            font=dict(size=11, color="#DCE7F5"),
             orientation="h",
             yanchor="bottom",
-            y=1.03,
+            y=1.02,
             xanchor="left",
             x=0.0,
-            bgcolor="rgba(10,16,29,0.56)",
-            bordercolor="rgba(123,144,168,0.32)",
+            bgcolor="rgba(10,16,29,0.45)",
+            bordercolor="rgba(123,144,168,0.26)",
             borderwidth=1,
         ),
-        plot_bgcolor="rgba(9,13,22,0.92)",
+        plot_bgcolor="rgba(9,13,22,0.82)",
         paper_bgcolor="rgba(0,0,0,0)",
         hoverlabel=dict(
             bgcolor="rgba(14,20,31,0.96)",
             bordercolor="rgba(123,144,168,0.65)",
-            font=dict(color="#F5F8FF", size=13),
+            font=dict(color="#F5F8FF", size=12),
         ),
         font=dict(color="#D6DFEA"),
     )
     fig.update_xaxes(
-        tickangle=-28,
+        tickangle=-25,
         automargin=True,
-        tickfont=dict(size=12),
-        title_font=dict(size=14),
+        tickfont=dict(size=11),
+        title_font=dict(size=13),
         ticklabelposition="outside",
         showgrid=False,
         zeroline=False,
     )
     fig.update_yaxes(
         automargin=True,
-        tickfont=dict(size=12),
-        title_font=dict(size=14),
-        gridcolor="rgba(123,144,168,0.22)",
+        tickfont=dict(size=11),
+        title_font=dict(size=13),
+        gridcolor="rgba(123,144,168,0.20)",
         griddash="dot",
         zeroline=False,
     )
     return fig
 
 
-def _render_priority_chart_card(fig, heading: str, note: str = ""):
-    st.markdown("<div class='priority-chart-card'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='priority-chart-title'>{heading}</div>", unsafe_allow_html=True)
+def _render_chart_panel(fig, heading: str, note: str = ""):
+    st.markdown("<div class='panel'>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-title' style='margin-bottom:4px'>{heading}</div>", unsafe_allow_html=True)
     if note:
-        st.markdown(f"<div class='priority-chart-note'>{note}</div>", unsafe_allow_html=True)
-    with st.container():
-        st.plotly_chart(fig, use_container_width=True)
+        st.markdown(f"<div class='section-subtitle' style='margin-bottom:10px'>{note}</div>", unsafe_allow_html=True)
+    st.plotly_chart(fig, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+
+def _render_match_record_table(view: pd.DataFrame) -> None:
+    table_df = view[
+        [
+            "opponent_team",
+            "matches_played",
+            "wins",
+            "losses",
+            "draws",
+            "win_rate_match",
+            "win_rate_rounds",
+            "round_diff",
+            "latest_result_label",
+            "confidence",
+        ]
+    ].copy()
+    table_df["win_rate_match"] = table_df["win_rate_match"].map(lambda v: f"{float(v):.1f}%")
+    table_df["win_rate_rounds"] = table_df["win_rate_rounds"].map(lambda v: f"{float(v):.1f}%")
+    table_df["round_diff"] = table_df["round_diff"].map(lambda v: f"{int(v):+d}")
+
+    headers = [
+        ("Opponent", "opponent_team"),
+        ("Matches", "matches_played"),
+        ("Wins", "wins"),
+        ("Losses", "losses"),
+        ("Draws", "draws"),
+        ("Win% (Match)", "win_rate_match"),
+        ("Win% (Rounds)", "win_rate_rounds"),
+        ("Round Diff", "round_diff"),
+        ("Latest Result", "latest_result_label"),
+        ("Confidence", "confidence"),
+    ]
+
+    header_html = "".join(f"<th>{label}</th>" for label, _ in headers)
+    row_html = "".join(
+        "<tr class='breakdown-row {row_class}'>".format(row_class="even" if idx % 2 == 0 else "odd")
+        + "".join(
+            f"<td class='{'breakdown-key' if col_key == 'opponent_team' else 'breakdown-num' if col_key in {'matches_played','wins','losses','draws','win_rate_match','win_rate_rounds','round_diff'} else ''}'>{str(row.get(col_key, 'N/A'))}</td>"
+            for _, col_key in headers
+        )
+        + "</tr>"
+        for idx, row in table_df.iterrows()
+    )
+
+    st.markdown(
+        f"""
+        <div class='panel map-performance-shell'>
+          <div class='breakdown-table-wrap map-performance-table-wrap'>
+            <table class='breakdown-table map-performance-table'>
+              <thead><tr>{header_html}</tr></thead>
+              <tbody>{row_html}</tbody>
+            </table>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def _render_heatmap(
     pivot: pd.DataFrame,
@@ -219,44 +275,13 @@ def render(ctx):
     view = grp.sort_values(["win_rate_match", "round_diff", "matches_played"], ascending=[False, False, False]).copy()
 
     section_header("Match Record vs Teams", "Primary view focused on full match outcomes.")
-    with st.container(border=True):
-        st.dataframe(
-            view[
-                [
-                    "opponent_team",
-                    "matches_played",
-                    "wins",
-                    "losses",
-                    "draws",
-                    "win_rate_match",
-                    "win_rate_rounds",
-                    "round_diff",
-                    "latest_result_label",
-                    "confidence",
-                ]
-            ],
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "opponent_team": st.column_config.TextColumn("Opponent", width="medium"),
-                "matches_played": st.column_config.NumberColumn("Matches", format="%d"),
-                "wins": st.column_config.NumberColumn("Wins", format="%d"),
-                "losses": st.column_config.NumberColumn("Losses", format="%d"),
-                "draws": st.column_config.NumberColumn("Draws", format="%d"),
-                "win_rate_match": st.column_config.ProgressColumn("Win% (Match)", min_value=0, max_value=100, format="%.1f%%"),
-                "win_rate_rounds": st.column_config.ProgressColumn("Win% (Rounds)", min_value=0, max_value=100, format="%.1f%%"),
-                "round_diff": st.column_config.NumberColumn("Round Diff", format="%+d"),
-                "latest_result_label": st.column_config.TextColumn("Latest Result", width="large"),
-                "confidence": st.column_config.TextColumn("Confidence"),
-            },
-        )
+    _render_match_record_table(view)
 
     if view.empty:
         st.info("No team matchup rows available for charting.")
         return
 
-    st.markdown("### Full-Match Priority Charts ✓")
-    st.caption("Full-match chart styling refreshed for readability while preserving the existing result colour language.")
+    section_header("Full-Match Priority Charts")
 
     wl_long = view.melt(
         id_vars=["opponent_team"],
@@ -283,7 +308,7 @@ def render(ctx):
         marker_line_width=1,
         hovertemplate="<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>",
     )
-    _render_priority_chart_card(
+    _render_chart_panel(
         _apply_priority_chart_style(fig_wl, height=520),
         "Wins / Losses / Draws by Team",
         "Grouped bars retain the same result colors as Match Record vs Teams for quick scanning.",
@@ -311,7 +336,7 @@ def render(ctx):
         marker_line_width=1,
         hovertemplate="<b>%{x}</b><br>Match Win %: %{y:.1f}%<br>Matches: %{marker.color}<extra></extra>",
     )
-    _render_priority_chart_card(
+    _render_chart_panel(
         _apply_priority_chart_style(fig_wr, height=520),
         "Match Win % by Team",
         "External value labels and larger axis text improve readability across longer opponent names.",
@@ -345,7 +370,7 @@ def render(ctx):
         ),
     )
     bubble.update_yaxes(range=[0, 100], ticksuffix="%")
-    _render_priority_chart_card(
+    _render_chart_panel(
         _apply_priority_chart_style(bubble, height=580),
         "Sample Depth vs Win Efficiency",
         "Point outlines, hover contrast, and spacing were tuned for cleaner interpretation.",
