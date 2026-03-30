@@ -62,6 +62,44 @@ def _true_record(df_scope: pd.DataFrame, tactics_scope: pd.DataFrame) -> tuple[i
     return wins, losses
 
 
+def _best_side_from_wins(df_scope: pd.DataFrame, tactics_scope: pd.DataFrame) -> str:
+    if df_scope.empty or "side" not in df_scope.columns:
+        return "N/A"
+
+    side_totals: dict[str, dict[str, int]] = {}
+    per_side = df_scope.copy()
+    if "match_id" in per_side.columns:
+        sort_cols = [c for c in ["date", "time"] if c in per_side.columns]
+        if sort_cols:
+            per_side = per_side.sort_values(sort_cols)
+        per_side = per_side.drop_duplicates(["match_id", "side"], keep="last")
+
+    for _, row in per_side.iterrows():
+        side_name = str(row.get("side", "") or "").strip()
+        if not side_name:
+            continue
+        result = resolve_match_result(row, tactics_scope)
+        if result not in {"Win", "Loss"}:
+            continue
+        bucket = side_totals.setdefault(side_name, {"wins": 0, "losses": 0})
+        if result == "Win":
+            bucket["wins"] += 1
+        else:
+            bucket["losses"] += 1
+
+    if not side_totals:
+        return "N/A"
+
+    ranked = sorted(
+        side_totals.items(),
+        key=lambda item: (item[1]["wins"], -item[1]["losses"], item[0].casefold()),
+        reverse=True,
+    )
+    if len(ranked) > 1 and ranked[0][1]["wins"] == ranked[1][1]["wins"]:
+        return "Even"
+    return ranked[0][0]
+
+
 
 
 def _render_match_list(title: str, matches: list[dict], empty_text: str, block_variant: str = "last"):
@@ -166,9 +204,7 @@ def render(ctx):
     role = str(meta.iloc[0].get("role", "")).strip() if not meta.empty else ""
 
     best_map = best_contexts(p, "map").head(1)
-    best_side = best_contexts(p, "side").head(1)
     best_map_label = str(best_map.iloc[0]["map"]) if not best_map.empty else "N/A"
-    best_side_label = str(best_side.iloc[0]["side"]) if not best_side.empty else "N/A"
 
     delta_10 = _form_delta(p)
     trend = "Heating Up" if delta_10 > 2 else "Cooling" if delta_10 < -2 else "Stable"
@@ -177,8 +213,11 @@ def render(ctx):
         match_ids = p["match_id"].dropna().astype(str).unique().tolist()
         tactics_scope = tactics_scope[tactics_scope["match_id"].astype(str).isin(match_ids)].copy()
     wins, losses = _true_record(p, tactics_scope)
+    best_side_label = _best_side_from_wins(p, tactics_scope)
     record_value = f"{wins}-{losses}"
     adr = p["damage"].sum() / p["rounds_played"].sum() if p["rounds_played"].sum() > 0 else 0.0
+    grev_avg = float(p["grevscore"].mean())
+    grev_pct = max(0.0, min((grev_avg / 2.0) * 100.0, 100.0))
 
     player_photo_match = resolve_player_photo(player)
     player_photo = image_data_uri(player_photo_match.get("path"))
@@ -193,31 +232,43 @@ def render(ctx):
     st.markdown(
         f"""
         <div class='hero-band player-viewer-hero'>
-          <div style='display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;'>
+          <div class='player-viewer-hero-grid'>
             <div class='player-viewer-head-main'>
               {hero_photo}
-              <div>
+              <div class='player-viewer-head-body'>
                 <div class='section-title' style='margin-top:0'>{player}</div>
                 <div class='section-subtitle'>{nation_label} • {role if role else 'Core Roster'} • {team_name}</div>
-                <span class='chip'>Role: {role if role else 'N/A'}</span>
-                <span class='chip'>Nationality: {nation_label}</span>
-                <span class='chip'>Record: {record_value}</span>
-                <span class='chip chip-good'>Best Map: {best_map_label}</span>
-                <span class='chip chip-mid'>Best Side: {best_side_label}</span>
-                <div class='muted' style='margin-top:8px;'>Current form summary: {player} is {trend.lower()} with a {p['grevscore'].mean():.1f} GrevScore baseline in this scope.</div>
+                <div class='player-viewer-chip-row'>
+                  <span class='chip'>Role: {role if role else 'N/A'}</span>
+                  <span class='chip'>Record: {record_value}</span>
+                  <span class='chip chip-good'>Best Map: {best_map_label}</span>
+                  <span class='chip chip-mid'>Best Side: {best_side_label}</span>
+                </div>
+                <div class='muted player-viewer-form-note'>Current form summary: {player} is {trend.lower()} with a {grev_avg:.1f} GrevScore baseline in this scope.</div>
               </div>
             </div>
-            <div style='min-width:340px;flex:1;'>
-              <div style='display:flex;justify-content:flex-end;margin-bottom:8px;'>{hero_logo}</div>
-              <div class='subtle-grid'>
-                <div class='panel panel-tight accent-good'><div class='metric-title'>Record</div><div class='metric-value'>{record_value}</div></div>
-                <div class='panel panel-tight accent-mid'><div class='metric-title'>KD</div><div class='metric-value'>{p['kpd'].mean():.2f}</div></div>
-                <div class='panel panel-tight accent-mid'><div class='metric-title'>GrevScore</div><div class='metric-value'>{p['grevscore'].mean():.2f}</div></div>
-                <div class='panel panel-tight accent-mid'><div class='metric-title'>Impact</div><div class='metric-value'>{p['impact'].mean():.1f}</div></div>
-                <div class='panel panel-tight accent-mid'><div class='metric-title'>ADR</div><div class='metric-value'>{adr:.1f}</div></div>
-                <div class='panel panel-tight accent-mid'><div class='metric-title'>KPR</div><div class='metric-value'>{p['kpr'].mean():.2f}</div></div>
+            <div class='player-viewer-gauge-panel'>
+              <div class='player-viewer-gauge-header'>
+                <div class='section-title player-viewer-mini-title'>GrevScore Gauge ✓</div>
+                {hero_logo}
+              </div>
+              <div class='player-viewer-gauge-wrap'>
+                <div class='grev-gauge' style="--gauge-pct:{grev_pct:.1f}%;">
+                  <div class='grev-gauge-inner'>
+                    <div class='metric-title'>GrevScore</div>
+                    <div class='metric-value'>{grev_avg:.2f}</div>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
+          <div class='player-viewer-top-metrics'>
+            <div class='panel panel-tight accent-good'><div class='metric-title'>Record</div><div class='metric-value'>{record_value}</div></div>
+            <div class='panel panel-tight accent-mid'><div class='metric-title'>KD</div><div class='metric-value'>{p['kpd'].mean():.2f}</div></div>
+            <div class='panel panel-tight accent-mid'><div class='metric-title'>GrevScore</div><div class='metric-value'>{grev_avg:.2f}</div></div>
+            <div class='panel panel-tight accent-mid'><div class='metric-title'>Impact</div><div class='metric-value'>{p['impact'].mean():.1f}</div></div>
+            <div class='panel panel-tight accent-mid'><div class='metric-title'>ADR</div><div class='metric-value'>{adr:.1f}</div></div>
+            <div class='panel panel-tight accent-mid'><div class='metric-title'>KPR</div><div class='metric-value'>{p['kpr'].mean():.2f}</div></div>
           </div>
         </div>
         """,

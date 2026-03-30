@@ -2,16 +2,47 @@ import re
 import unicodedata
 
 COUNTRY_TO_ISO2 = {
+    "argentina": "AR",
+    "australia": "AU",
+    "austria": "AT",
     "belarus": "BY",
+    "brazil": "BR",
+    "canada": "CA",
     "china": "CN",
+    "czech republic": "CZ",
+    "denmark": "DK",
+    "finland": "FI",
+    "france": "FR",
+    "germany": "DE",
     "greece": "GR",
+    "hungary": "HU",
+    "india": "IN",
+    "indonesia": "ID",
+    "israel": "IL",
+    "italy": "IT",
     "japan": "JP",
+    "kazakhstan": "KZ",
     "latvia": "LV",
+    "lithuania": "LT",
+    "mexico": "MX",
+    "netherlands": "NL",
+    "norway": "NO",
+    "philippines": "PH",
+    "poland": "PL",
+    "portugal": "PT",
     "peru": "PE",
+    "romania": "RO",
     "russia": "RU",
+    "sweden": "SE",
+    "switzerland": "CH",
     "slovakia": "SK",
     "serbia": "RS",
     "spain": "ES",
+    "ukraine": "UA",
+    "united kingdom": "GB",
+    "united states": "US",
+    "usa": "US",
+    "us": "US",
     "turkey": "TR",
 }
 
@@ -24,8 +55,11 @@ def _normalize_country(value: str | None) -> str:
 
 
 def country_to_flag_emoji(country_text: str | None) -> str:
-    key = _normalize_country(country_text)
+    raw_text = str(country_text or "").strip()
+    key = _normalize_country(raw_text)
     iso2 = COUNTRY_TO_ISO2.get(key)
+    if not iso2 and len(raw_text) == 2 and raw_text.isalpha():
+        iso2 = raw_text.upper()
     if not iso2 or len(iso2) != 2 or not iso2.isalpha():
         return ""
     base = 127397
