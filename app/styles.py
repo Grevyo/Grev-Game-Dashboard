@@ -360,7 +360,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .achievement-event-title {{
       color: #eef2ff;
-      font-size: 8.5px;
+      font-size: 7.5px;
       line-height: 1.15;
       font-weight: 760;
       text-shadow: 0 1px 3px rgba(0,0,0,0.78);
