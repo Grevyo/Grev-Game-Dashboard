@@ -16,6 +16,7 @@ FILES = {
     "tactics": DATA_DIR / "TacticsDataMaster.csv",
     "achievements": DATA_DIR / "Achievements.csv",
 }
+REQUIRED_FILES = ("players", "player_matches", "tactics", "achievements")
 
 THEMES = {
     "Dark": {
