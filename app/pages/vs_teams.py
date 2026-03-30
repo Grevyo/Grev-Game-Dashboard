@@ -301,15 +301,18 @@ def render(ctx):
     fig_wl.update_layout(
         legend_title_text="Result",
         bargap=0.25,
-        margin=dict(t=110, b=110),
-        title=dict(pad=dict(t=18, b=8)),
+        margin=dict(t=128, b=92, l=56, r=26),
+        title=dict(pad=dict(t=22, b=18)),
         legend=dict(
             orientation="h",
-            yanchor="top",
-            y=-0.22,
-            xanchor="center",
-            x=0.5,
+            yanchor="bottom",
+            y=1.03,
+            xanchor="right",
+            x=1.0,
             traceorder="normal",
+            bgcolor="rgba(10,16,28,0.55)",
+            bordercolor="rgba(125,150,180,0.28)",
+            borderwidth=1,
         ),
     )
     fig_wl.update_traces(
@@ -371,11 +374,12 @@ def render(ctx):
     bubble.update_traces(
         textposition="top center",
         cliponaxis=False,
-        textfont=dict(size=11, color="#EAF2FF"),
+        textfont=dict(size=10, color="#EAF2FF"),
         marker=dict(
-            line=dict(color="rgba(233,242,255,0.55)", width=1.5),
-            opacity=0.88,
-            sizemin=9,
+            symbol="circle",
+            line=dict(color="rgba(233,242,255,0.82)", width=1.9),
+            opacity=0.82,
+            sizemin=10,
         ),
         hovertemplate=(
             "<b>%{hovertext}</b><br>Tracked Rounds: %{x}<br>"
@@ -383,14 +387,17 @@ def render(ctx):
         ),
     )
     bubble.update_layout(
-        margin=dict(l=70, r=42, t=96, b=86),
-        title=dict(x=0.02, xanchor="left", font=dict(size=21, color="#F2F7FF"), pad=dict(t=8, b=10)),
+        margin=dict(l=72, r=44, t=120, b=98),
+        title=dict(x=0.02, xanchor="left", font=dict(size=21, color="#F2F7FF"), pad=dict(t=14, b=20)),
         coloraxis_colorbar=dict(
             title="Round Diff",
-            len=0.72,
+            len=0.68,
             thickness=14,
             ticks="outside",
             tickfont=dict(size=11),
+            y=0.5,
+            yanchor="middle",
+            x=1.02,
         ),
     )
     bubble.update_xaxes(
@@ -400,6 +407,7 @@ def render(ctx):
         showline=True,
         linewidth=1,
         linecolor="rgba(152,173,197,0.35)",
+        gridcolor="rgba(152,173,197,0.16)",
     )
     bubble.update_yaxes(
         range=[0, 100],
