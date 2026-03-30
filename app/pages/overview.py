@@ -91,6 +91,18 @@ def _best_map_for_player(
     return value if value else default
 
 
+def _overview_player_context(df_base: pd.DataFrame, filters: dict | None = None) -> tuple[pd.DataFrame, str | None]:
+    df_context = df_base.copy()
+    selected_seasons = (filters or {}).get("season") or []
+    auto_current_season = None
+    if not selected_seasons:
+        auto_current_season = get_current_season(df_context, "resolved_season")
+        season_col = "resolved_season"
+        if auto_current_season and season_col in df_context.columns:
+            df_context = df_context[df_context[season_col].astype(str) == auto_current_season].copy()
+    return df_context, auto_current_season
+
+
 def _context_for_player(df, player_name: str, by: str, default: str = "N/A") -> str:
     if df.empty or by not in df.columns or "player" not in df.columns:
         return default
@@ -243,6 +255,7 @@ def _render_roster_cards(
                 merged["roster_bucket"] = ""
                 merged["desc"] = player_description(merged)
             merged["best_map"] = _best_map_for_player(df_context, str(row["player"]))
+            merged["best_map_label"] = f"Best Map (Overview): {merged['best_map']}"
             merged["best_side"] = _best_side_for_player(
                 df_context,
                 tactics_context,
@@ -324,13 +337,7 @@ def render(ctx):
     achievements_df = ctx.get("achievements")
 
     df_base = get_medisports_roster_df(full_df, player_col="player")
-    selected_seasons = filters.get("season") or []
-    auto_current_season = None
-    if not selected_seasons:
-        auto_current_season = get_current_season(df_base, "resolved_season")
-        season_col = "resolved_season"
-        if auto_current_season and season_col in df_base.columns:
-            df_base = df_base[df_base[season_col].astype(str) == auto_current_season].copy()
+    df_base, auto_current_season = _overview_player_context(df_base, filters)
 
     if auto_current_season:
         st.markdown(f"<span class='chip chip-mid'>Defaulted to Season {auto_current_season}</span>", unsafe_allow_html=True)
