@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import re
-from pathlib import Path
 
 try:
     import plotly.express as px
@@ -13,15 +12,9 @@ except ModuleNotFoundError:
 
 from app.components import render_achievement_mini_tile, section_header, stat_card
 from app.achievements import achievements_for_player
-from app.config import IMAGES
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.filters import filter_panel_toggle
-from app.image_helpers import (
-    find_map_image,
-    image_data_uri,
-    find_team_logo,
-    resolve_player_photo,
-)
+from app.image_helpers import image_data_uri, find_team_logo, resolve_player_photo
 from app.match_summaries import build_best_n_matches, build_last_n_matches, resolve_match_result
 from app.presentation_helpers import nationality_label
 
@@ -87,41 +80,6 @@ def _render_match_list(title: str, matches: list[dict], empty_text: str, block_v
     st.markdown(f"<div class='match-list-wrap'>{''.join(rows)}</div>", unsafe_allow_html=True)
 
 
-def _resolve_map_visuals(map_name: str) -> tuple[str | None, str | None]:
-    folder = IMAGES.get("map_images")
-    if folder is None:
-        return None, None
-
-    map_dir = Path(folder)
-    if not map_dir.exists():
-        return None, None
-
-    map_clean = str(map_name or "").strip()
-    if not map_clean:
-        return None, None
-
-    lower = map_clean.casefold()
-    bg_path = None
-    logo_path = None
-    for path in map_dir.iterdir():
-        if not path.is_file():
-            continue
-        stem = path.stem.casefold()
-        suffix = path.suffix.casefold()
-        if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".svg"}:
-            continue
-        if stem == f"{lower}_4k":
-            bg_path = str(path)
-        elif stem == lower:
-            logo_path = str(path)
-
-    if not bg_path:
-        bg_path = find_map_image(f"{map_clean}_4k")
-    if not logo_path:
-        logo_path = find_map_image(map_clean)
-    return bg_path, logo_path
-
-
 def _metric_mean(df_scope: pd.DataFrame, column: str, decimals: int = 2) -> str:
     if column not in df_scope.columns:
         return "N/A"
@@ -140,8 +98,8 @@ def _metric_sum(df_scope: pd.DataFrame, column: str) -> str:
     return str(int(series.sum()))
 
 
-def _render_map_breakdown_cards(p: pd.DataFrame, tactics_scope: pd.DataFrame):
-    section_header("Map Breakdown ✓", "Per-map scoped player performance panels")
+def _render_map_performance_table(p: pd.DataFrame, tactics_scope: pd.DataFrame):
+    section_header("Map Performance", "Merged per-map performance view")
     if "map" not in p.columns:
         st.markdown("<div class='panel panel-tight'><span class='muted'>No map column available in this scope.</span></div>", unsafe_allow_html=True)
         return
@@ -153,7 +111,16 @@ def _render_map_breakdown_cards(p: pd.DataFrame, tactics_scope: pd.DataFrame):
         st.markdown("<div class='panel panel-tight'><span class='muted'>No map data available in this scope.</span></div>", unsafe_allow_html=True)
         return
 
-    st.markdown("<div class='map-breakdown-shell'>", unsafe_allow_html=True)
+    include_kd = "kpd" in maps.columns
+    include_grevscore = "grevscore" in maps.columns
+    include_impact = "impact" in maps.columns
+    include_damage = "damage" in maps.columns
+    include_accuracy = "accuracy_pct" in maps.columns
+    include_hs = "hs_pct" in maps.columns
+    include_mvps = "mvps" in maps.columns
+    include_adr = {"damage", "rounds_played"}.issubset(maps.columns)
+
+    rows = []
     for map_name, map_df in maps.groupby("map", dropna=False):
         map_df = map_df.copy()
         map_df = map_df.sort_values("date") if "date" in map_df.columns else map_df
@@ -163,59 +130,68 @@ def _render_map_breakdown_cards(p: pd.DataFrame, tactics_scope: pd.DataFrame):
 
         wins, losses = _true_record(map_df, map_tactics)
         matches = int(map_df["match_id"].nunique()) if "match_id" in map_df.columns else int(len(map_df))
-        rounds = int(pd.to_numeric(map_df.get("rounds_played", 0), errors="coerce").fillna(0).sum()) if "rounds_played" in map_df.columns else 0
-        adr_value = "N/A"
-        if {"damage", "rounds_played"}.issubset(map_df.columns):
+        row = {
+            "map": str(map_name),
+            "matches": matches,
+            "record": f"{wins}-{losses}" if (wins + losses) > 0 else "N/A",
+            "kd": _metric_mean(map_df, "kpd", 2) if include_kd else "N/A",
+            "grevscore": _metric_mean(map_df, "grevscore", 2) if include_grevscore else "N/A",
+            "impact": _metric_mean(map_df, "impact", 1) if include_impact else "N/A",
+            "damage": _metric_mean(map_df, "damage", 0) if include_damage else "N/A",
+            "accuracy": _metric_mean(map_df, "accuracy_pct", 1) if include_accuracy else "N/A",
+            "hs": _metric_mean(map_df, "hs_pct", 1) if include_hs else "N/A",
+            "mvps": _metric_sum(map_df, "mvps") if include_mvps else "N/A",
+            "adr": "N/A",
+        }
+        if include_adr:
             rounds_played = float(pd.to_numeric(map_df["rounds_played"], errors="coerce").fillna(0).sum())
             damage = float(pd.to_numeric(map_df["damage"], errors="coerce").fillna(0).sum())
             if rounds_played > 0:
-                adr_value = f"{(damage / rounds_played):.1f}"
+                row["adr"] = f"{(damage / rounds_played):.1f}"
+        rows.append(row)
 
-        stats = [
-            ("Record", f"{wins}-{losses}" if (wins + losses) > 0 else "N/A"),
-            ("Matches", str(matches)),
-            ("Rounds", str(rounds)),
-            ("KD", _metric_mean(map_df, "kpd", 2)),
-            ("KDA", _metric_mean(map_df, "kda", 2)),
-            ("KPR", _metric_mean(map_df, "kpr", 2)),
-            ("GrevScore", _metric_mean(map_df, "grevscore", 2)),
-            ("Impact", _metric_mean(map_df, "impact", 1)),
-            ("ADR", adr_value),
-            ("Accuracy %", _metric_mean(map_df, "accuracy_pct", 1)),
-            ("HS %", _metric_mean(map_df, "hs_pct", 1)),
-            ("MVPs", _metric_sum(map_df, "mvps")),
-        ]
+    rows = sorted(rows, key=lambda item: (-item["matches"], item["map"].casefold()))
+    headers = [("Map", "map"), ("Matches", "matches"), ("Record", "record")]
+    if include_kd:
+        headers.append(("KD", "kd"))
+    if include_grevscore:
+        headers.append(("GrevScore", "grevscore"))
+    if include_impact:
+        headers.append(("Impact", "impact"))
+    if include_adr:
+        headers.append(("ADR", "adr"))
+    if include_damage:
+        headers.append(("Damage", "damage"))
+    if include_accuracy:
+        headers.append(("Accuracy %", "accuracy"))
+    if include_hs:
+        headers.append(("HS %", "hs"))
+    if include_mvps:
+        headers.append(("MVPs", "mvps"))
 
-        bg_path, logo_path = _resolve_map_visuals(str(map_name))
-        bg_uri = image_data_uri(bg_path)
-        logo_uri = image_data_uri(logo_path)
-        style_attr = f" style=\"background-image:url('{bg_uri}')\"" if bg_uri else ""
-        logo_html = f"<img class='map-breakdown-logo' src='{logo_uri}' alt='{map_name} map logo'/>" if logo_uri else ""
-
-        metric_html = "".join(
-            f"<div class='map-breakdown-stat'><span class='map-breakdown-stat-label'>{label}</span><span class='map-breakdown-stat-value'>{value}</span></div>"
-            for label, value in stats
-            if value != "N/A"
+    header_html = "".join(f"<th>{label}</th>" for label, _ in headers)
+    row_html = "".join(
+        "<tr class='breakdown-row {row_class}'>".format(row_class="even" if idx % 2 == 0 else "odd")
+        + "".join(
+            f"<td class='{'breakdown-key' if col_key == 'map' else 'breakdown-num'}'>{str(row.get(col_key, 'N/A'))}</td>"
+            for _, col_key in headers
         )
-        if not metric_html:
-            metric_html = "<div class='muted'>No numeric map stats available in this scope.</div>"
-
-        st.markdown(
-            f"""
-            <div class='map-breakdown-card'{style_attr}>
-              <div class='map-breakdown-overlay'>
-                <div class='map-breakdown-header'>
-                  <div class='section-title map-breakdown-title'>{map_name} ✓</div>
-                  {logo_html}
-                </div>
-                <div class='map-breakdown-grid'>{metric_html}</div>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("</div>", unsafe_allow_html=True)
+        + "</tr>"
+        for idx, row in enumerate(rows)
+    )
+    st.markdown(
+        f"""
+        <div class='map-performance-shell'>
+          <div class='breakdown-table-wrap map-performance-table-wrap'>
+            <table class='breakdown-table map-performance-table'>
+              <thead><tr>{header_html}</tr></thead>
+              <tbody>{row_html}</tbody>
+            </table>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def render(ctx):
     df = get_medisports_roster_df(ctx["player_matches"], player_col="player")
@@ -454,4 +430,4 @@ def render(ctx):
     with s4:
         stat_card("MVPs", int(p.get("mvps", 0).sum()), "Total MVPs captured")
 
-    _render_map_breakdown_cards(p, tactics_scope)
+    _render_map_performance_table(p, tactics_scope)
