@@ -421,9 +421,10 @@ def inject_styles(theme_name: str = "Dark"):
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
     }}
     .grev-tier-label {{ font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 5px; }}
-    .grev-tier-row {{ display:flex; align-items:stretch; gap: 5px; }}
+    .grev-tier-row {{ display:flex; align-items:stretch; gap: 5px; width: 100%; }}
     .grev-tier-box {{
-      width: 40px;
+      flex: 1 1 0;
+      min-width: 0;
       min-height: 34px;
       border-radius: 6px;
       border: 1px solid color-mix(in srgb, var(--border) 86%, #fff 14%);
