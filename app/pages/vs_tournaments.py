@@ -9,7 +9,7 @@ except ModuleNotFoundError:
     go = None
     PLOTLY_AVAILABLE = False
 
-from app.components import data_section_shell, section_header, style_refresh_note
+from app.components import section_header
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.metrics import confidence_from_sample
 
@@ -19,8 +19,7 @@ def render(ctx):
     filters = ctx["filters"]
     col = get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))
 
-    style_refresh_note()
-    section_header("Medisports vs Tournaments", "Event-by-event performance and reliability")
+    st.title("Medisports vs Tournaments")
     if tdf.empty or col not in tdf.columns:
         st.warning("Tournament data unavailable for current mode.")
         return
@@ -35,7 +34,7 @@ def render(ctx):
     grp["round_diff"] = grp["wins"] - grp["losses"]
     grp["confidence"] = grp["rounds"].map(confidence_from_sample)
 
-    data_section_shell("Tournament Performance", "Win rate, round profile, and event depth", tone="mid")
+    section_header("Tournament Performance")
     st.dataframe(grp.sort_values("win_rate", ascending=False), use_container_width=True, hide_index=True)
 
     if not PLOTLY_AVAILABLE:
@@ -44,10 +43,10 @@ def render(ctx):
         fig = px.scatter(grp, x="round_diff", y="win_rate", size="rounds", color="confidence", hover_name="competition", title="Over/Under-performance by competition")
         st.plotly_chart(fig, use_container_width=True)
 
-    c1, c2 = st.columns(2, gap="small")
+    c1, c2 = st.columns(2)
     with c1:
-        data_section_shell("Best Events", "Top tournaments by win rate", tone="good")
+        st.subheader("Best Events")
         st.dataframe(grp.nlargest(5, "win_rate"), use_container_width=True, hide_index=True)
     with c2:
-        data_section_shell("Worst Events", "Lowest win-rate events to review", tone="poor")
+        st.subheader("Worst Events")
         st.dataframe(grp.nsmallest(5, "win_rate"), use_container_width=True, hide_index=True)
