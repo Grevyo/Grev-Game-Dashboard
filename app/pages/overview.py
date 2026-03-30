@@ -195,82 +195,6 @@ def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, fl
     return {str(tier).upper(): float(score) for tier, score in tier_summary.items()}
 
 
-def _format_last_game_date(value) -> str:
-    dt = pd.to_datetime(value, errors="coerce")
-    if pd.isna(dt):
-        return "N/A"
-    return dt.strftime("%Y-%m-%d")
-
-
-def build_last_game_summary(
-    player_name: str,
-    player_matches: pd.DataFrame,
-    tactics_matches: pd.DataFrame,
-) -> dict[str, str] | None:
-    """Build compact last-game details for a player from real match rows."""
-    if player_matches.empty or "player" not in player_matches.columns:
-        return None
-
-    subset = player_matches[player_matches["player"].astype(str) == str(player_name)].copy()
-    if subset.empty:
-        return None
-
-    if "date" not in subset.columns:
-        return None
-    subset["date"] = pd.to_datetime(subset["date"], errors="coerce")
-    subset = subset[subset["date"].notna()].copy()
-    if subset.empty:
-        return None
-
-    if "time" in subset.columns:
-        time_text = subset["time"].fillna("").astype(str).str.strip()
-        subset["match_ts"] = pd.to_datetime(
-            subset["date"].dt.strftime("%Y-%m-%d") + " " + time_text.replace("", "00:00"),
-            errors="coerce",
-        )
-    else:
-        subset["match_ts"] = subset["date"]
-    subset["match_ts"] = subset["match_ts"].fillna(subset["date"])
-
-    ordered = subset.sort_values(["match_ts", "date"], ascending=[False, False]).copy()
-    latest = ordered.iloc[0]
-
-    kd_value = pd.to_numeric(latest.get("kpd"), errors="coerce")
-    if pd.isna(kd_value):
-        kills = pd.to_numeric(latest.get("kills"), errors="coerce")
-        deaths = pd.to_numeric(latest.get("deaths"), errors="coerce")
-        kd_value = kills / deaths if pd.notna(kills) and pd.notna(deaths) and deaths > 0 else pd.NA
-    kd_text = f"{float(kd_value):.2f}" if pd.notna(kd_value) else "N/A"
-
-    opponent = str(latest.get("opponent_team", "") or "").strip() or "N/A"
-    competition = (
-        str(latest.get("grouped_competition_name", "") or "").strip()
-        or str(latest.get("competition", "") or "").strip()
-        or str(latest.get("raw_competition_name", "") or "").strip()
-        or "N/A"
-    )
-
-    result = "N/A"
-    match_id = str(latest.get("match_id", "") or "").strip()
-    if not tactics_matches.empty and match_id and "match_id" in tactics_matches.columns:
-        tactic_rows = tactics_matches[tactics_matches["match_id"].astype(str) == match_id].copy()
-        if not tactic_rows.empty and {"wins", "losses"}.issubset(tactic_rows.columns):
-            wins = pd.to_numeric(tactic_rows["wins"], errors="coerce").fillna(0).sum()
-            losses = pd.to_numeric(tactic_rows["losses"], errors="coerce").fillna(0).sum()
-            if wins > losses:
-                result = "Win"
-            elif losses > wins:
-                result = "Loss"
-
-    return {
-        "date": _format_last_game_date(latest.get("date")),
-        "kd": kd_text,
-        "result": result,
-        "opponent": opponent,
-        "tournament": competition,
-    }
-
-
 def _render_roster_cards(
     summary: pd.DataFrame,
     df_context: pd.DataFrame,
@@ -303,7 +227,6 @@ def _render_roster_cards(
                         "nationality": m.get("nationality", ""),
                         "role": m.get("role", ""),
                         "fame": m.get("fame", ""),
-                        "new_team": m.get("new_team", ""),
                     }
                 )
             merged["favourite_map"] = _resolve_favourite_map(players_meta, key)

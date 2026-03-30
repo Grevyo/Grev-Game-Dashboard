@@ -264,7 +264,6 @@ def split_roster_active_benched_streamer_transferred(
     roster_names = set(merged.get("player", pd.Series(dtype=object)).dropna().astype(str).tolist())
     meta_players = _extract_metadata_players(players_meta)
     streamer_keys = _extract_metadata_streamer_keys(players_meta)
-    transferred_by_metadata = _extract_metadata_transfer_destinations(players_meta)
 
     usage = (
         full_medisports_matches[["player", "match_id"]].copy()
@@ -299,10 +298,6 @@ def split_roster_active_benched_streamer_transferred(
 
         player_key = _player_key(player)
         in_metadata = player_key in meta_by_key
-
-        if player_key in transferred_by_metadata:
-            classified[player] = "transferred"
-            continue
 
         # 2) Streamer: explicit role in players metadata.
         if player_key in streamer_keys:

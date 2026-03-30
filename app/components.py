@@ -209,9 +209,6 @@ def player_card(row: dict):
     safe_player_note = html.escape(str(_player_note(row) or ""))
     safe_best_map = html.escape(str(row.get("best_map", "N/A")))
     safe_favourite_map = html.escape(str(row.get("favourite_map", "N/A")))
-    transfer_destination = _clean_transfer_destination(row.get("new_team", row.get("New_team", "")))
-    transfer_line_html = f"<p class='identity-line transfer-line'>Transferred to: <strong>{html.escape(transfer_destination)}</strong></p>" if transfer_destination else ""
-    last_game_html = _last_game_html(row)
 
     if is_streamer_card:
         streamer_card_html = f"""
@@ -229,12 +226,10 @@ def player_card(row: dict):
                     </div>
                     <p class='identity-line'>{safe_identity_line}</p>
                     <p class='identity-line'>{safe_role_line}</p>
-                    {transfer_line_html}
                     {fame_html}
                     <div class='player-meta-row'><span class='muted'>Best map <strong>{safe_best_map}</strong> · Favourite map <strong>{safe_favourite_map}</strong></span></div>
                 </div>
             </div>
-            {last_game_html}
             <div class='player-card-bottom'><p class='player-card-note'>{safe_player_note}</p></div>
         </div>
         """
@@ -297,7 +292,6 @@ def player_card(row: dict):
             </div>
             <p class='identity-line'>{safe_identity_line}</p>
             <p class='identity-line'>{safe_role_line}</p>
-            {transfer_line_html}
             {fame_html}
             {context_html}
             {last_game_html}
