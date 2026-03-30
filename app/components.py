@@ -282,7 +282,7 @@ def player_card(row: dict):
     tier_html = (
         "<div class='grev-tier-strip'><div class='grev-tier-label'>GrevScore vs Tier Bands</div>"
         f"<div class='grev-tier-row'>{tier_boxes}</div>"
-        "<div class='muted grev-band-legend'>Super: 1.20+ • Good: 1.00–1.19 • Meh: 0.76–0.99 • Bad: ≤0.75</div></div>"
+        "</div>"
     )
     if not ach_html:
         ach_html = "<div class='achievement-empty'>No achievements recorded</div>"
