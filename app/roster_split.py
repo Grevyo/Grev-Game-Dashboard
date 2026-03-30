@@ -64,6 +64,56 @@ def _extract_metadata_streamer_keys(players_meta: pd.DataFrame) -> set[str]:
     return set(streamer_meta[key_col].map(_player_key).tolist())
 
 
+def _normalize_new_team_value(value) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return text
+
+
+def _is_dash_placeholder(value: str) -> bool:
+    compact = re.sub(r"\s+", "", str(value or ""))
+    if not compact:
+        return True
+    # Treat plain dash-like placeholders as "not transferred".
+    dash_chars = {"-", "–", "—", "−", "﹣", "－", "‑"}
+    return all(ch in dash_chars for ch in compact)
+
+
+def _extract_metadata_transfer_destinations(players_meta: pd.DataFrame) -> dict[str, str]:
+    """Return transfer destinations keyed by normalized player key.
+
+    Hard rule:
+    - any non-empty, non-dash value in `new_team` means transferred.
+    """
+    if players_meta.empty:
+        return {}
+    new_team_col = None
+    for candidate in ["new_team", "new team", "newteam", "New_team"]:
+        if candidate in players_meta.columns:
+            new_team_col = candidate
+            break
+    if new_team_col is None:
+        return {}
+
+    key_col = None
+    for candidate in ["player_clean", "player", "name"]:
+        if candidate in players_meta.columns:
+            key_col = candidate
+            break
+    if key_col is None:
+        return {}
+
+    meta = players_meta[[key_col, new_team_col]].copy()
+    meta[key_col] = meta[key_col].astype(str).str.strip()
+    meta["new_team_clean"] = meta[new_team_col].map(_normalize_new_team_value)
+    meta = meta[~meta["new_team_clean"].map(_is_dash_placeholder)]
+    if meta.empty:
+        return {}
+
+    return {_player_key(row[key_col]): row["new_team_clean"] for _, row in meta.iterrows()}
+
+
 def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
     if df.empty:
         return pd.Series(dtype=float)

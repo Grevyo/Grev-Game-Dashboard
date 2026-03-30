@@ -198,6 +198,7 @@ def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, fl
 def _render_roster_cards(
     summary: pd.DataFrame,
     df_context: pd.DataFrame,
+    last_game_context: pd.DataFrame,
     tactics_context: pd.DataFrame,
     players_meta: pd.DataFrame,
     player_match_counts: pd.DataFrame,
@@ -249,6 +250,7 @@ def _render_roster_cards(
             ) if card_variant != "streamer" else "N/A"
             merged["trend"] = _trend_for_player(df_context, str(row["player"])) if card_variant != "streamer" else ""
             merged["tier_grevscores"] = _tier_grevscores(df_context, str(row["player"])) if card_variant != "streamer" else {}
+            merged["last_game"] = build_last_game_summary(str(row["player"]), last_game_context, tactics_context)
             photo = resolve_player_photo(str(row["player"]))
             merged["photo_uri"] = image_data_uri(photo.get("path"))
             if transferred_logo_fallback:
@@ -447,7 +449,7 @@ def render(ctx):
         st.info("No players currently qualify for Active Roster in this filter context.")
     else:
         st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
-        _render_roster_cards(active_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
+        _render_roster_cards(active_summary, df, full_medisports_matches, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
     section_header("Benched / Academy", "Secondary squad view — lower-usage players in the current filtered context")
@@ -455,7 +457,7 @@ def render(ctx):
         st.info("No Benched / Academy players in this filtered context.")
     else:
         st.markdown("<div class='roster-section roster-section-academy'>", unsafe_allow_html=True)
-        _render_roster_cards(benched_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
+        _render_roster_cards(benched_summary, df, full_medisports_matches, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
     if all_streamer_names:
@@ -480,15 +482,16 @@ def render(ctx):
             st.info("No streamer-only profiles to show after excluding Active, Benched / Academy, and Transferred players.")
         else:
             st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
-            _render_roster_cards(streamer_cards, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
+            _render_roster_cards(streamer_cards, df, full_medisports_matches, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
             st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
-        section_header("Transferred", "Historical Medisports players absent for more than two seasons")
+        section_header("Transferred", "Players marked as transferred via players metadata")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
         _render_roster_cards(
             transferred_summary,
             df,
+            full_medisports_matches,
             ctx.get("tactics", pd.DataFrame()),
             players_meta,
             player_match_counts,

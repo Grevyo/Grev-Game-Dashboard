@@ -212,6 +212,38 @@ def inject_styles(theme_name: str = "Dark"):
     .fame-stars {{ font-size: 13px; letter-spacing: 0.08em; color: color-mix(in srgb, var(--mid) 70%, #fff 30%); }}
     .fame-value {{ color: var(--muted); font-size: 10px; }}
     .player-meta-row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }}
+    .transfer-line strong {{ color: color-mix(in srgb, var(--bad) 70%, #fff 30%); }}
+    .last-game-inline {{
+      margin-top: 2px;
+      display:flex;
+      flex-direction:column;
+      gap: 1px;
+    }}
+    .last-game-top {{
+      display:flex;
+      gap: 7px;
+      font-size: 10px;
+      color: var(--muted);
+      flex-wrap: wrap;
+      line-height: 1.2;
+    }}
+    .last-game-label {{
+      color: var(--text);
+      font-weight: 700;
+    }}
+    .last-game-sub {{
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    .last-game-fallback {{
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.2;
+    }}
     .achievement-strip {{
       display:flex;
       flex-direction: row;
