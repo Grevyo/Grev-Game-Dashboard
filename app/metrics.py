@@ -2,7 +2,7 @@ import pandas as pd
 
 DEFAULT_STAT_BANDS = (0.7, 1.0, 1.35)
 STAT_BANDS = {
-    "grevscore": (0.75, 1.0, 1.4),
+    "grevscore": (0.76, 1.0, 1.2),
     "rating": (0.85, 1.0, 1.2),
     "impact": (20.0, 26.0, 32.0),
     "form": (0.8, 1.0, 1.3),

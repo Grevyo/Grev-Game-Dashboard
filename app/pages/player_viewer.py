@@ -260,6 +260,7 @@ def render(ctx):
                   </div>
                 </div>
               </div>
+              <div class='muted'>Bands: Super 1.20+ • Good 1.00–1.19 • Meh 0.76–0.99 • Bad ≤0.75</div>
             </div>
           </div>
           <div class='player-viewer-top-metrics'>

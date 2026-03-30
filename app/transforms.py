@@ -2,29 +2,49 @@ import numpy as np
 import pandas as pd
 
 
-GREVSCORE_CAP = 2.5
+GREVSCORE_CAP = 2.2
 GREVSCORE_WEIGHTS = {
-    "kd": 0.24,
-    "kda": 0.22,
-    "kpd": 0.18,
-    "mvps": 0.14,
-    "accuracy_pct": 0.07,
-    "hs_pct": 0.05,
+    "kd": 0.26,
+    "kda": 0.24,
+    "kpd": 0.20,
+    "mvps": 0.12,
+    "accuracy_pct": 0.05,
+    "hs_pct": 0.03,
     "damage": 0.10,
+}
+GREVSCORE_REFERENCES = {
+    "kd": 1.00,
+    "kda": 1.25,
+    "kpd": 1.00,
+    "mvps": 2.00,
+    "accuracy_pct": 68.0,
+    "hs_pct": 40.0,
+    "damage": 3300.0,
+}
+GREVSCORE_FLOORS = {
+    "kd": 0.55,
+    "kda": 0.55,
+    "kpd": 0.55,
+    "mvps": 0.75,
+    "accuracy_pct": 0.90,
+    "hs_pct": 0.90,
+    "damage": 0.75,
 }
 
 
-def _metric_series(df: pd.DataFrame, column: str, fallback: str | None = None) -> pd.Series:
+def _metric_series(df: pd.DataFrame, column: str, fallbacks: tuple[str, ...] = ()) -> pd.Series:
     if column in df.columns:
         return pd.to_numeric(df[column], errors="coerce")
-    if fallback and fallback in df.columns:
-        return pd.to_numeric(df[fallback], errors="coerce")
-    return pd.Series(0.0, index=df.index, dtype=float)
+    for fallback in fallbacks:
+        if fallback in df.columns:
+            return pd.to_numeric(df[fallback], errors="coerce")
+    return pd.Series(np.nan, index=df.index, dtype=float)
 
 
-def _normalize_by_dataset_mean(series: pd.Series, cap: float = GREVSCORE_CAP) -> pd.Series:
-    baseline = max(float(series.mean(skipna=True) or 1.0), 0.01)
-    return np.clip(series.fillna(0.0) / baseline, 0.0, cap)
+def _normalize_to_reference(series: pd.Series, reference: float, floor: float, cap: float = GREVSCORE_CAP) -> pd.Series:
+    safe_reference = max(float(reference or 1.0), 0.01)
+    normalized = series.fillna(safe_reference) / safe_reference
+    return np.clip(normalized, floor, cap)
 
 
 def compute_grevscore(df: pd.DataFrame) -> pd.Series:
@@ -32,42 +52,38 @@ def compute_grevscore(df: pd.DataFrame) -> pd.Series:
     Source-of-truth GrevScore built ONLY from trusted stats.
 
     GrevScore =
-      0.24 * norm(kd)
-    + 0.22 * norm(kda)
-    + 0.18 * norm(kpd)
-    + 0.14 * norm(mvps)
-    + 0.07 * norm(accuracy_pct)
-    + 0.05 * norm(hs_pct)
+      0.26 * norm(kd)
+    + 0.24 * norm(kda)
+    + 0.20 * norm(kpd)
+    + 0.12 * norm(mvps)
+    + 0.05 * norm(accuracy_pct)
+    + 0.03 * norm(hs_pct)
     + 0.10 * norm(damage)
 
-    Normalization method (same for every metric):
-      norm(x) = clip(x / dataset_mean(x), 0.0, 2.5)
-    """
-    kd = _metric_series(df, "kd", fallback="kpd")
+    Normalization method:
+      norm(metric) = clip(metric / reference_metric, floor_metric, 2.2)
 
-    if "kda" in df.columns:
-        kda = _metric_series(df, "kda")
-    elif {"kills", "deaths", "assists"}.issubset(df.columns):
-        kills = _metric_series(df, "kills")
-        deaths = _metric_series(df, "deaths").replace(0, np.nan)
-        assists = _metric_series(df, "assists")
-        kda = (kills + assists) / deaths
-    else:
-        kda = kd.copy()
+    Missing trusted metrics are neutral (norm = 1.0) rather than punitive.
+    """
+    kd = _metric_series(df, "kd", fallbacks=("kpd",))
+    kda = _metric_series(df, "kda", fallbacks=("kd", "kpd"))
+    kpd = _metric_series(df, "kpd", fallbacks=("kd",))
+    mvps = _metric_series(df, "mvps")
+    accuracy_pct = _metric_series(df, "accuracy_pct")
+    hs_pct = _metric_series(df, "hs_pct")
+    damage = _metric_series(df, "damage")
 
     normalized = {
-        "kd": _normalize_by_dataset_mean(kd),
-        "kda": _normalize_by_dataset_mean(kda),
-        "kpd": _normalize_by_dataset_mean(_metric_series(df, "kpd", fallback="kd")),
-        "mvps": _normalize_by_dataset_mean(_metric_series(df, "mvps")),
-        "accuracy_pct": _normalize_by_dataset_mean(_metric_series(df, "accuracy_pct")),
-        "hs_pct": _normalize_by_dataset_mean(_metric_series(df, "hs_pct")),
-        "damage": _normalize_by_dataset_mean(_metric_series(df, "damage")),
+        "kd": _normalize_to_reference(kd, GREVSCORE_REFERENCES["kd"], GREVSCORE_FLOORS["kd"]),
+        "kda": _normalize_to_reference(kda, GREVSCORE_REFERENCES["kda"], GREVSCORE_FLOORS["kda"]),
+        "kpd": _normalize_to_reference(kpd, GREVSCORE_REFERENCES["kpd"], GREVSCORE_FLOORS["kpd"]),
+        "mvps": _normalize_to_reference(mvps, GREVSCORE_REFERENCES["mvps"], GREVSCORE_FLOORS["mvps"]),
+        "accuracy_pct": _normalize_to_reference(accuracy_pct, GREVSCORE_REFERENCES["accuracy_pct"], GREVSCORE_FLOORS["accuracy_pct"]),
+        "hs_pct": _normalize_to_reference(hs_pct, GREVSCORE_REFERENCES["hs_pct"], GREVSCORE_FLOORS["hs_pct"]),
+        "damage": _normalize_to_reference(damage, GREVSCORE_REFERENCES["damage"], GREVSCORE_FLOORS["damage"]),
     }
 
     score = sum(normalized[k] * w for k, w in GREVSCORE_WEIGHTS.items())
-    dataset_anchor = max(float(sum(normalized[k].mean(skipna=True) * w for k, w in GREVSCORE_WEIGHTS.items()) or 1.0), 0.01)
-    score = score / dataset_anchor
     return pd.Series(np.clip(score, 0.0, GREVSCORE_CAP), index=df.index)
 
 
