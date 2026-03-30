@@ -298,6 +298,23 @@ def render(ctx):
         + grp["latest_map"].fillna("n/a")
     )
 
+    top_filter_col, _ = st.columns([1, 3], gap="small")
+    with top_filter_col:
+        min_matches_played = st.number_input(
+            "Minimum Matches Played",
+            min_value=1,
+            max_value=max(1, int(grp["matches_played"].max())),
+            value=1,
+            step=1,
+            help="Show only opponents with at least this many full matches played.",
+        )
+
+    eligible_opponents = set(
+        grp.loc[grp["matches_played"] >= int(min_matches_played), "opponent_team"].tolist()
+    )
+    grp = grp[grp["opponent_team"].isin(eligible_opponents)].copy()
+    match_level = match_level[match_level["opponent_team"].isin(eligible_opponents)].copy()
+
     overall_matches = int(grp["matches_played"].sum())
     overall_wins = int(grp["wins"].sum())
     overall_losses = int(grp["losses"].sum())
@@ -364,8 +381,23 @@ def render(ctx):
         marker_line_width=1,
         hovertemplate="<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>",
     )
+    fig_wl = _apply_priority_chart_style(fig_wl, height=520)
+    fig_wl.update_layout(
+        margin=dict(t=96, b=92, l=56, r=180),
+        legend=dict(
+            title_text="Result",
+            orientation="v",
+            yanchor="top",
+            y=1.0,
+            xanchor="left",
+            x=1.02,
+            bgcolor="rgba(10,16,28,0.55)",
+            bordercolor="rgba(125,150,180,0.28)",
+            borderwidth=1,
+        ),
+    )
     _render_chart_panel(
-        _apply_priority_chart_style(fig_wl, height=520),
+        fig_wl,
         "",
         "",
     )
