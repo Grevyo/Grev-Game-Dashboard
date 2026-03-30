@@ -1,9 +1,6 @@
 import numpy as np
 import pandas as pd
 
-from app.data_loader import normalize_side_label
-from app.match_summaries import resolve_match_result
-
 
 def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
@@ -78,78 +75,3 @@ def best_contexts(df: pd.DataFrame, by: str) -> pd.DataFrame:
         .sort_values("grevscore", ascending=False)
         .reset_index()
     )
-
-
-def best_side_from_wins(
-    df_context: pd.DataFrame,
-    tactics_context: pd.DataFrame,
-    player_name: str,
-    default: str = "N/A",
-    tie_label: str = "Even",
-) -> str:
-    if df_context.empty or "player" not in df_context.columns:
-        return default
-
-    subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
-    if subset.empty:
-        return default
-
-    side_candidates = ["side", "team_side", "player_side", "starting_side"]
-    player_side_col = next((col for col in side_candidates if col in subset.columns), None)
-
-    side_lookup: dict[str, str] = {}
-    if player_side_col:
-        raw_sides = (
-            subset[["match_id", player_side_col]]
-            .dropna(subset=[player_side_col])
-            .assign(match_id=lambda d: d["match_id"].astype(str))
-        ) if "match_id" in subset.columns else pd.DataFrame(columns=["match_id", player_side_col])
-        if not raw_sides.empty:
-            for _, side_row in raw_sides.iterrows():
-                side_lookup[str(side_row["match_id"])] = str(side_row[player_side_col]).strip()
-    elif not tactics_context.empty and "match_id" in subset.columns and "match_id" in tactics_context.columns:
-        tactic_side_col = next((col for col in side_candidates if col in tactics_context.columns), None)
-        if tactic_side_col:
-            tactic_rows = (
-                tactics_context[["match_id", tactic_side_col]]
-                .dropna(subset=[tactic_side_col])
-                .assign(match_id=lambda d: d["match_id"].astype(str))
-            )
-            if not tactic_rows.empty:
-                side_lookup = {
-                    str(row["match_id"]): str(row[tactic_side_col]).strip()
-                    for _, row in tactic_rows.iterrows()
-                }
-
-    per_match = subset.copy()
-    sort_cols = [col for col in ["date", "time"] if col in per_match.columns]
-    if sort_cols:
-        per_match = per_match.sort_values(sort_cols)
-    if "match_id" in per_match.columns:
-        per_match = per_match.drop_duplicates("match_id", keep="last")
-
-    win_counts: dict[str, int] = {}
-    for _, row in per_match.iterrows():
-        result = resolve_match_result(row, tactics_context)
-        if result != "Win":
-            continue
-
-        side_raw = ""
-        if player_side_col:
-            side_raw = str(row.get(player_side_col, "") or "").strip()
-        if not side_raw and "match_id" in row.index:
-            side_raw = side_lookup.get(str(row.get("match_id", "") or "").strip(), "")
-
-        side = normalize_side_label(side_raw)
-        if not side:
-            continue
-        win_counts[side] = win_counts.get(side, 0) + 1
-
-    if not win_counts:
-        return default
-
-    ordered = sorted(win_counts.items(), key=lambda item: item[1], reverse=True)
-    top_side, top_wins = ordered[0]
-    if len(ordered) > 1 and ordered[1][1] == top_wins:
-        return tie_label
-    return top_side
