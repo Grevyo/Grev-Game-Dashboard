@@ -1,5 +1,6 @@
 import streamlit as st
 
+from app.config import FILES
 from app.data_loader import detect_our_team, load_data, validate_columns
 from app.filters import apply_filters, build_global_filters, filter_panel_toggle, filter_summary, global_filters_from_state
 from app.image_helpers import find_team_logo, image_data_uri
@@ -55,7 +56,17 @@ def _render_page_navigation() -> str:
 def run_app():
     st.set_page_config(page_title="Medisports Analytics", page_icon="🎮", layout="wide")
 
-    data = load_data()
+    with st.sidebar:
+        if st.button("Reload Data", use_container_width=True, help="Clear cached data and reload files from data/."):
+            st.cache_data.clear()
+            st.rerun()
+
+    try:
+        data = load_data()
+    except FileNotFoundError as exc:
+        st.error(f"Data loading failed.\n\n{exc}")
+        st.stop()
+
     p_df = with_player_metrics(data["player_matches"])
     t_df = data["tactics"]
     team_name = detect_our_team(p_df, t_df)
@@ -87,6 +98,25 @@ def run_app():
         "team_name": team_name,
         "filters": filters,
     }
+
+    max_match_date = "N/A"
+    if "date" in p_df.columns and not p_df.empty:
+        max_date = p_df["date"].max()
+        if hasattr(max_date, "strftime"):
+            max_match_date = max_date.strftime("%Y-%m-%d")
+        else:
+            max_match_date = str(max_date)
+
+    with st.expander("Data Load Debug (temporary)", expanded=False):
+        st.write("Active player data path:", str(FILES["player_matches"]))
+        st.write("Active tactics data path:", str(FILES["tactics"]))
+        st.write("Active achievements data path:", str(FILES["achievements"]))
+        st.write("Active players metadata path:", str(FILES["players"]))
+        st.write("Player matches rows:", len(data["player_matches"]))
+        st.write("Tactics rows:", len(data["tactics"]))
+        st.write("Achievements rows:", len(data["achievements"]))
+        st.write("Players metadata rows:", len(data["players"]))
+        st.write("Max player match date loaded:", max_match_date)
 
     filter_summary(filters)
     PAGES[page](filtered)
