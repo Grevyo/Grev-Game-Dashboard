@@ -9,10 +9,9 @@ except ModuleNotFoundError:
     go = None
     PLOTLY_AVAILABLE = False
 
-from app.components import section_header
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.metrics import confidence_from_sample
-from app.presentation_helpers import is_mobile_view
+from app.page_layout import is_mobile_view, section_header
 
 
 def render(ctx):

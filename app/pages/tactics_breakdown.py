@@ -10,10 +10,10 @@ except ModuleNotFoundError:
     go = None
     PLOTLY_AVAILABLE = False
 
-from app.components import insight_card, section_header
+from app.components import insight_card
 from app.filters import filter_panel_toggle
-from app.presentation_helpers import is_mobile_view
 from app.tactics import tactic_bucket, tactic_summary
+from app.page_layout import is_mobile_view, section_header
 
 def _format_last_used(value) -> str:
     if pd.isna(value):

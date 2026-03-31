@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-from app.components import insight_card, player_card, section_header, stat_card
+from app.components import insight_card, player_card, stat_card
 from app.achievements import achievements_for_player
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df, normalize_player_key, normalize_side_label
 from app.descriptions import player_description
@@ -11,6 +11,7 @@ from app.image_helpers import find_team_logo, image_data_uri, resolve_player_pho
 from app.metrics import stat_tone, trend_label
 from app.transforms import best_contexts, summarize_player
 from app.match_summaries import build_best_match_summary, build_last_match_summary
+from app.page_layout import section_header
 
 
 def _resolve_favourite_map(meta: pd.DataFrame, player_key: str, default: str = "N/A") -> str:

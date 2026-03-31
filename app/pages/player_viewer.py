@@ -10,13 +10,14 @@ except ModuleNotFoundError:
     px = None
     PLOTLY_AVAILABLE = False
 
-from app.components import render_achievement_mini_tile, section_header, stat_card
+from app.components import render_achievement_mini_tile, stat_card
 from app.achievements import achievements_for_player
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.filters import filter_panel_toggle
 from app.image_helpers import image_data_uri, find_team_logo, resolve_player_photo
 from app.match_summaries import build_best_n_matches, build_last_n_matches, resolve_match_result
-from app.presentation_helpers import is_mobile_view, nationality_label
+from app.presentation_helpers import nationality_label
+from app.page_layout import is_mobile_view, section_header
 
 
 def _player_key(name: str) -> str:

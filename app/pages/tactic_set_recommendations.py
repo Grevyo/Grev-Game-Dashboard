@@ -1,8 +1,9 @@
 import streamlit as st
 
-from app.components import insight_card, section_header, trend_chip
+from app.components import insight_card, trend_chip
 from app.filters import filter_panel_toggle
 from app.tactics import recommend_set, tactic_summary
+from app.page_layout import section_header
 
 
 def _confidence_label(score: float) -> str:
