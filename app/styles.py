@@ -207,14 +207,14 @@ def inject_styles(theme_name: str = "Dark"):
     .identity-line {{ margin:0; color:var(--muted); font-size:.66rem; letter-spacing:.06em; text-transform:uppercase; }}
     .player-card-note {{ margin:0; font-size:.74rem; line-height:1.4; color:#c3d2e2; }}
 
-    .achievement-strip {{ display:flex; flex-wrap:wrap; gap:8px; }}
+    .achievement-strip {{ display:flex; flex-wrap:wrap; gap:7px; }}
     .achievement-tile {{
-      position:relative; width:74px; height:82px; overflow:hidden;
+      position:relative; width:71px; height:79px; overflow:hidden;
       border:1px solid #465769; border-radius:5px;
       background:linear-gradient(180deg,#1a2432,#121a25);
       box-shadow: 0 10px 20px rgba(0,0,0,.3);
     }}
-    .achievement-tile-lg {{ width:84px; height:94px; }}
+    .achievement-tile-lg {{ width:81px; height:91px; }}
     .achievement-tier {{ font-size:.52rem; padding:1px 4px; border:1px solid currentColor; border-radius:3px; }}
     .achievement-season-top {{
       position:absolute; top:4px; left:4px; right:4px; padding:2px 5px;
@@ -282,15 +282,20 @@ def inject_styles(theme_name: str = "Dark"):
     .grev-tier-box {{
       border:1px solid #324354;
       border-radius:6px;
-      padding:6px;
+      padding:7px 6px;
+      min-height:66px;
       background:#121b28;
       display:flex;
       flex-direction:column;
-      gap:3px;
+      justify-content:center;
+      align-items:center;
+      text-align:center;
+      gap:2px;
+      line-height:1.15;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 7px 15px rgba(0,0,0,.24);
     }}
-    .tier-name {{ font-size:.58rem; text-transform:uppercase; letter-spacing:.12em; color:#d6e1ee; }}
-    .tier-score {{ font-size:1rem; font-weight:800; color:#f6fbff; }}
+    .tier-name {{ font-size:.58rem; text-transform:uppercase; letter-spacing:.12em; color:#d6e1ee; display:block; width:100%; }}
+    .tier-score {{ font-size:1rem; font-weight:800; color:#f6fbff; display:block; width:100%; }}
     .grev-tier-s {{
       border-color: color-mix(in srgb, #d4aa5f 78%, #3f4f62);
       background: linear-gradient(180deg, rgba(212,170,95,.22), rgba(20,27,37,.96));
