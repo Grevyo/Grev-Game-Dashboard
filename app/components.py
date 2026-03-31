@@ -143,10 +143,11 @@ def render_achievement_mini_tile(achievement: dict, size_variant: str = "overvie
 
 
 def _tier_box_html(tier: str, score: float | None) -> str:
+    tier_key = str(tier).strip().upper()
     display = f"{score:.2f}" if isinstance(score, (int, float)) else "n/a"
     return (
-        f"<div class='grev-tier-box grev-tier-{tier}'>"
-        f"<span class='tier-name'>vs {tier}</span>"
+        f"<div class='grev-tier-box grev-tier-{tier_key.lower()}'>"
+        f"<span class='tier-name'>vs {tier_key}</span>"
         f"<span class='tier-score'>{display}</span>"
         "</div>"
     )

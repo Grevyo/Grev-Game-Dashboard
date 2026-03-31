@@ -44,7 +44,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .block-container {{
       max-width: min(98vw, 1820px);
-      padding: 2rem .8rem 1.4rem;
+      padding: 4.1rem .8rem 1.4rem;
     }}
 
     h1,h2,h3,h4 {{ color:var(--text); letter-spacing:.01em; font-weight:760; }}
@@ -237,6 +237,8 @@ def inject_styles(theme_name: str = "Dark"):
     .overview-hero-row {{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }}
     .overview-hero-brand {{ display:flex; align-items:flex-start; gap:10px; }}
     .overview-hero-copy {{ display:flex; flex-direction:column; gap:7px; }}
+    .overview-command-shell {{ margin-top: 1.35rem; margin-bottom: .35rem; display:flex; flex-direction:column; gap:.55rem; }}
+    .overview-command-heading {{ margin:0 !important; }}
     .overview-hero-kicker {{ margin:0 !important; }}
     .overview-hero-title {{
       font-size:1.02rem;
@@ -246,6 +248,7 @@ def inject_styles(theme_name: str = "Dark"):
       margin:0;
     }}
     .overview-hero-meta, .overview-hero-stats {{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }}
+    .overview-hero-stats {{ margin-top: 2px; }}
 
     .player-viewer-head-main {{ display:flex; gap:10px; align-items:flex-start; }}
     .player-viewer-player-title {{
@@ -273,10 +276,41 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .grev-gauge-inner {{ width:120px; height:120px; border-radius:999px; background:#101925; border:1px solid #37485a; display:flex; align-items:center; justify-content:center; flex-direction:column; }}
 
-    .grev-tier-strip {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }}
-    .grev-tier-box {{ border:1px solid #324354; border-radius:6px; padding:6px; background:#121b28; display:flex; flex-direction:column; gap:3px; }}
-    .tier-name {{ font-size:.58rem; text-transform:uppercase; letter-spacing:.12em; color:#90a4bb; }}
-    .tier-score {{ font-size:1rem; font-weight:800; }}
+    .grev-tier-strip {{ display:flex; flex-direction:column; gap:7px; }}
+    .grev-tier-label {{ font-size:.58rem; text-transform:uppercase; letter-spacing:.13em; color:#8ea3ba; }}
+    .grev-tier-row {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }}
+    .grev-tier-box {{
+      border:1px solid #324354;
+      border-radius:6px;
+      padding:6px;
+      background:#121b28;
+      display:flex;
+      flex-direction:column;
+      gap:3px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 7px 15px rgba(0,0,0,.24);
+    }}
+    .tier-name {{ font-size:.58rem; text-transform:uppercase; letter-spacing:.12em; color:#d6e1ee; }}
+    .tier-score {{ font-size:1rem; font-weight:800; color:#f6fbff; }}
+    .grev-tier-s {{
+      border-color: color-mix(in srgb, #d4aa5f 78%, #3f4f62);
+      background: linear-gradient(180deg, rgba(212,170,95,.22), rgba(20,27,37,.96));
+      box-shadow: inset 0 1px 0 rgba(255,229,170,.2), 0 8px 16px rgba(212,170,95,.22);
+    }}
+    .grev-tier-a {{
+      border-color: color-mix(in srgb, #8f63ff 78%, #3f4f62);
+      background: linear-gradient(180deg, rgba(143,99,255,.22), rgba(20,27,37,.96));
+      box-shadow: inset 0 1px 0 rgba(219,199,255,.16), 0 8px 16px rgba(143,99,255,.2);
+    }}
+    .grev-tier-b {{
+      border-color: color-mix(in srgb, #3e8fff 78%, #3f4f62);
+      background: linear-gradient(180deg, rgba(62,143,255,.2), rgba(20,27,37,.96));
+      box-shadow: inset 0 1px 0 rgba(185,218,255,.15), 0 8px 16px rgba(62,143,255,.18);
+    }}
+    .grev-tier-c {{
+      border-color: color-mix(in srgb, #38b774 78%, #3f4f62);
+      background: linear-gradient(180deg, rgba(56,183,116,.22), rgba(20,27,37,.96));
+      box-shadow: inset 0 1px 0 rgba(197,248,221,.16), 0 8px 16px rgba(56,183,116,.18);
+    }}
 
     .breakdown-table {{ width:100%; border-collapse:collapse; font-size:.74rem; }}
     .breakdown-table th, .breakdown-table td {{ border-bottom:1px solid #273544; padding:8px 7px; text-align:left; }}
@@ -288,12 +322,12 @@ def inject_styles(theme_name: str = "Dark"):
       .subtle-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
     }}
     @media (max-width: 760px) {{
-      .block-container {{ padding:.55rem .5rem 1.05rem; }}
+      .block-container {{ padding:1.35rem .5rem 1.05rem; }}
       .app-topbar-title {{ font-size:.96rem; }}
       .hero-logo, .app-topbar .hero-logo {{ width:38px; height:38px; }}
       .overview-hero .hero-logo, .player-viewer-hero .hero-logo {{ width:34px; height:34px; }}
       .player-viewer-top-metrics, .stats-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
-      .grev-tier-strip {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
+      .grev-tier-row {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
     }}
     </style>
     """

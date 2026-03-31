@@ -8,7 +8,7 @@ from app.descriptions import player_description
 from app.roster_split import split_roster_active_benched_streamer_transferred
 from app.filters import get_current_season
 from app.image_helpers import find_team_logo, image_data_uri, resolve_player_photo, resolve_transferred_logo
-from app.metrics import trend_label
+from app.metrics import stat_tone, trend_label
 from app.transforms import best_contexts, summarize_player
 from app.match_summaries import build_best_match_summary, build_last_match_summary
 
@@ -396,6 +396,8 @@ def render(ctx):
     team_logo = image_data_uri(find_team_logo(team_name) or find_team_logo("Medisports"))
     team_logo_html = f"<img class='hero-logo' src='{team_logo}' alt='Medisports logo'/>" if team_logo else ""
 
+    st.markdown("<div class='overview-command-shell'>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title overview-command-heading'>Squad Command Hub</div>", unsafe_allow_html=True)
     st.markdown(
         f"""
         <div class='hero-band overview-hero'>
@@ -403,7 +405,6 @@ def render(ctx):
               <div class='overview-hero-brand'>
                 {team_logo_html}
                 <div class='overview-hero-copy'>
-                  <div class='section-title overview-hero-kicker'>Squad Command Hub</div>
                   <div class='overview-hero-title'>Live Medisports pulse across map, side, and form context.</div>
                   <div class='overview-hero-meta'>
                   <span class='chip'>Season: {', '.join(map(str, seasons[:2]))}{'…' if len(seasons) > 2 else ''}</span>
@@ -428,13 +429,14 @@ def render(ctx):
     squad_avg_rating = float(summary["rating"].mean()) if not summary.empty else 0.0
     squad_avg_impact = float(summary["impact"].mean()) if not summary.empty else 0.0
     with k1:
-        stat_card("Squad Avg GrevScore", f"{squad_avg_grev:.2f}", "Current output index")
+        stat_card("Squad Avg GrevScore", f"{squad_avg_grev:.2f}", "Current output index", quality_override=stat_tone("grevscore", squad_avg_grev))
     with k2:
-        stat_card("Squad Avg Rating", f"{squad_avg_rating:.2f}", "Form-normalized")
+        stat_card("Squad Avg Rating", f"{squad_avg_rating:.2f}", "Form-normalized", quality_override=stat_tone("rating", squad_avg_rating))
     with k3:
-        stat_card("Avg Impact", f"{squad_avg_impact:.1f}", "Kills + clutch value")
+        stat_card("Avg Impact", f"{squad_avg_impact:.1f}", "Kills + clutch value", quality_override=stat_tone("impact", squad_avg_impact))
     with k4:
         stat_card("Tracked Matches", int(df["match_id"].nunique()), "Selected context window")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     insight_pool = active_summary if not active_summary.empty else summary
     section_header("Team Pulse", "High-signal summary strip")
