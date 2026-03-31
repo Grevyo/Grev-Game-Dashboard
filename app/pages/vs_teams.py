@@ -331,21 +331,55 @@ def render(ctx):
 
     _frame(
         "Opponent Dot Graph (Restored)",
-        "Legacy scatter view for quick sample-vs-performance scanning across opponents.",
+        "Rounds played vs round win rate, with match sample size and round differential context.",
     )
+    label_candidates = (
+        scoped.assign(abs_round_diff=scoped["round_diff"].abs())
+        .sort_values(["matches_played", "abs_round_diff", "rounds"], ascending=[False, False, False])
+        .head(6)["opponent_team"]
+        .tolist()
+    )
+    dot_df = scoped.copy()
+    dot_df["point_label"] = np.where(dot_df["opponent_team"].isin(label_candidates), dot_df["opponent_team"], "")
     dot = px.scatter(
-        scoped,
-        x="matches_played",
-        y="win_rate_match",
-        size="rounds",
+        dot_df,
+        x="rounds",
+        y="win_rate_rounds",
+        size="matches_played",
         color="round_diff",
         hover_name="opponent_team",
+        text="point_label",
         color_continuous_scale=[[0, "#ff4d5e"], [0.48, "#4c5968"], [1, "#9FE870"]],
         labels={
+            "rounds": "Rounds Played",
+            "win_rate_rounds": "Round Win Rate (%)",
             "matches_played": "Matches Played",
-            "win_rate_match": "Match Win Rate (%)",
             "round_diff": "Round Diff",
         },
+        custom_data=[
+            "wins",
+            "losses",
+            "draws",
+            "round_wins",
+            "round_losses",
+            "win_rate_match",
+            "win_rate_rounds",
+        ],
+    )
+    dot.update_traces(
+        marker=dict(sizemin=9, sizemode="area", line=dict(width=1, color="rgba(242,246,255,0.2)")),
+        textposition="top center",
+        textfont=dict(size=10, color="#dce6f7"),
+        hovertemplate=(
+            "<b>%{hovertext}</b><br>"
+            "Matches Played: %{marker.size:.0f}<br>"
+            "Rounds Played: %{x:.0f}<br>"
+            "Match Win Rate: %{customdata[5]:.1f}%<br>"
+            "Round Win Rate: %{y:.1f}%<br>"
+            "Round Differential: %{marker.color:+.0f}<br>"
+            "W/L/D: %{customdata[0]:.0f} / %{customdata[1]:.0f} / %{customdata[2]:.0f}<br>"
+            "Round W-L: %{customdata[3]:.0f}-%{customdata[4]:.0f}<extra></extra>"
+        ),
     )
     dot.update_layout(
         template="plotly_dark",
@@ -356,7 +390,7 @@ def render(ctx):
         paper_bgcolor="rgba(0,0,0,0)",
     )
     dot.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
-    dot.update_xaxes(gridcolor="rgba(133,147,163,0.24)")
+    dot.update_xaxes(gridcolor="rgba(133,147,163,0.24)", title="Rounds Played")
     dot.add_hline(y=50, line_width=1, line_dash="dot", line_color="rgba(159,184,202,0.65)")
     st.plotly_chart(dot, use_container_width=True, config={"responsive": True, "displayModeBar": True})
     _frame_end()
