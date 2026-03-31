@@ -44,7 +44,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .block-container {{
       max-width: min(98vw, 1820px);
-      padding: .85rem .8rem 1.4rem;
+      padding: 2rem .8rem 1.4rem;
     }}
 
     h1,h2,h3,h4 {{ color:var(--text); letter-spacing:.01em; font-weight:760; }}
@@ -69,7 +69,7 @@ def inject_styles(theme_name: str = "Dark"):
         linear-gradient(92deg, rgba(12,20,30,.97) 0%, rgba(10,16,24,.96) 44%, rgba(15,24,34,.98) 100%);
       box-shadow: 0 24px 48px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
     }}
-    .app-topbar {{ padding: .7rem .9rem; }}
+    .app-topbar {{ padding: .9rem 1rem; margin-top: .45rem; }}
     .app-topbar-row {{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }}
     .app-topbar-brand {{ display:flex; align-items:center; gap:10px; min-width: 0; }}
     .app-topbar-copy {{ min-width: 0; }}
@@ -134,7 +134,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .overview-hero .hero-logo {{ width:46px; height:46px; }}
     .player-viewer-hero .hero-logo {{ width:42px; height:42px; }}
-    .app-topbar .hero-logo {{ width:48px; height:48px; }}
+    .app-topbar .hero-logo {{ width:54px; height:54px; }}
     .chip-good {{ border-color:color-mix(in srgb, var(--lime) 55%, #31404f); color:var(--lime); }}
     .chip-mid {{ border-color:color-mix(in srgb, var(--gold) 55%, #31404f); color:var(--gold); }}
     .chip-poor {{ border-color:color-mix(in srgb, var(--ember) 55%, #31404f); color:var(--ember); }}
@@ -191,6 +191,14 @@ def inject_styles(theme_name: str = "Dark"):
 
     .player-card {{ min-height: 680px; display:flex; flex-direction:column; gap:8px; }}
     .player-head {{ display:flex; gap:10px; }}
+    .player-head-title-row {{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }}
+    .team-mini-logo {{
+      width:30px;
+      height:30px;
+      object-fit:contain;
+      filter: drop-shadow(0 5px 8px rgba(0,0,0,.26));
+      opacity:.9;
+    }}
     .player-avatar-frame, .hero-player-photo-frame {{ border:1px solid #3b4d61; border-radius:6px; background:#101925; }}
     .player-avatar-frame {{ width:94px; height:118px; overflow:hidden; }}
     .hero-player-photo-frame {{ width:152px; height:190px; overflow:hidden; }}
