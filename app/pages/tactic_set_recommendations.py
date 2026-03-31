@@ -13,7 +13,7 @@ except ModuleNotFoundError:
     PLOTLY_AVAILABLE = False
 
 from app.page_layout import is_mobile_view
-from app.tactics import tactic_category
+from app.tactics import TIER_ORDER, attach_normalized_tier, tactic_category
 
 
 TIER_WEIGHTS = {"S": 1.35, "A": 1.15, "B": 1.0, "C": 0.72}
@@ -48,24 +48,6 @@ def _fmt_signed(value: float) -> str:
 
 def _fmt_tier_pct(value: float) -> str:
     return "N/A" if pd.isna(value) else _fmt_pct(value)
-
-
-def _safe_tier_col(df: pd.DataFrame) -> str | None:
-    preferred_cols = ["tier", "opponent_tier", "unnamed:_13", "unnamed: 13", "unnamed_13", "Unnamed: 13", ""]
-    normalized_map = {str(col).strip().lower(): col for col in df.columns}
-    for key in preferred_cols:
-        col = normalized_map.get(str(key).strip().lower())
-        if col is not None:
-            return col
-    return None
-
-
-def _normalize_tier_values(series: pd.Series) -> pd.Series:
-    cleaned = series.fillna("").astype(str).str.strip().str.upper()
-    extracted = cleaned.str.extract(r"\b([SABC])(?:-?TIER)?\b", expand=False)
-    fallback = cleaned.str.extract(r"([SABC])", expand=False)
-    normalized = extracted.fillna(fallback)
-    return normalized.where(normalized.isin(["S", "A", "B", "C"]), pd.NA)
 
 
 def _route_role(name: str) -> str:
@@ -161,12 +143,12 @@ def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     )
     tier["tier_wr"] = (tier["twins"] / (tier["twins"] + tier["tlosses"]).clip(lower=1) * 100).fillna(0)
     tier_pivot = tier.pivot_table(index=group_cols, columns="tier", values="tier_wr", aggfunc="mean").reset_index()
-    for t in ["S", "A", "B", "C"]:
+    for t in TIER_ORDER:
         if t not in tier_pivot.columns:
             tier_pivot[t] = np.nan
 
     tactical = tactical.merge(recent[group_cols + ["recent_wr"]], on=group_cols, how="left").merge(
-        tier_pivot[group_cols + ["S", "A", "B", "C"]], on=group_cols, how="left"
+        tier_pivot[group_cols + TIER_ORDER], on=group_cols, how="left"
     )
 
     weighted_num = sum(tactical[t].fillna(tactical["win_rate"]) * w for t, w in TIER_WEIGHTS.items())
@@ -317,11 +299,7 @@ def render(ctx):
     tdf["tactic_type"] = tdf["category"].replace({"Standard": "Standard", "Eco": "Eco", "Pistol": "Pistol"})
     tdf["role"] = tdf["tactic_name"].map(_route_role)
 
-    tier_col = _safe_tier_col(tdf)
-    if tier_col:
-        tdf["tier"] = _normalize_tier_values(tdf[tier_col]).fillna("C")
-    else:
-        tdf["tier"] = "C"
+    tdf = attach_normalized_tier(tdf, fallback="C")
 
     date_ser = tdf.get("date", pd.Series([None] * len(tdf)))
     time_ser = tdf.get("time", pd.Series([""] * len(tdf))).astype(str)

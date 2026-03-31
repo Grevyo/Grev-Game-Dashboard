@@ -314,7 +314,8 @@ def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) ->
     achievements = _derive_core(_read_flexible_csv(FILES["achievements"]))
     players = _derive_core(_read_players_csv_safe(FILES["players"]))
 
-    tactics = tactics.rename(columns={"": "tier"})
+    if "" in tactics.columns and "tier" not in tactics.columns:
+        tactics = tactics.rename(columns={"": "tier"})
     tactics = _safe_numeric(tactics, ["wins", "losses", "total_rounds", "win_rate_pct"])
     tactics = _dedupe_tactics_rows(tactics)
     player_matches = _safe_numeric(
