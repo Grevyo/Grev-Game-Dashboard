@@ -18,6 +18,15 @@ from app.tactics import TIER_ORDER, attach_normalized_tier, tactic_category
 
 
 TIER_WEIGHTS = {"S": 1.35, "A": 1.15, "B": 1.0, "C": 0.72}
+EXCLUDE_FOR_NOW_STATUS = "Exclude For Now"
+EXCLUDE_FOR_NOW_DISPLAY = "Try Build Replacement"
+
+
+def _display_status(status: str | None) -> str:
+    value = str(status or "")
+    return EXCLUDE_FOR_NOW_DISPLAY if value == EXCLUDE_FOR_NOW_STATUS else value
+
+
 STATUS_ORDER = [
     "Locked In",
     "Strong Pick",
@@ -25,7 +34,7 @@ STATUS_ORDER = [
     "Situational",
     "Test More",
     "Backup",
-    "Exclude For Now",
+    EXCLUDE_FOR_NOW_STATUS,
 ]
 STATUS_TONE = {
     "Locked In": "good",
@@ -34,10 +43,10 @@ STATUS_TONE = {
     "Situational": "mid",
     "Test More": "poor",
     "Backup": "poor",
-    "Exclude For Now": "bad",
+    EXCLUDE_FOR_NOW_STATUS: "bad",
 }
 STRONG_COVERAGE_STATUSES = {"Locked In", "Strong Pick"}
-WEAK_COVERAGE_STATUSES = {"Situational", "Risky", "Drop", "Backup", "Exclude For Now"}
+WEAK_COVERAGE_STATUSES = {"Situational", "Risky", "Drop", "Backup", EXCLUDE_FOR_NOW_STATUS}
 TIER_COLORS = {"S": "#d4b15d", "A": "#9b6ef3", "B": "#4d8dff", "C": "#59b67a"}
 REQUIRED_CORE_BUCKETS = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B"]
 MAP_OPTIONAL_BUCKETS = {
@@ -174,7 +183,7 @@ def _status_logic(row: pd.Series) -> tuple[str, str]:
         return "Situational", "Historically useful but short-term form has cooled; keep for specific scenarios only."
     if weak_tier_inflation > 4.5 and (np.isnan(s_wr) or s_wr < row["win_rate"] - 10):
         return "Backup", "Output is inflated by lower-tier opposition; keep as reserve until stronger-tier proof improves."
-    return "Exclude For Now", "Below baseline or unreliable evidence profile for this map+side; avoid in default call sheet."
+    return EXCLUDE_FOR_NOW_STATUS, "Below baseline or unreliable evidence profile for this map+side; avoid in default call sheet."
 
 
 def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -462,7 +471,7 @@ def render(ctx):
 
     active_pool = tactical[~tactical["tactic_name"].isin(excluded_tactics)].copy()
     manually_excluded = tactical[tactical["tactic_name"].isin(excluded_tactics)].copy()
-    model_excluded_mask = active_pool["status"].isin(["Backup", "Exclude For Now"])
+    model_excluded_mask = active_pool["status"].isin(["Backup", EXCLUDE_FOR_NOW_STATUS])
     model_excluded_names = set(active_pool.loc[model_excluded_mask, "tactic_name"].astype(str).tolist())
     effective_model_excluded = model_excluded_names - model_overrides
     recommendation_pool = active_pool[~active_pool["tactic_name"].isin(effective_model_excluded)].copy()
@@ -580,7 +589,7 @@ def render(ctx):
                 <div class='reco-tile'>
                   <h4 class='reco-name'>{row['tactic_name']}</h4>
                   <div class='reco-role'>{row['role']} • {row['tactic_type']}</div>
-                  <span class='status-pill {tone}'>{row['status']}</span>
+                  <span class='status-pill {tone}'>{_display_status(row['status'])}</span>
                   <div class='mini-grid'>
                     <div class='mini-cell'><div class='mini-l'>Win Rate</div><div class='mini-v'>{_fmt_pct(row['win_rate'])}</div></div>
                     <div class='mini-cell'><div class='mini-l'>Δ Baseline</div><div class='mini-v'>{_fmt_signed(row['delta_vs_baseline'])}</div></div>
@@ -625,7 +634,7 @@ def render(ctx):
             chosen = chosen_candidates.iloc[0]
             badge, chip_class = _coverage_state(str(chosen["status"]))
             fill = 100
-            detail = f"{chosen['tactic_name']} • {chosen['status']}"
+            detail = f"{chosen['tactic_name']} • {_display_status(chosen['status'])}"
             detail_kind = " weak" if badge == "Weak Coverage" else ""
         else:
             fill = 0
@@ -639,7 +648,7 @@ def render(ctx):
                 detail = "No tactic available for this required slot."
             else:
                 nearest = fallback_bucket.iloc[0]
-                detail = f"Closest available: {nearest['tactic_name']} • {nearest['status']}"
+                detail = f"Closest available: {nearest['tactic_name']} • {_display_status(nearest['status'])}"
             detail_kind = ""
         st.markdown(
             f"""
@@ -747,7 +756,7 @@ def render(ctx):
                     "Situational": "#c79555",
                     "Test More": "#ff9f43",
                     "Backup": "#ff7a4d",
-                    "Exclude For Now": "#ff4d5e",
+                    EXCLUDE_FOR_NOW_STATUS: "#ff4d5e",
                 },
             )
             scatter.update_layout(template="plotly_dark", margin=dict(l=8, r=8, t=10, b=8), height=360 if not mobile_view else 320)
@@ -799,6 +808,7 @@ def render(ctx):
         }
     )
     shortlist["Excluded?"] = "No"
+    shortlist["Recommendation Status"] = shortlist["Recommendation Status"].map(_display_status)
 
     st.markdown("<div class='panel'><div class='section-title'>Premium Recommendation Shortlist</div>", unsafe_allow_html=True)
     st.dataframe(
@@ -856,6 +866,7 @@ def render(ctx):
         )
         excluded_shortlist["Included?"] = "No"
         excluded_shortlist["Excluded?"] = "Yes"
+        excluded_shortlist["Recommendation Status"] = excluded_shortlist["Recommendation Status"].map(_display_status)
         st.markdown("<div class='panel'><div class='section-title'>Excluded Tactics</div>", unsafe_allow_html=True)
         st.dataframe(
             excluded_shortlist,
@@ -881,7 +892,7 @@ def render(ctx):
 
     f1, f2, f3 = st.columns(3, gap="small")
     with f1:
-        st.markdown(f"<div class='stat-item'><div class='label'>Recommendation Status</div><div class='metric-value' style='font-size:1.1rem'>{focus['status']}</div><div class='muted'>{focus['status_note']}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='stat-item'><div class='label'>Recommendation Status</div><div class='metric-value' style='font-size:1.1rem'>{_display_status(focus['status'])}</div><div class='muted'>{focus['status_note']}</div></div>", unsafe_allow_html=True)
     with f2:
         tier_note = (
             f"S-tier {_fmt_pct(focus['S']) if pd.notna(focus['S']) else 'N/A'}, "
