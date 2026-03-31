@@ -35,6 +35,7 @@ STATUS_TONE = {
     "Backup": "poor",
     "Exclude For Now": "bad",
 }
+TIER_COLORS = {"S": "#d4b15d", "A": "#9b6ef3", "B": "#4d8dff", "C": "#59b67a"}
 
 
 def _fmt_pct(value: float) -> str:
@@ -43,6 +44,10 @@ def _fmt_pct(value: float) -> str:
 
 def _fmt_signed(value: float) -> str:
     return f"{float(value):+.1f}pp"
+
+
+def _fmt_tier_pct(value: float) -> str:
+    return "N/A" if pd.isna(value) else _fmt_pct(value)
 
 
 def _safe_tier_col(df: pd.DataFrame) -> str | None:
@@ -275,6 +280,14 @@ def _inject_page_css() -> None:
         .decision-item{border:1px solid #2a3d50;background:#101c2a;border-radius:6px;padding:.44rem .48rem;margin-bottom:7px;}
         .decision-item strong{display:block;color:#e9f2ff;font-size:.76rem;}
         .decision-item span{font-size:.65rem;color:#95a9be;}
+        .vs-tier-wrap{margin-top:10px;}
+        .vs-tier-title{font-size:.56rem;letter-spacing:.11em;text-transform:uppercase;color:#9cb1c7;margin-bottom:5px;}
+        .vs-tier-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.35rem;}
+        .vs-tier-cell{border-radius:6px;padding:.34rem .2rem;text-align:center;border:1px solid rgba(255,255,255,0.18);}
+        .vs-tier-label{font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;}
+        .vs-tier-value{font-size:.72rem;font-weight:760;margin-top:1px;}
+        .tile-actions{margin-top:10px;display:flex;justify-content:flex-end;}
+        .excluded-note{margin-top:8px;font-size:.58rem;color:#f2b8bf;letter-spacing:.06em;text-transform:uppercase;}
         </style>
         """,
         unsafe_allow_html=True,
@@ -330,7 +343,27 @@ def render(ctx):
         return
 
     tactical = tactical.sort_values(["recommendation_score", "confidence", "rounds"], ascending=False).copy()
-    rec_set = _select_recommended_set(tactical, max_picks=7)
+
+    exclusion_key = f"tsr_excluded::{map_name}::{side}"
+    excluded_tactics = set(st.session_state.get(exclusion_key, []))
+    all_tactics = tactical["tactic_name"].dropna().astype(str).unique().tolist()
+    excluded_tactics = {name for name in excluded_tactics if name in all_tactics}
+
+    control_left, control_right = st.columns([1.5, 1], gap="small")
+    with control_left:
+        picked_exclusions = st.multiselect(
+            "Excluded tactics",
+            options=all_tactics,
+            default=sorted(excluded_tactics),
+            help="Excluded tactics are removed from active recommendation calculations for this map+side context.",
+        )
+    with control_right:
+        show_excluded = st.toggle("Show excluded tactics", value=False, help="Reveal manually excluded tactics in dedicated sections.")
+    excluded_tactics = set(picked_exclusions)
+    st.session_state[exclusion_key] = sorted(excluded_tactics)
+
+    active_pool = tactical[~tactical["tactic_name"].isin(excluded_tactics)].copy()
+    rec_set = _select_recommended_set(active_pool, max_picks=7)
 
     st.markdown(
         f"""
@@ -345,6 +378,7 @@ def render(ctx):
                 <span class='chip chip-mid'>{side}</span>
                 <span class='chip'>{int(scoped['total_rounds'].sum())} context rounds</span>
                 <span class='chip chip-poor'>{tactical['tactic_name'].nunique()} tactics in pool</span>
+                <span class='chip'>{len(excluded_tactics)} excluded</span>
             </div>
         </div>
         """,
@@ -376,11 +410,23 @@ def render(ctx):
         f"<div class='section-subtitle'>Primary answer for <strong>{map_name} • {side}</strong>. Selections are never transferred across other map-side contexts.</div>",
         unsafe_allow_html=True,
     )
+    if rec_set.empty:
+        st.info("No recommendations available after exclusions for this map+side. Re-include tactics to restore candidate coverage.")
     cols = st.columns(3 if not mobile_view else 1, gap="small")
     for i, (_, row) in enumerate(rec_set.iterrows()):
         tone = STATUS_TONE.get(str(row["status"]), "mid")
         col = cols[i % len(cols)]
         with col:
+            tier_cells_html = "".join(
+                [
+                    (
+                        f"<div class='vs-tier-cell' style='background:{TIER_COLORS[t]}1f;border-color:{TIER_COLORS[t]}66;'>"
+                        f"<div class='vs-tier-label' style='color:{TIER_COLORS[t]};'>{t}</div>"
+                        f"<div class='vs-tier-value'>{_fmt_tier_pct(row[t])}</div></div>"
+                    )
+                    for t in ["S", "A", "B", "C"]
+                ]
+            )
             st.markdown(
                 f"""
                 <div class='reco-tile'>
@@ -395,11 +441,19 @@ def render(ctx):
                     <div class='mini-cell'><div class='mini-l'>Confidence</div><div class='mini-v'>{int(row['confidence'])}</div></div>
                     <div class='mini-cell'><div class='mini-l'>Last Used</div><div class='mini-v'>{row['last_used_label']}</div></div>
                   </div>
+                  <div class='vs-tier-wrap'>
+                    <div class='vs-tier-title'>VS Tier %</div>
+                    <div class='vs-tier-grid'>{tier_cells_html}</div>
+                  </div>
                   <div class='muted' style='margin-top:8px;'>{row['status_note']}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
+            if st.button("Exclude", key=f"exclude_reco_{map_name}_{side}_{row['tactic_name']}", use_container_width=True):
+                excluded_tactics.add(str(row["tactic_name"]))
+                st.session_state[exclusion_key] = sorted(excluded_tactics)
+                st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
     coverage_roles = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B", "Mid Lane", "Ivy Lane"]
@@ -425,15 +479,18 @@ def render(ctx):
         )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    included = tactical[tactical["tactic_name"].isin(rec_set["tactic_name"])].copy()
-    borderline = tactical[tactical["status"].isin(["Viable", "Situational", "Test More"]) & ~tactical["tactic_name"].isin(rec_set["tactic_name"])].head(8)
-    excluded = tactical[tactical["status"].isin(["Backup", "Exclude For Now"])].head(8)
+    included = active_pool[active_pool["tactic_name"].isin(rec_set["tactic_name"])].copy()
+    borderline = active_pool[
+        active_pool["status"].isin(["Viable", "Situational", "Test More"]) & ~active_pool["tactic_name"].isin(rec_set["tactic_name"])
+    ].head(8)
+    excluded_by_model = active_pool[active_pool["status"].isin(["Backup", "Exclude For Now"])].head(8)
+    manually_excluded = tactical[tactical["tactic_name"].isin(excluded_tactics)].copy()
 
     d1, d2, d3 = st.columns(3, gap="small")
     for col, title, frame in [
         (d1, "Included in Recommended Set", included),
         (d2, "Borderline / Rotational", borderline),
-        (d3, "Excluded For Now", excluded),
+        (d3, "Excluded By Model", excluded_by_model),
     ]:
         with col:
             st.markdown(f"<div class='panel decision-col'><h4>{title}</h4>", unsafe_allow_html=True)
@@ -441,19 +498,51 @@ def render(ctx):
                 st.markdown("<div class='muted'>No tactics in this bucket for the active context.</div>", unsafe_allow_html=True)
             else:
                 for _, r in frame.iterrows():
+                    manual_note = "<div class='excluded-note'>Manually excluded</div>" if r["tactic_name"] in excluded_tactics else ""
                     st.markdown(
                         f"<div class='decision-item'><strong>{r['tactic_name']}</strong>"
-                        f"<span>{r['role']} • {_fmt_pct(r['win_rate'])} • {_fmt_signed(r['delta_vs_baseline'])} • conf {int(r['confidence'])}</span></div>",
+                        f"<span>{r['role']} • {_fmt_pct(r['win_rate'])} • {_fmt_signed(r['delta_vs_baseline'])} • conf {int(r['confidence'])}</span>"
+                        f"{manual_note}</div>",
                         unsafe_allow_html=True,
                     )
+                    if title != "Excluded By Model" and st.button(
+                        "Exclude tactic",
+                        key=f"exclude_bucket_{title}_{map_name}_{side}_{r['tactic_name']}",
+                        use_container_width=True,
+                    ):
+                        excluded_tactics.add(str(r["tactic_name"]))
+                        st.session_state[exclusion_key] = sorted(excluded_tactics)
+                        st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
+
+    if show_excluded:
+        st.markdown("<div class='panel decision-col'><h4>Manually Excluded (Hidden From Active Recommendations)</h4>", unsafe_allow_html=True)
+        if manually_excluded.empty:
+            st.markdown("<div class='muted'>No manually excluded tactics in this map+side context.</div>", unsafe_allow_html=True)
+        else:
+            for _, r in manually_excluded.sort_values("recommendation_score", ascending=False).iterrows():
+                st.markdown(
+                    f"<div class='decision-item'><strong>{r['tactic_name']}</strong>"
+                    f"<span>{r['role']} • {_fmt_pct(r['win_rate'])} • {_fmt_signed(r['delta_vs_baseline'])} • conf {int(r['confidence'])}</span>"
+                    f"<div class='excluded-note'>Excluded from candidate pool</div></div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    "Re-include tactic",
+                    key=f"reinclude_{map_name}_{side}_{r['tactic_name']}",
+                    use_container_width=True,
+                ):
+                    excluded_tactics.discard(str(r["tactic_name"]))
+                    st.session_state[exclusion_key] = sorted(excluded_tactics)
+                    st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if PLOTLY_AVAILABLE:
         v1, v2 = st.columns([1.1, 1], gap="small")
         with v1:
             st.markdown("<div class='analytics-frame'><div class='section-title'>Recommendation Score vs Confidence</div></div>", unsafe_allow_html=True)
             scatter = px.scatter(
-                tactical,
+                active_pool,
                 x="recommendation_score",
                 y="confidence",
                 size="rounds",
@@ -480,7 +569,7 @@ def render(ctx):
             role_bar.update_layout(template="plotly_dark", margin=dict(l=8, r=8, t=10, b=8), height=360 if not mobile_view else 320)
             st.plotly_chart(role_bar, use_container_width=True)
 
-    shortlist = tactical.copy()
+    shortlist = active_pool.copy()
     shortlist["Included?"] = shortlist["tactic_name"].isin(rec_set["tactic_name"]).map({True: "Yes", False: "No"})
     shortlist = shortlist[
         [
@@ -518,6 +607,7 @@ def render(ctx):
             "role": "Set Role",
         }
     )
+    shortlist["Excluded?"] = "No"
 
     st.markdown("<div class='panel'><div class='section-title'>Premium Recommendation Shortlist</div>", unsafe_allow_html=True)
     st.dataframe(
@@ -537,9 +627,66 @@ def render(ctx):
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
+    if show_excluded and not manually_excluded.empty:
+        excluded_shortlist = manually_excluded[
+            [
+                "tactic_name",
+                "tactic_type",
+                "map",
+                "side",
+                "rounds",
+                "win_rate",
+                "delta_vs_baseline",
+                "recent_wr",
+                "last_used_label",
+                "S",
+                "A",
+                "B",
+                "C",
+                "confidence",
+                "status",
+                "role",
+            ]
+        ].rename(
+            columns={
+                "tactic_name": "Tactic",
+                "tactic_type": "Type",
+                "map": "Map",
+                "side": "Side",
+                "rounds": "Rounds",
+                "win_rate": "Win Rate",
+                "delta_vs_baseline": "Delta vs Baseline",
+                "recent_wr": "Recent WR",
+                "last_used_label": "Last Used",
+                "confidence": "Confidence",
+                "status": "Recommendation Status",
+                "role": "Set Role",
+            }
+        )
+        excluded_shortlist["Included?"] = "No"
+        excluded_shortlist["Excluded?"] = "Yes"
+        st.markdown("<div class='panel'><div class='section-title'>Excluded Tactics</div>", unsafe_allow_html=True)
+        st.dataframe(
+            excluded_shortlist,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Win Rate": st.column_config.NumberColumn(format="%.1f%%"),
+                "Delta vs Baseline": st.column_config.NumberColumn(format="%+.1f pp"),
+                "Recent WR": st.column_config.NumberColumn(format="%.1f%%"),
+                "S": st.column_config.NumberColumn(format="%.1f%%"),
+                "A": st.column_config.NumberColumn(format="%.1f%%"),
+                "B": st.column_config.NumberColumn(format="%.1f%%"),
+                "C": st.column_config.NumberColumn(format="%.1f%%"),
+                "Confidence": st.column_config.NumberColumn(format="%d"),
+            },
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
     st.markdown("<div class='panel'><div class='section-title'>Deep-Dive Decision Analysis</div>", unsafe_allow_html=True)
-    focus_name = st.selectbox("Inspect tactic", options=tactical["tactic_name"].tolist(), index=0)
-    focus = tactical[tactical["tactic_name"] == focus_name].iloc[0]
+    focus_source = active_pool if not active_pool.empty else tactical
+    focus_name = st.selectbox("Inspect tactic", options=focus_source["tactic_name"].tolist(), index=0)
+    focus = focus_source[focus_source["tactic_name"] == focus_name].iloc[0]
 
     f1, f2, f3 = st.columns(3, gap="small")
     with f1:
