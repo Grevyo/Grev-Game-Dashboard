@@ -36,6 +36,8 @@ STATUS_TONE = {
     "Backup": "poor",
     "Exclude For Now": "bad",
 }
+STRONG_COVERAGE_STATUSES = {"Locked In", "Strong Pick"}
+WEAK_COVERAGE_STATUSES = {"Situational", "Risky", "Drop", "Backup", "Exclude For Now"}
 TIER_COLORS = {"S": "#d4b15d", "A": "#9b6ef3", "B": "#4d8dff", "C": "#59b67a"}
 REQUIRED_CORE_BUCKETS = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B"]
 MAP_OPTIONAL_BUCKETS = {
@@ -250,30 +252,46 @@ def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return tactical, baseline
 
 
-def _select_recommended_set(pool: pd.DataFrame, map_name: str, max_picks: int = 7) -> pd.DataFrame:
-    if pool.empty:
+def _select_recommended_set(
+    pool: pd.DataFrame,
+    map_name: str,
+    max_picks: int = 7,
+    required_fallback_pool: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    if pool.empty and (required_fallback_pool is None or required_fallback_pool.empty):
         return pool
 
     candidates = pool.sort_values(["recommendation_score", "confidence", "rounds"], ascending=False).copy()
+    fallback = (
+        required_fallback_pool.sort_values(["recommendation_score", "confidence", "rounds"], ascending=False).copy()
+        if required_fallback_pool is not None
+        else candidates.copy()
+    )
+    source = pd.concat([candidates, fallback], ignore_index=True).drop_duplicates(subset=["tactic_name"], keep="first")
+
     map_optional = MAP_OPTIONAL_BUCKETS.get(_canonical_map_name(map_name), [])
-    selected_idx = []
+    selected_names: list[str] = []
     core_counts: dict[str, int] = {}
     covered_optional: set[str] = set()
 
     for role in REQUIRED_CORE_BUCKETS:
         role_rows = candidates[candidates["core_bucket"] == role]
         if role_rows.empty:
+            role_rows = fallback[fallback["core_bucket"] == role]
+        if role_rows.empty:
             continue
-        idx = int(role_rows.index[0])
-        if idx not in selected_idx:
-            selected_idx.append(idx)
+        chosen = role_rows.iloc[0]
+        chosen_name = str(chosen["tactic_name"])
+        if chosen_name not in selected_names:
+            selected_names.append(chosen_name)
             core_counts[role] = core_counts.get(role, 0) + 1
-            covered_optional.update(candidates.at[idx, "optional_buckets"])
+            covered_optional.update(chosen["optional_buckets"] if isinstance(chosen["optional_buckets"], list) else [])
 
     for idx, row in candidates.iterrows():
-        if len(selected_idx) >= max_picks:
+        if len(selected_names) >= max_picks:
             break
-        if int(idx) in selected_idx:
+        row_name = str(row["tactic_name"])
+        if row_name in selected_names:
             continue
         missing_required = [r for r in REQUIRED_CORE_BUCKETS if core_counts.get(r, 0) == 0]
         row_core = str(row["core_bucket"])
@@ -288,29 +306,42 @@ def _select_recommended_set(pool: pd.DataFrame, map_name: str, max_picks: int = 
         adjusted_score -= role_penalty
         candidates.at[idx, "_adjusted_score"] = adjusted_score
 
-    if "_adjusted_score" in candidates.columns:
-        ordered = candidates.sort_values(
-            ["_adjusted_score", "confidence", "rounds"],
-            ascending=False,
-        )
-    else:
-        ordered = candidates
+    ordered = (
+        candidates.sort_values(["_adjusted_score", "confidence", "rounds"], ascending=False)
+        if "_adjusted_score" in candidates.columns
+        else candidates
+    )
 
-    for idx, row in ordered.iterrows():
-        if len(selected_idx) >= max_picks:
+    for _, row in ordered.iterrows():
+        if len(selected_names) >= max_picks:
             break
-        if int(idx) in selected_idx:
+        row_name = str(row["tactic_name"])
+        if row_name in selected_names:
             continue
         missing_required = [r for r in REQUIRED_CORE_BUCKETS if core_counts.get(r, 0) == 0]
         row_core = str(row["core_bucket"])
         if missing_required and row_core not in missing_required and core_counts.get(row_core, 0) >= 2:
             continue
-        selected_idx.append(int(idx))
+        selected_names.append(row_name)
         core_counts[row_core] = core_counts.get(row_core, 0) + 1
-        covered_optional.update(row["optional_buckets"])
+        covered_optional.update(row["optional_buckets"] if isinstance(row["optional_buckets"], list) else [])
 
-    out = candidates.loc[selected_idx].copy()
-    return out.sort_values(["core_bucket", "role"], key=lambda s: s.map(_role_priority))
+    if not selected_names:
+        return candidates.head(0)
+    out = source[source["tactic_name"].astype(str).isin(selected_names)].copy()
+    out["__pick_order"] = out["tactic_name"].astype(str).map({name: i for i, name in enumerate(selected_names)})
+    return out.sort_values(["__pick_order", "core_bucket", "role"], key=lambda s: s.map(_role_priority) if s.name != "__pick_order" else s).drop(
+        columns="__pick_order"
+    )
+
+
+def _coverage_state(status: str | None) -> tuple[str, str]:
+    norm = str(status or "").strip()
+    if norm in STRONG_COVERAGE_STATUSES:
+        return "Strongly Covered", "chip-good"
+    if norm in WEAK_COVERAGE_STATUSES:
+        return "Weak Coverage", "coverage-chip-weak"
+    return "Covered", "chip-mid"
 
 
 def _inject_page_css() -> None:
@@ -356,6 +387,9 @@ def _inject_page_css() -> None:
         .shortlist-bucket{border:1px solid #4b3440;background:linear-gradient(180deg,#211821,#16101a);border-radius:8px;padding:.58rem .62rem;margin-top:.55rem;}
         .shortlist-head{display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;}
         .shortlist-title{margin:0;font-size:.75rem;letter-spacing:.11em;text-transform:uppercase;color:#f0cad2;}
+        .coverage-chip-weak{background:#3a2615 !important;border-color:#915c28 !important;color:#ffbe72 !important;}
+        .coverage-detail{margin:-4px 0 8px 0;padding:6px 8px;border-radius:6px;border:1px solid #27394d;background:#111c29;font-size:.67rem;color:#c5d3e2;}
+        .coverage-detail.weak{border-color:#7a4f2b;background:#1d1611;color:#ffca86;}
         </style>
         """,
         unsafe_allow_html=True,
@@ -432,7 +466,12 @@ def render(ctx):
     model_excluded_names = set(active_pool.loc[model_excluded_mask, "tactic_name"].astype(str).tolist())
     effective_model_excluded = model_excluded_names - model_overrides
     recommendation_pool = active_pool[~active_pool["tactic_name"].isin(effective_model_excluded)].copy()
-    rec_set = _select_recommended_set(recommendation_pool, map_name=map_name, max_picks=7)
+    rec_set = _select_recommended_set(
+        recommendation_pool,
+        map_name=map_name,
+        max_picks=7,
+        required_fallback_pool=active_pool,
+    )
 
     st.markdown(
         f"""
@@ -578,25 +617,30 @@ def render(ctx):
     st.markdown("<div class='section-subtitle'>Required core coverage is prioritized first. Optional map coverage is used to improve tactical completeness within the 7-call cap.</div>", unsafe_allow_html=True)
     st.markdown("<div class='brief-label' style='margin-top:10px;'>Required Core Coverage</div>", unsafe_allow_html=True)
     for bucket in REQUIRED_CORE_BUCKETS:
-        count = int(core_counts.get(bucket, 0))
-        fill = min(100, count * 100)
-        if count > 0:
-            badge = "Covered"
-            chip_class = "chip-good"
-            detail = ""
+        chosen_candidates = rec_set[rec_set["core_bucket"] == bucket].sort_values(
+            ["recommendation_score", "confidence", "rounds"],
+            ascending=False,
+        )
+        if not chosen_candidates.empty:
+            chosen = chosen_candidates.iloc[0]
+            badge, chip_class = _coverage_state(str(chosen["status"]))
+            fill = 100
+            detail = f"{chosen['tactic_name']} • {chosen['status']}"
+            detail_kind = " weak" if badge == "Weak Coverage" else ""
         else:
-            candidates_for_bucket = recommendation_pool[
-                recommendation_pool["core_bucket"] == bucket
-            ].sort_values(["recommendation_score", "confidence"], ascending=False)
-            if candidates_for_bucket.empty:
-                badge = "Missing"
-                chip_class = "chip-bad"
-                detail = "No viable candidate currently available."
+            fill = 0
+            badge = "Missing"
+            chip_class = "chip-bad"
+            fallback_bucket = active_pool[active_pool["core_bucket"] == bucket].sort_values(
+                ["recommendation_score", "confidence", "rounds"],
+                ascending=False,
+            )
+            if fallback_bucket.empty:
+                detail = "No tactic available for this required slot."
             else:
-                nearest = candidates_for_bucket.iloc[0]
-                badge = "Weak / Borderline"
-                chip_class = "chip-mid"
-                detail = f"Nearest fit: {nearest['tactic_name']} ({nearest['status']})."
+                nearest = fallback_bucket.iloc[0]
+                detail = f"Closest available: {nearest['tactic_name']} • {nearest['status']}"
+            detail_kind = ""
         st.markdown(
             f"""
             <div class='coverage-row'>
@@ -604,12 +648,12 @@ def render(ctx):
               <div class='coverage-track'><div class='coverage-fill' style='width:{fill}%;'></div></div>
               <div><span class='chip {chip_class}'>{badge}</span></div>
             </div>
-            {f"<div class='muted' style='margin:-4px 0 8px 0;'>{detail}</div>" if detail else ""}
+            {f"<div class='coverage-detail{detail_kind}'>{detail}</div>" if detail else ""}
             """,
             unsafe_allow_html=True,
         )
 
-    st.markdown("<div class='brief-label' style='margin-top:12px;'>Map-Specific Optional Coverage</div>", unsafe_allow_html=True)
+    st.markdown("<div class='brief-label' style='margin-top:12px;'>Optional Lane Coverage</div>", unsafe_allow_html=True)
     if not map_optional_buckets:
         st.markdown("<div class='muted'>No optional coverage buckets configured for this map.</div>", unsafe_allow_html=True)
     else:
