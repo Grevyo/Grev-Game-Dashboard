@@ -256,17 +256,26 @@ def render(ctx):
     grp_all, _, _ = _build_views(base)
 
     st.markdown("<div class='panel teams-command-zone'>", unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns([1.15, 1.25, 1.2, 1.15], gap="small")
+    c1, c2, c3, c4, c5 = st.columns([1.0, 1.0, 1.2, 1.05, 1.15], gap="small")
     with c1:
         min_matches = st.slider(
             "Minimum Matches",
             min_value=1,
             max_value=max(1, int(grp_all["matches_played"].max())),
-            value=1,
+            value=2,
             step=1,
             help="Filter out low-sample opponents.",
         )
     with c2:
+        min_rounds = st.slider(
+            "Minimum Rounds",
+            min_value=1,
+            max_value=max(1, int(grp_all["rounds"].max())),
+            value=min(max(8, int(np.nanpercentile(grp_all["rounds"], 25))), max(1, int(grp_all["rounds"].max()))),
+            step=1,
+            help="Require enough rounds so focus-window rankings remain meaningful.",
+        )
+    with c3:
         map_options = sorted(base["map"].dropna().unique().tolist())
         selected_maps = st.multiselect(
             "Map Context",
@@ -274,9 +283,9 @@ def render(ctx):
             default=map_options,
             help="Limit analysis to selected maps.",
         )
-    with c3:
-        focus_top_n = st.select_slider("Focus Window", options=[8, 10, 12, 16, 20, 30], value=12)
     with c4:
+        focus_top_n = st.select_slider("Focus Window", options=[8, 10, 12, 16, 20, 30], value=12)
+    with c5:
         primary_sort = st.selectbox(
             "Primary Sort",
             options=["Win Rate", "Round Differential", "Sample Size", "Volatility", "Danger Index"],
@@ -288,7 +297,6 @@ def render(ctx):
         base = base[base["map"].isin(selected_maps)].copy()
 
     grp, match_level, map_team = _build_views(base)
-    grp = grp[grp["matches_played"] >= int(min_matches)].copy()
     if grp.empty:
         st.warning("No opponents meet the current filter thresholds.")
         return
@@ -300,7 +308,22 @@ def render(ctx):
         "Volatility": ["volatility", "matches_played"],
         "Danger Index": ["danger_index", "matches_played"],
     }
-    scoped = grp.sort_values(sort_map[primary_sort], ascending=False).copy()
+    dynamic_match_gate = max(2, int(np.ceil(np.nanpercentile(grp["matches_played"], 35)))) if not grp.empty else 2
+    dynamic_round_gate = max(8, int(np.ceil(np.nanpercentile(grp["rounds"], 35)))) if not grp.empty else 8
+    effective_min_matches = max(int(min_matches), dynamic_match_gate)
+    effective_min_rounds = max(int(min_rounds), dynamic_round_gate)
+
+    sample_valid_mask = (grp["matches_played"] >= effective_min_matches) & (grp["rounds"] >= effective_min_rounds)
+    scoped = grp.loc[sample_valid_mask].sort_values(sort_map[primary_sort], ascending=False).copy()
+    low_sample = grp.loc[~sample_valid_mask].sort_values(["matches_played", "rounds", "win_rate_match"], ascending=[False, False, False]).copy()
+
+    if scoped.empty:
+        st.warning(
+            "No opponents meet the current quality gate for this focus window. "
+            "Lower Minimum Matches/Rounds to include more teams."
+        )
+        return
+
     top = scoped.head(int(focus_top_n)).copy()
 
     best_wr = scoped.sort_values(["win_rate_match", "matches_played"], ascending=[False, False]).head(1).iloc[0]
@@ -327,7 +350,7 @@ def render(ctx):
     with k7:
         _kpi_card("Highest Sample", f"{int(high_sample['rounds'])} rds", str(high_sample["opponent_team"]), "mid")
     with k8:
-        _kpi_card("Opponents Faced", f"{int(scoped['opponent_team'].nunique())}", "After filters", "mid")
+        _kpi_card("Opponents Faced", f"{int(scoped['opponent_team'].nunique())}", f"+ {int(low_sample['opponent_team'].nunique())} low sample", "mid")
 
     _frame(
         "Opponent Dot Graph (Restored)",
@@ -409,20 +432,72 @@ def render(ctx):
 
     left, right = st.columns([1.15, 1], gap="small")
     with left:
-        _frame("Win Rate by Opponent", f"Top {len(top)} opponents by {primary_sort.lower()}.")
+        _frame(
+            "Win Rate by Opponent",
+            (
+                f"Top {len(top)} quality-sample opponents by {primary_sort.lower()} "
+                f"(gate: ≥{effective_min_matches} matches and ≥{effective_min_rounds} rounds)."
+            ),
+        )
+        ranked_for_wr = scoped.sort_values(sort_map[primary_sort], ascending=False).head(int(focus_top_n)).copy()
+        wr_plot = ranked_for_wr.sort_values(sort_map[primary_sort], ascending=True).copy()
+        wr_plot["sample_label"] = wr_plot.apply(lambda r: f"{int(r['matches_played'])}m / {int(r['rounds'])}r", axis=1)
         wr_fig = px.bar(
-            top.sort_values("win_rate_match", ascending=True),
+            wr_plot,
             x="win_rate_match",
             y="opponent_team",
             orientation="h",
             color="win_rate_match",
-            text=top.sort_values("win_rate_match", ascending=True)["matches_played"].map(lambda x: f"{int(x)} m"),
+            text="sample_label",
             color_continuous_scale=["#ff4d5e", "#d3a85c", "#9FE870"],
+            custom_data=["matches_played", "rounds", "round_diff"],
+        )
+        wr_fig.update_traces(
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "Match Win Rate: %{x:.1f}%<br>"
+                "Matches: %{customdata[0]:.0f}<br>"
+                "Rounds: %{customdata[1]:.0f}<br>"
+                "Round Diff: %{customdata[2]:+.0f}<extra></extra>"
+            )
         )
         wr_fig.update_layout(template="plotly_dark", height=560 if not mobile_view else 440, margin=dict(l=12, r=12, t=8, b=32), coloraxis_showscale=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
         wr_fig.update_xaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
         wr_fig.update_yaxes(automargin=True)
         st.plotly_chart(wr_fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        if not low_sample.empty:
+            low_sample_preview = low_sample.head(min(10, len(low_sample))).copy()
+            low_sample_preview["label"] = low_sample_preview.apply(lambda r: f"{int(r['matches_played'])}m / {int(r['rounds'])}r", axis=1)
+            st.markdown("<div class='section-subtitle' style='margin-top:.35rem;'>Small sample opponents (excluded from main ranking)</div>", unsafe_allow_html=True)
+            low_fig = px.bar(
+                low_sample_preview.sort_values(["matches_played", "rounds", "win_rate_match"], ascending=True),
+                x="matches_played",
+                y="opponent_team",
+                orientation="h",
+                color="win_rate_match",
+                text="label",
+                color_continuous_scale=["#4c5968", "#9fb4ca", "#dce6f7"],
+                custom_data=["win_rate_match", "rounds"],
+            )
+            low_fig.update_traces(
+                hovertemplate=(
+                    "<b>%{y}</b><br>"
+                    "Matches: %{x:.0f}<br>"
+                    "Rounds: %{customdata[1]:.0f}<br>"
+                    "Win Rate: %{customdata[0]:.1f}%<extra></extra>"
+                )
+            )
+            low_fig.update_layout(
+                template="plotly_dark",
+                height=260 if not mobile_view else 220,
+                margin=dict(l=12, r=12, t=8, b=12),
+                coloraxis_showscale=False,
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                xaxis_title="Matches",
+            )
+            low_fig.update_yaxes(automargin=True)
+            st.plotly_chart(low_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
         _frame_end()
     with right:
         _frame("Ranked Opponent Analysis", "One row per opponent. Sort by outcome quality, sample depth, or name.")
