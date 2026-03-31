@@ -288,6 +288,9 @@ def _inject_page_css() -> None:
         .vs-tier-value{font-size:.72rem;font-weight:760;margin-top:1px;}
         .tile-actions{margin-top:10px;display:flex;justify-content:flex-end;}
         .excluded-note{margin-top:8px;font-size:.58rem;color:#f2b8bf;letter-spacing:.06em;text-transform:uppercase;}
+        .shortlist-bucket{border:1px solid #4b3440;background:linear-gradient(180deg,#211821,#16101a);border-radius:8px;padding:.58rem .62rem;margin-top:.55rem;}
+        .shortlist-head{display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;}
+        .shortlist-title{margin:0;font-size:.75rem;letter-spacing:.11em;text-transform:uppercase;color:#f0cad2;}
         </style>
         """,
         unsafe_allow_html=True,
@@ -349,17 +352,11 @@ def render(ctx):
     all_tactics = tactical["tactic_name"].dropna().astype(str).unique().tolist()
     excluded_tactics = {name for name in excluded_tactics if name in all_tactics}
 
-    control_left, control_right = st.columns([1.5, 1], gap="small")
-    with control_left:
-        picked_exclusions = st.multiselect(
-            "Excluded tactics",
-            options=all_tactics,
-            default=sorted(excluded_tactics),
-            help="Excluded tactics are removed from active recommendation calculations for this map+side context.",
-        )
-    with control_right:
-        show_excluded = st.toggle("Show excluded tactics", value=False, help="Reveal manually excluded tactics in dedicated sections.")
-    excluded_tactics = set(picked_exclusions)
+    show_excluded = st.toggle(
+        "Show excluded tactics bucket",
+        value=bool(excluded_tactics),
+        help="Show a dedicated shortlist-management bucket where excluded tactics can be re-included.",
+    )
     st.session_state[exclusion_key] = sorted(excluded_tactics)
 
     active_pool = tactical[~tactical["tactic_name"].isin(excluded_tactics)].copy()
@@ -379,11 +376,47 @@ def render(ctx):
                 <span class='chip'>{int(scoped['total_rounds'].sum())} context rounds</span>
                 <span class='chip chip-poor'>{tactical['tactic_name'].nunique()} tactics in pool</span>
                 <span class='chip'>{len(excluded_tactics)} excluded</span>
+                <span class='chip chip-good'>{len(active_pool)} active</span>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    if show_excluded:
+        st.markdown("<div class='shortlist-bucket'>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='shortlist-head'><h4 class='shortlist-title'>Excluded Tactics Bucket</h4><span class='chip chip-bad'>{len(excluded_tactics)} excluded</span></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div class='muted'>Managed shortlist bucket. Re-include any tactic to return it to the active recommendation pool and recalculate all set logic.</div>",
+            unsafe_allow_html=True,
+        )
+        if not excluded_tactics:
+            st.markdown("<div class='muted' style='margin-top:8px;'>No tactics are manually excluded in this map+side context.</div>", unsafe_allow_html=True)
+        else:
+            for _, r in tactical[tactical["tactic_name"].isin(excluded_tactics)].sort_values(
+                "recommendation_score", ascending=False
+            ).iterrows():
+                c1, c2 = st.columns([4, 1], gap="small")
+                with c1:
+                    st.markdown(
+                        f"<div class='decision-item'><strong>{r['tactic_name']}</strong>"
+                        f"<span>{r['role']} • {_fmt_pct(r['win_rate'])} • {_fmt_signed(r['delta_vs_baseline'])} • conf {int(r['confidence'])}</span>"
+                        f"<div class='excluded-note'>Excluded from candidate pool</div></div>",
+                        unsafe_allow_html=True,
+                    )
+                with c2:
+                    if st.button(
+                        "Re-include",
+                        key=f"reinclude_bucket_{map_name}_{side}_{r['tactic_name']}",
+                        use_container_width=True,
+                    ):
+                        excluded_tactics.discard(str(r["tactic_name"]))
+                        st.session_state[exclusion_key] = sorted(excluded_tactics)
+                        st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     global_filters = ctx.get("filters", {})
     comp = global_filters.get("competition") or ["All Competitions"]
@@ -514,28 +547,6 @@ def render(ctx):
                         st.session_state[exclusion_key] = sorted(excluded_tactics)
                         st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
-
-    if show_excluded:
-        st.markdown("<div class='panel decision-col'><h4>Manually Excluded (Hidden From Active Recommendations)</h4>", unsafe_allow_html=True)
-        if manually_excluded.empty:
-            st.markdown("<div class='muted'>No manually excluded tactics in this map+side context.</div>", unsafe_allow_html=True)
-        else:
-            for _, r in manually_excluded.sort_values("recommendation_score", ascending=False).iterrows():
-                st.markdown(
-                    f"<div class='decision-item'><strong>{r['tactic_name']}</strong>"
-                    f"<span>{r['role']} • {_fmt_pct(r['win_rate'])} • {_fmt_signed(r['delta_vs_baseline'])} • conf {int(r['confidence'])}</span>"
-                    f"<div class='excluded-note'>Excluded from candidate pool</div></div>",
-                    unsafe_allow_html=True,
-                )
-                if st.button(
-                    "Re-include tactic",
-                    key=f"reinclude_{map_name}_{side}_{r['tactic_name']}",
-                    use_container_width=True,
-                ):
-                    excluded_tactics.discard(str(r["tactic_name"]))
-                    st.session_state[exclusion_key] = sorted(excluded_tactics)
-                    st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
 
     if PLOTLY_AVAILABLE:
         v1, v2 = st.columns([1.1, 1], gap="small")
