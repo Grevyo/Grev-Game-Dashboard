@@ -14,7 +14,7 @@ except ModuleNotFoundError:
 
 from app.config import TIER_COLORS
 from app.page_layout import is_mobile_view
-from app.tactics import tactic_category
+from app.tactics import TIER_ORDER, attach_normalized_tier, normalize_tier_values, tactic_category
 
 
 TIER_WEIGHTS = {"S": 1.35, "A": 1.15, "B": 1.0, "C": 0.75}
@@ -27,7 +27,6 @@ STATUS_COLORS = {
     "Risky": "poor",
     "Drop": "bad",
 }
-TIER_ORDER = ["S", "A", "B", "C"]
 TIER_COLOR_CLASS = {"S": "grev-tier-s", "A": "grev-tier-a", "B": "grev-tier-b", "C": "grev-tier-c"}
 STATUS_PRIORITY = ["Strong Keep", "Keep", "Refine", "Test More", "Situational", "Risky", "Drop"]
 
@@ -38,24 +37,6 @@ def _fmt_pct(value: float) -> str:
 
 def _fmt_signed(value: float) -> str:
     return f"{float(value):+.1f}pp"
-
-
-def _safe_tier_col(df: pd.DataFrame) -> str | None:
-    preferred_cols = ["tier", "opponent_tier", "unnamed:_13", "unnamed: 13", "unnamed_13", "Unnamed: 13", ""]
-    normalized_map = {str(col).strip().lower(): col for col in df.columns}
-    for key in preferred_cols:
-        col = normalized_map.get(str(key).strip().lower())
-        if col is not None:
-            return col
-    return None
-
-
-def _normalize_tier_values(series: pd.Series) -> pd.Series:
-    cleaned = series.fillna("").astype(str).str.strip().str.upper()
-    extracted = cleaned.str.extract(r"\b([SABC])(?:-?TIER)?\b", expand=False)
-    fallback = cleaned.str.extract(r"([SABC])", expand=False)
-    normalized = extracted.fillna(fallback)
-    return normalized.where(normalized.isin(["S", "A", "B", "C"]), pd.NA)
 
 
 def _route_bucket(name: str) -> str:
@@ -323,11 +304,7 @@ def _render_tactics_breakdown(ctx, *, recent_mode: bool = False):
     tdf["total_rounds"] = pd.to_numeric(tdf.get("total_rounds", 0), errors="coerce").fillna(0)
     tdf["competition"] = tdf.get("competition", "Unknown").astype(str).str.strip().replace("", "Unknown")
 
-    tier_col = _safe_tier_col(tdf)
-    if tier_col:
-        tdf["tier"] = _normalize_tier_values(tdf[tier_col]).fillna("C")
-    else:
-        tdf["tier"] = "C"
+    tdf = attach_normalized_tier(tdf, fallback="C")
 
     date_ser = tdf.get("date", pd.Series([None] * len(tdf)))
     time_ser = tdf.get("time", pd.Series([""] * len(tdf))).astype(str)
@@ -837,7 +814,7 @@ def _render_tactics_breakdown(ctx, *, recent_mode: bool = False):
         g3, g4 = st.columns([1, 1], gap="small")
         with g3:
             tier_perf = (
-                match_table.assign(tier=_normalize_tier_values(match_table["tier"]).fillna("C"))
+                match_table.assign(tier=normalize_tier_values(match_table["tier"]).fillna("C"))
                 .groupby("tier", dropna=False)
                 .agg(matches=("match_id", "count"), rounds_won=("rounds_won", "sum"), rounds_used=("rounds_used", "sum"))
                 .reindex(TIER_ORDER, fill_value=0)

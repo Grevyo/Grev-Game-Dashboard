@@ -5,6 +5,94 @@ import pandas as pd
 from app.descriptions import tactic_reason
 from app.metrics import trend_label
 
+TIER_ORDER = ["S", "A", "B", "C"]
+TIER_COLUMN_PREFERENCES = (
+    "tier",
+    "opponent_tier",
+    "league_tier",
+    "unnamed:_13",
+    "unnamed: 13",
+    "unnamed_13",
+    "unnamed:13",
+    "",
+)
+
+
+def normalize_tier_values(series: pd.Series) -> pd.Series:
+    cleaned = series.fillna("").astype(str).str.strip().str.upper()
+    compact = cleaned.str.replace(r"[\s_\-]+", "", regex=True)
+
+    direct_map = {
+        "S": "S",
+        "A": "A",
+        "B": "B",
+        "C": "C",
+        "STIER": "S",
+        "ATIER": "A",
+        "BTIER": "B",
+        "CTIER": "C",
+        "TIERS": "S",
+        "TIERA": "A",
+        "TIERB": "B",
+        "TIERC": "C",
+        "1": "S",
+        "2": "A",
+        "3": "B",
+        "4": "C",
+    }
+    normalized = compact.map(direct_map)
+    extracted = compact.str.extract(r"\b([SABC])(?:TIER)?\b", expand=False)
+    normalized = normalized.combine_first(extracted)
+    return normalized.where(normalized.isin(TIER_ORDER), pd.NA)
+
+
+def best_tier_column(df: pd.DataFrame) -> str | None:
+    if df.empty:
+        return None
+
+    normalized_cols = [str(col).strip().lower() for col in df.columns]
+    best_col = None
+    best_score = (-1, -1)
+
+    for pref in TIER_COLUMN_PREFERENCES:
+        pref_key = str(pref).strip().lower()
+        matching = [col for col, norm in zip(df.columns, normalized_cols) if norm == pref_key]
+        for col in matching:
+            col_data = df[col]
+            if isinstance(col_data, pd.DataFrame):
+                # Duplicate column names can produce a DataFrame; use the most populated slice.
+                for _, dup_series in col_data.items():
+                    norm = normalize_tier_values(dup_series)
+                    score = (int(norm.notna().sum()), int(dup_series.astype(str).str.strip().ne("").sum()))
+                    if score > best_score:
+                        best_score = score
+                        best_col = col
+            else:
+                norm = normalize_tier_values(col_data)
+                score = (int(norm.notna().sum()), int(col_data.astype(str).str.strip().ne("").sum()))
+                if score > best_score:
+                    best_score = score
+                    best_col = col
+
+    return best_col
+
+
+def attach_normalized_tier(df: pd.DataFrame, *, fallback: str = "C") -> pd.DataFrame:
+    out = df.copy()
+    tier_col = best_tier_column(out)
+    if tier_col is None:
+        out["tier"] = fallback
+        return out
+
+    tier_raw = out[tier_col]
+    if isinstance(tier_raw, pd.DataFrame):
+        candidates = [normalize_tier_values(dup_series) for _, dup_series in tier_raw.items()]
+        tier_series = max(candidates, key=lambda s: int(s.notna().sum())) if candidates else pd.Series(pd.NA, index=out.index)
+    else:
+        tier_series = normalize_tier_values(tier_raw)
+    out["tier"] = tier_series.fillna(fallback)
+    return out
+
 
 def tactic_category(name: str) -> str:
     n = str(name).upper()
