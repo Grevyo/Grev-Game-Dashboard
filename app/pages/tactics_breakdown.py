@@ -39,10 +39,21 @@ def _fmt_signed(value: float) -> str:
 
 
 def _safe_tier_col(df: pd.DataFrame) -> str | None:
-    for col in ["tier", "opponent_tier", "Unnamed: 13", ""]:
-        if col in df.columns:
+    preferred_cols = ["tier", "opponent_tier", "unnamed:_13", "unnamed: 13", "unnamed_13", "Unnamed: 13", ""]
+    normalized_map = {str(col).strip().lower(): col for col in df.columns}
+    for key in preferred_cols:
+        col = normalized_map.get(str(key).strip().lower())
+        if col is not None:
             return col
     return None
+
+
+def _normalize_tier_values(series: pd.Series) -> pd.Series:
+    cleaned = series.fillna("").astype(str).str.strip().str.upper()
+    extracted = cleaned.str.extract(r"\b([SABC])(?:-?TIER)?\b", expand=False)
+    fallback = cleaned.str.extract(r"([SABC])", expand=False)
+    normalized = extracted.fillna(fallback)
+    return normalized.where(normalized.isin(["S", "A", "B", "C"]), pd.NA)
 
 
 def _route_bucket(name: str) -> str:
@@ -248,8 +259,10 @@ def render(ctx):
     tdf["competition"] = tdf.get("competition", "Unknown").astype(str).str.strip().replace("", "Unknown")
 
     tier_col = _safe_tier_col(tdf)
-    tdf["tier"] = tdf[tier_col].astype(str).str.upper().str.strip() if tier_col else "C"
-    tdf["tier"] = tdf["tier"].where(tdf["tier"].isin(["S", "A", "B", "C"]), "C")
+    if tier_col:
+        tdf["tier"] = _normalize_tier_values(tdf[tier_col]).fillna("C")
+    else:
+        tdf["tier"] = "C"
 
     date_ser = tdf.get("date", pd.Series([None] * len(tdf)))
     time_ser = tdf.get("time", pd.Series([""] * len(tdf))).astype(str)
