@@ -347,38 +347,60 @@ def render(ctx):
         st.plotly_chart(wr_fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
         _frame_end()
     with right:
-        _frame("Sample Size vs Win Rate vs Round Diff", "Bubble size = matches, color = round differential")
+        _frame("Sample Size vs Win Rate vs Round Diff", "X = matches played, color = round differential")
+        scatter_points = scoped.copy()
+        scatter_points["label"] = ""
+
+        highlight_idx: set[int] = set()
+        if not scatter_points.empty:
+            highlight_idx.add(int(scatter_points["matches_played"].idxmax()))
+            high_sample_pool = scatter_points[scatter_points["matches_played"] >= scatter_points["matches_played"].median()].copy()
+            if high_sample_pool.empty:
+                high_sample_pool = scatter_points
+            highlight_idx.add(int(high_sample_pool["win_rate_match"].idxmax()))
+            highlight_idx.add(int(high_sample_pool["win_rate_match"].idxmin()))
+            highlight_idx.add(int(scatter_points["round_diff"].idxmax()))
+            highlight_idx.add(int(scatter_points["round_diff"].idxmin()))
+            highlight_idx.add(int((scatter_points["win_rate_match"] - 50).abs().idxmax()))
+
+        scatter_points.loc[list(highlight_idx), "label"] = scatter_points.loc[list(highlight_idx), "opponent_team"]
+
         scatter = px.scatter(
-            scoped,
-            x="rounds",
+            scatter_points,
+            x="matches_played",
             y="win_rate_match",
-            size="matches_played",
             color="round_diff",
             hover_name="opponent_team",
-            text="opponent_team",
-            color_continuous_scale=["#ff4d5e", "#d3a85c", "#9FE870"],
+            text="label",
+            custom_data=["opponent_team", "matches_played", "rounds", "wins", "losses", "draws", "win_rate_match", "round_diff"],
+            color_continuous_scale="RdYlGn",
+            color_continuous_midpoint=0,
         )
         scatter.update_traces(
+            marker=dict(size=11, line=dict(color="rgba(231,241,255,0.72)", width=1.1), opacity=0.86),
             textposition="top center",
             textfont=dict(size=10),
-            marker_line=dict(color="rgba(231,241,255,0.8)", width=1.4),
-            marker_opacity=0.82,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Matches: %{customdata[1]}<br>"
+                "Rounds: %{customdata[2]}<br>"
+                "Wins: %{customdata[3]} | Losses: %{customdata[4]} | Draws: %{customdata[5]}<br>"
+                "Win Rate: %{customdata[6]:.1f}%<br>"
+                "Round Diff: %{customdata[7]:+.0f}<extra></extra>"
+            ),
         )
         scatter.update_layout(
             template="plotly_dark",
             height=560 if not mobile_view else 440,
             margin=dict(l=12, r=12, t=8, b=32),
-            coloraxis_colorbar=dict(
-                title=dict(text="Round Diff", side="right"),
-                len=0.78,
-                thickness=14,
-                bgcolor="rgba(16,20,28,0.35)",
-            ),
+            coloraxis_colorbar=dict(title="Round Diff", len=0.78, thickness=14),
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
         )
         scatter.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
-        scatter.update_xaxes(gridcolor="rgba(133,147,163,0.24)")
+        scatter.update_xaxes(title="Matches Played", gridcolor="rgba(133,147,163,0.24)")
+        scatter.add_hline(y=50, line_width=1, line_dash="dash", line_color="rgba(211,168,92,0.65)")
+        scatter.add_vline(x=float(scatter_points["matches_played"].median()), line_width=1, line_dash="dot", line_color="rgba(159,232,112,0.45)")
         st.plotly_chart(scatter, use_container_width=True, config={"responsive": True, "displayModeBar": True})
         _frame_end()
 
