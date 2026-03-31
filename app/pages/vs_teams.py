@@ -329,6 +329,40 @@ def render(ctx):
     with k8:
         _kpi_card("Opponents Faced", f"{int(scoped['opponent_team'].nunique())}", "After filters", "mid")
 
+    _frame(
+        "Opponent Dot Graph (Restored)",
+        "Legacy scatter view for quick sample-vs-performance scanning across opponents.",
+    )
+    dot = px.scatter(
+        scoped,
+        x="matches_played",
+        y="win_rate_match",
+        size="rounds",
+        color="round_diff",
+        hover_name="opponent_team",
+        color_continuous_scale=[[0, "#ff4d5e"], [0.48, "#4c5968"], [1, "#9FE870"]],
+        labels={
+            "matches_played": "Matches Played",
+            "win_rate_match": "Match Win Rate (%)",
+            "round_diff": "Round Diff",
+        },
+    )
+    dot.update_layout(
+        template="plotly_dark",
+        height=420 if not mobile_view else 340,
+        margin=dict(l=12, r=12, t=8, b=32),
+        coloraxis_colorbar=dict(title="Round Diff", len=0.82, thickness=12),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    dot.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
+    dot.update_xaxes(gridcolor="rgba(133,147,163,0.24)")
+    dot.add_hline(y=50, line_width=1, line_dash="dot", line_color="rgba(159,184,202,0.65)")
+    st.plotly_chart(dot, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+    _frame_end()
+
+    st.markdown("<div style='height: 2.1rem;'></div>", unsafe_allow_html=True)
+
     left, right = st.columns([1.15, 1], gap="small")
     with left:
         _frame("Win Rate by Opponent", f"Top {len(top)} opponents by {primary_sort.lower()}.")
