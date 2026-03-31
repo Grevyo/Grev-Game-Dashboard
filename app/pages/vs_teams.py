@@ -24,11 +24,11 @@ HEATMAP_RED_GREEN_SCALE = [
 ]
 
 
-def _apply_priority_chart_style(fig, *, height: int = 500):
+def _apply_priority_chart_style(fig, *, height: int = 500, x_tickangle: int = -20):
     fig.update_layout(
         template="plotly_dark",
         height=height,
-        margin=dict(l=56, r=24, t=64, b=84),
+        margin=dict(l=44, r=18, t=62, b=78),
         title=dict(font=dict(size=17, color="#EAF2FF"), x=0.0, xanchor="left"),
         legend=dict(
             title_font=dict(size=12, color="#EAF2FF"),
@@ -52,7 +52,7 @@ def _apply_priority_chart_style(fig, *, height: int = 500):
         font=dict(color="#D6DFEA"),
     )
     fig.update_xaxes(
-        tickangle=-25,
+        tickangle=x_tickangle,
         automargin=True,
         tickfont=dict(size=11),
         title_font=dict(size=13),
@@ -219,12 +219,15 @@ def _render_heatmap(
 
     heat = px.imshow(**imshow_kwargs)
     heat.update_traces(textfont={"color": "#F5F7FA"})
+    map_count = len(pivot.columns)
+    team_count = len(pivot.index)
     heat.update_layout(
         template="plotly_dark",
-        height=max(420, 120 + 34 * len(pivot.index)),
-        margin=dict(l=130, r=30, t=70, b=120),
-        xaxis=dict(tickangle=-35, automargin=True),
+        height=max(340, min(680, 120 + 32 * team_count)),
+        margin=dict(l=88, r=18, t=62, b=88),
+        xaxis=dict(tickangle=-30 if map_count > 4 else 0, automargin=True),
         yaxis=dict(automargin=True),
+        coloraxis_colorbar=dict(len=0.75, thickness=12, y=0.52),
     )
     st.plotly_chart(heat, use_container_width=True)
 
@@ -369,16 +372,17 @@ def render(ctx):
         marker_line_width=1,
         hovertemplate="<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>",
     )
-    fig_wl = _apply_priority_chart_style(fig_wl, height=520)
+    angle_wl = -30 if view["opponent_team"].nunique() > 7 else 0
+    fig_wl = _apply_priority_chart_style(fig_wl, height=460, x_tickangle=angle_wl)
     fig_wl.update_layout(
-        margin=dict(t=152, b=92, l=56, r=56),
+        margin=dict(t=108, b=80, l=44, r=20),
         legend=dict(
             title_text="Result",
             orientation="h",
             yanchor="top",
-            y=1.10,
-            xanchor="right",
-            x=1.0,
+            y=1.05,
+            xanchor="left",
+            x=0.0,
             bgcolor="rgba(10,16,28,0.55)",
             bordercolor="rgba(125,150,180,0.28)",
             borderwidth=1,
@@ -412,11 +416,8 @@ def render(ctx):
         marker_line_width=1,
         hovertemplate="<b>%{x}</b><br>Match Win %: %{y:.1f}%<br>Matches: %{marker.color}<extra></extra>",
     )
-    _render_chart_panel(
-        _apply_priority_chart_style(fig_wr, height=520),
-        "",
-        "",
-    )
+    angle_wr = -30 if view["opponent_team"].nunique() > 7 else 0
+    _render_chart_panel(_apply_priority_chart_style(fig_wr, height=460, x_tickangle=angle_wr), "", "")
 
     bubble = px.scatter(
         view,
@@ -451,17 +452,17 @@ def render(ctx):
         ),
     )
     bubble.update_layout(
-        margin=dict(l=72, r=44, t=120, b=98),
+        margin=dict(l=54, r=22, t=92, b=72),
         title=dict(x=0.02, xanchor="left", font=dict(size=21, color="#F2F7FF"), pad=dict(t=14, b=20)),
         coloraxis_colorbar=dict(
             title="Round Diff",
-            len=0.68,
-            thickness=14,
+            len=0.62,
+            thickness=12,
             ticks="outside",
             tickfont=dict(size=11),
             y=0.5,
             yanchor="middle",
-            x=1.02,
+            x=1.0,
         ),
     )
     bubble.update_xaxes(
@@ -488,7 +489,7 @@ def render(ctx):
         unsafe_allow_html=True,
     )
     _render_chart_panel(
-        _apply_priority_chart_style(bubble, height=590),
+        _apply_priority_chart_style(bubble, height=500, x_tickangle=0),
         "",
         "",
     )

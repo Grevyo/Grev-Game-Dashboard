@@ -242,6 +242,20 @@ def inject_styles(theme_name: str = "Dark"):
 
     @media (max-width: 768px) {{
       .block-container {{ padding-top: 1.2rem; }}
+      div[data-testid="stHorizontalBlock"] {{
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }}
+      div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {{
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+      }}
+      [data-testid="stPlotlyChart"] {{
+        overflow: hidden;
+      }}
+      [data-testid="stPlotlyChart"] > div {{
+        max-width: 100%;
+      }}
       div[data-testid="stPills"],
       div[data-testid="stSegmentedControl"],
       div[data-testid="stRadio"][role="radiogroup"] {{
