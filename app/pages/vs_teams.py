@@ -183,18 +183,23 @@ def _render_heatmap(
         imshow_kwargs["color_continuous_midpoint"] = zmid
 
     heat = px.imshow(**imshow_kwargs)
-    heat.update_traces(textfont={"color": "#F5F7FA"})
+    heat.update_traces(textfont={"color": "#F5F7FA", "size": 10 if mobile_view else 12})
     map_count = len(pivot.columns)
     team_count = len(pivot.index)
     heat.update_layout(
         template="plotly_dark",
-        height=max(280 if mobile_view else 340, min(560 if mobile_view else 680, (100 if mobile_view else 120) + (24 if mobile_view else 32) * team_count)),
-        margin=dict(l=56 if mobile_view else 88, r=10 if mobile_view else 18, t=62, b=56 if mobile_view else 88),
-        xaxis=dict(tickangle=-20 if map_count > 3 else 0, automargin=True, tickfont=dict(size=10 if mobile_view else 11)),
-        yaxis=dict(automargin=True, tickfont=dict(size=10 if mobile_view else 11)),
-        coloraxis_colorbar=dict(len=0.75, thickness=12, y=0.52),
+        height=max(
+            320 if mobile_view else 420,
+            min(600 if mobile_view else 820, (130 if mobile_view else 165) + (26 if mobile_view else 34) * team_count),
+        ),
+        margin=dict(l=54 if mobile_view else 70, r=8 if mobile_view else 14, t=66, b=60 if mobile_view else 92),
+        xaxis=dict(tickangle=-30 if map_count > 3 else 0, automargin=True, tickfont=dict(size=10 if mobile_view else 12)),
+        yaxis=dict(automargin=True, tickfont=dict(size=10 if mobile_view else 12)),
+        coloraxis_colorbar=dict(len=0.80, thickness=14, y=0.52),
     )
+    st.markdown("<div class='heatmap-stage'>", unsafe_allow_html=True)
     st.plotly_chart(heat, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render(ctx):
@@ -503,6 +508,7 @@ def render(ctx):
     round_diff_abs = float(round_diff_pivot.abs().to_numpy().max()) if not round_diff_pivot.empty else 0.0
     match_diff_abs = float(match_diff_pivot.abs().to_numpy().max()) if not match_diff_pivot.empty else 0.0
 
+    st.markdown("<div class='heatmap-stage--fullbleed'>", unsafe_allow_html=True)
     st.markdown("### Heatmaps")
     st.caption(
         "Metrics: Round Win/Lose uses round differential (rounds won - rounds lost). "
@@ -545,6 +551,7 @@ def render(ctx):
         zmid=50,
         mobile_view=mobile_view,
     )
+    st.markdown("</div>", unsafe_allow_html=True)
 
     weak = grp.nsmallest(3, "win_rate_match")
     strong = grp.nlargest(3, "win_rate_match")
