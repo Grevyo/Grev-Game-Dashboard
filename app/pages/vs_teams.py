@@ -329,7 +329,37 @@ def render(ctx):
     with k8:
         _kpi_card("Opponents Faced", f"{int(scoped['opponent_team'].nunique())}", "After filters", "mid")
 
-    left, right = st.columns([1.15, 1], gap="small")
+    median_matches = float(scoped["matches_played"].median()) if not scoped.empty else 0.0
+    scoped["sample_bucket"] = np.where(scoped["matches_played"] >= median_matches, "High Sample", "Low Sample")
+    scoped["rd_per_match"] = scoped["round_diff"] / scoped["matches_played"].clip(lower=1)
+    scoped["wr_signal"] = (scoped["win_rate_match"] - 50.0) / 50.0
+    scoped["rd_signal"] = np.tanh(scoped["rd_per_match"] / 3.0)
+    scoped["disagreement_score"] = (scoped["wr_signal"] - scoped["rd_signal"]).abs()
+    scoped["sign_mismatch"] = np.sign(scoped["wr_signal"]) != np.sign(scoped["rd_signal"])
+
+    trusted_strengths = scoped[
+        (scoped["matches_played"] >= median_matches) & (scoped["win_rate_match"] >= 55) & (scoped["round_diff"] > 0)
+    ].copy()
+    caution_highs = scoped[(scoped["matches_played"] < median_matches) & (scoped["win_rate_match"] >= 60)].copy()
+    recurring_problems = scoped[
+        (scoped["matches_played"] >= median_matches) & (scoped["win_rate_match"] < 50) & (scoped["round_diff"] < 0)
+    ].copy()
+    misleading_records = scoped[(scoped["disagreement_score"] >= 0.55) | (scoped["sign_mismatch"])].copy()
+
+    label_pool: list[str] = []
+    label_pool.extend(
+        trusted_strengths.sort_values(["matches_played", "win_rate_match"], ascending=False).head(2)["opponent_team"].tolist()
+    )
+    label_pool.extend(
+        recurring_problems.sort_values(["matches_played", "win_rate_match"], ascending=[False, True]).head(2)["opponent_team"].tolist()
+    )
+    label_pool.extend(misleading_records.sort_values("disagreement_score", ascending=False).head(2)["opponent_team"].tolist())
+    if not scoped.empty:
+        label_pool.append(scoped.sort_values("matches_played", ascending=False).iloc[0]["opponent_team"])
+    scoped["point_label"] = np.where(scoped["opponent_team"].isin(set(label_pool)), scoped["opponent_team"], "")
+    scoped["bubble_size"] = np.clip(10 + np.sqrt(scoped["matches_played"]) * 2.2, 10, 20)
+
+    left, right = st.columns([1.1, 1.05], gap="small")
     with left:
         _frame("Win Rate by Opponent", f"Top {len(top)} opponents by {primary_sort.lower()}.")
         wr_fig = px.bar(
@@ -347,39 +377,155 @@ def render(ctx):
         st.plotly_chart(wr_fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
         _frame_end()
     with right:
-        _frame("Sample Size vs Win Rate vs Round Diff", "Bubble size = matches, color = round differential")
-        scatter = px.scatter(
-            scoped,
-            x="rounds",
-            y="win_rate_match",
-            size="matches_played",
-            color="round_diff",
-            hover_name="opponent_team",
-            text="opponent_team",
-            color_continuous_scale=["#ff4d5e", "#d3a85c", "#9FE870"],
-        )
-        scatter.update_traces(
-            textposition="top center",
-            textfont=dict(size=10),
-            marker_line=dict(color="rgba(231,241,255,0.8)", width=1.4),
-            marker_opacity=0.82,
-        )
-        scatter.update_layout(
-            template="plotly_dark",
-            height=560 if not mobile_view else 440,
-            margin=dict(l=12, r=12, t=8, b=32),
-            coloraxis_colorbar=dict(
-                title=dict(text="Round Diff", side="right"),
-                len=0.78,
-                thickness=14,
-                bgcolor="rgba(16,20,28,0.35)",
-            ),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-        )
-        scatter.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
-        scatter.update_xaxes(gridcolor="rgba(133,147,163,0.24)")
-        st.plotly_chart(scatter, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        _frame("Opponent Intelligence Panel", "Sample-backed strengths, risks, and disagreement signals.")
+        i1, i2 = st.columns([1, 1], gap="small")
+        with i1:
+            min_matches_intel = st.slider(
+                "Intel Min Matches",
+                min_value=1,
+                max_value=max(1, int(scoped["matches_played"].max())),
+                value=max(1, int(median_matches)),
+                step=1,
+                help="Raise floor for high-confidence scouting points.",
+                key="vs_team_intel_min_matches",
+            )
+        with i2:
+            insight_sort = st.selectbox(
+                "Insight Sort",
+                options=["Priority", "Win Rate", "Round Diff", "Sample Size"],
+                index=0,
+                key="vs_team_intel_sort",
+            )
+
+        intel_df = scoped[scoped["matches_played"] >= int(min_matches_intel)].copy()
+        if intel_df.empty:
+            st.info("No points in intelligence panel after min matches filter.")
+        else:
+            intel_df["priority"] = (
+                intel_df["matches_played"] * 0.35
+                + intel_df["disagreement_score"] * 100 * 0.45
+                + (100 - (intel_df["win_rate_match"] - 50).abs() * 2) * 0.20
+            )
+
+            chart_col, insight_col = st.columns([1.55, 1], gap="small")
+            with chart_col:
+                scatter = px.scatter(
+                    intel_df,
+                    x="matches_played",
+                    y="win_rate_match",
+                    size="bubble_size",
+                    size_max=20,
+                    color="round_diff",
+                    text="point_label",
+                    hover_name="opponent_team",
+                    hover_data={
+                        "matches_played": ":.0f",
+                        "rounds": ":.0f",
+                        "wins": ":.0f",
+                        "losses": ":.0f",
+                        "draws": ":.0f",
+                        "win_rate_match": ":.1f",
+                        "round_diff": ":.0f",
+                        "recent_form": True,
+                        "bubble_size": False,
+                        "point_label": False,
+                    },
+                    custom_data=["opponent_team", "rounds", "wins", "losses", "draws", "recent_form"],
+                    color_continuous_scale=["#ff5d6b", "#768191", "#9FE870"],
+                )
+                scatter.update_traces(
+                    marker_line=dict(color="rgba(220,234,250,0.78)", width=1.1),
+                    marker_opacity=0.88,
+                    textposition="top center",
+                    textfont=dict(size=10, color="#dbe9ff"),
+                    hovertemplate=(
+                        "<b>%{customdata[0]}</b><br>"
+                        "Matches: %{x:.0f}<br>"
+                        "Rounds Played: %{customdata[1]:.0f}<br>"
+                        "W/L/D: %{customdata[2]:.0f}/%{customdata[3]:.0f}/%{customdata[4]:.0f}<br>"
+                        "Win Rate: %{y:.1f}%<br>"
+                        "Round Diff: %{marker.color:+.0f}<br>"
+                        "Recent Form: %{customdata[5]}<extra></extra>"
+                    ),
+                )
+                scatter.add_vline(x=median_matches, line_dash="dot", line_color="#9fb4ca", opacity=0.85)
+                scatter.add_hline(y=50, line_dash="dot", line_color="#9fb4ca", opacity=0.85)
+                scatter.add_annotation(
+                    xref="paper",
+                    yref="paper",
+                    x=0.03,
+                    y=0.95,
+                    text="Small-Sample Highs",
+                    showarrow=False,
+                    font=dict(size=10, color="#f4d39a"),
+                )
+                scatter.add_annotation(
+                    xref="paper",
+                    yref="paper",
+                    x=0.73,
+                    y=0.95,
+                    text="Trusted Strengths",
+                    showarrow=False,
+                    font=dict(size=10, color="#9FE870"),
+                )
+                scatter.add_annotation(
+                    xref="paper",
+                    yref="paper",
+                    x=0.73,
+                    y=0.07,
+                    text="Recurring Problems",
+                    showarrow=False,
+                    font=dict(size=10, color="#ff8d98"),
+                )
+                scatter.update_layout(
+                    template="plotly_dark",
+                    height=530 if not mobile_view else 410,
+                    margin=dict(l=6, r=10, t=10, b=28),
+                    coloraxis_colorbar=dict(title=dict(text="Round Diff", side="right"), thickness=12, len=0.75),
+                    xaxis_title="Matches Played",
+                    yaxis_title="Match Win Rate",
+                    plot_bgcolor="rgba(5,11,18,0.75)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                )
+                scatter.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.20)")
+                scatter.update_xaxes(gridcolor="rgba(133,147,163,0.20)")
+                st.plotly_chart(scatter, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+
+            with insight_col:
+                st.markdown("<div class='teams-intel-panel'>", unsafe_allow_html=True)
+
+                def _pick_sort(df: pd.DataFrame) -> pd.DataFrame:
+                    if insight_sort == "Win Rate":
+                        return df.sort_values(["win_rate_match", "matches_played"], ascending=[False, False])
+                    if insight_sort == "Round Diff":
+                        return df.sort_values(["round_diff", "matches_played"], ascending=[False, False])
+                    if insight_sort == "Sample Size":
+                        return df.sort_values(["matches_played", "win_rate_match"], ascending=[False, False])
+                    return df.sort_values(["priority", "matches_played"], ascending=[False, False])
+
+                for title, cls, subset in [
+                    ("Trusted Strengths", "intel-good", trusted_strengths),
+                    ("Caution Highs", "intel-caution", caution_highs),
+                    ("Recurring Problems", "intel-bad", recurring_problems),
+                    ("Misleading Records", "intel-mixed", misleading_records),
+                ]:
+                    top_subset = _pick_sort(subset).head(4)
+                    st.markdown(f"<div class='intel-group {cls}'><div class='intel-title'>{title}</div>", unsafe_allow_html=True)
+                    if top_subset.empty:
+                        st.markdown("<div class='intel-item muted'>No high-signal entries under current filters.</div>", unsafe_allow_html=True)
+                    else:
+                        for _, row in top_subset.iterrows():
+                            st.markdown(
+                                (
+                                    "<div class='intel-item'>"
+                                    f"<b>{row['opponent_team']}</b> · {int(row['matches_played'])}m · {row['win_rate_match']:.1f}% WR · "
+                                    f"{_fmt_signed(row['round_diff'])} RD · Form {row.get('recent_form', '-')}"
+                                    "</div>"
+                                ),
+                                unsafe_allow_html=True,
+                            )
+                    st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
         _frame_end()
 
     row2_left, row2_right = st.columns(2, gap="small")
