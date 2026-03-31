@@ -358,8 +358,25 @@ def render(ctx):
             text="opponent_team",
             color_continuous_scale=["#ff4d5e", "#d3a85c", "#9FE870"],
         )
-        scatter.update_traces(textposition="top center", textfont=dict(size=10), marker=dict(line=dict(color="rgba(231,241,255,.8)", width=1.4), opacity=0.82))
-        scatter.update_layout(template="plotly_dark", height=560 if not mobile_view else 440, margin=dict(l=12, r=12, t=8, b=32), plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        scatter.update_traces(
+            textposition="top center",
+            textfont=dict(size=10),
+            marker_line=dict(color="rgba(231,241,255,0.8)", width=1.4),
+            marker_opacity=0.82,
+        )
+        scatter.update_layout(
+            template="plotly_dark",
+            height=560 if not mobile_view else 440,
+            margin=dict(l=12, r=12, t=8, b=32),
+            coloraxis_colorbar=dict(
+                title=dict(text="Round Diff", side="right"),
+                len=0.78,
+                thickness=14,
+                bgcolor="rgba(16,20,28,0.35)",
+            ),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+        )
         scatter.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
         scatter.update_xaxes(gridcolor="rgba(133,147,163,0.24)")
         st.plotly_chart(scatter, use_container_width=True, config={"responsive": True, "displayModeBar": True})
