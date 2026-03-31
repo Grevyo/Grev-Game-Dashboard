@@ -2,6 +2,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 from app.metrics import confidence_from_sample
+from app.presentation_helpers import is_mobile_view
 
 
 def _summary_box(label: str, value: str, accent: str, bg: str) -> None:
@@ -24,18 +25,18 @@ HEATMAP_RED_GREEN_SCALE = [
 ]
 
 
-def _apply_priority_chart_style(fig, *, height: int = 500, x_tickangle: int = -20):
+def _apply_priority_chart_style(fig, *, height: int = 500, x_tickangle: int = -20, mobile_view: bool = False):
     fig.update_layout(
         template="plotly_dark",
         height=height,
-        margin=dict(l=44, r=18, t=62, b=78),
+        margin=dict(l=30 if mobile_view else 44, r=12 if mobile_view else 18, t=62, b=52 if mobile_view else 78),
         title=dict(font=dict(size=17, color="#EAF2FF"), x=0.0, xanchor="left"),
         legend=dict(
             title_font=dict(size=12, color="#EAF2FF"),
-            font=dict(size=11, color="#DCE7F5"),
+            font=dict(size=10 if mobile_view else 11, color="#DCE7F5"),
             orientation="h",
-            yanchor="bottom",
-            y=1.02,
+            yanchor="top",
+            y=1.0 if mobile_view else 1.02,
             xanchor="left",
             x=0.0,
             bgcolor="rgba(10,16,29,0.45)",
@@ -54,7 +55,7 @@ def _apply_priority_chart_style(fig, *, height: int = 500, x_tickangle: int = -2
     fig.update_xaxes(
         tickangle=x_tickangle,
         automargin=True,
-        tickfont=dict(size=11),
+        tickfont=dict(size=10 if mobile_view else 11),
         title_font=dict(size=13),
         ticklabelposition="outside",
         showgrid=False,
@@ -62,7 +63,7 @@ def _apply_priority_chart_style(fig, *, height: int = 500, x_tickangle: int = -2
     )
     fig.update_yaxes(
         automargin=True,
-        tickfont=dict(size=11),
+        tickfont=dict(size=10 if mobile_view else 11),
         title_font=dict(size=13),
         gridcolor="rgba(123,144,168,0.20)",
         griddash="dot",
@@ -77,7 +78,7 @@ def _render_chart_panel(fig, heading: str, note: str = ""):
         st.markdown(f"<div class='section-title' style='margin-bottom:4px'>{heading}</div>", unsafe_allow_html=True)
     if note:
         st.markdown(f"<div class='section-subtitle' style='margin-bottom:10px'>{note}</div>", unsafe_allow_html=True)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -193,6 +194,7 @@ def _render_heatmap(
     zmax=None,
     zmid=None,
     scale=HEATMAP_RED_GREEN_SCALE,
+    mobile_view: bool = False,
 ) -> None:
     if pivot.empty:
         st.info(f"No data available for {title}.")
@@ -223,17 +225,18 @@ def _render_heatmap(
     team_count = len(pivot.index)
     heat.update_layout(
         template="plotly_dark",
-        height=max(340, min(680, 120 + 32 * team_count)),
-        margin=dict(l=88, r=18, t=62, b=88),
-        xaxis=dict(tickangle=-30 if map_count > 4 else 0, automargin=True),
-        yaxis=dict(automargin=True),
+        height=max(280 if mobile_view else 340, min(560 if mobile_view else 680, (100 if mobile_view else 120) + (24 if mobile_view else 32) * team_count)),
+        margin=dict(l=56 if mobile_view else 88, r=10 if mobile_view else 18, t=62, b=56 if mobile_view else 88),
+        xaxis=dict(tickangle=-20 if map_count > 3 else 0, automargin=True, tickfont=dict(size=10 if mobile_view else 11)),
+        yaxis=dict(automargin=True, tickfont=dict(size=10 if mobile_view else 11)),
         coloraxis_colorbar=dict(len=0.75, thickness=12, y=0.52),
     )
-    st.plotly_chart(heat, use_container_width=True)
+    st.plotly_chart(heat, use_container_width=True, config={"responsive": True, "displayModeBar": True})
 
 
 def render(ctx):
     tdf = ctx["tactics"]
+    mobile_view = is_mobile_view()
     st.title("Medisports vs Teams")
 
     if tdf.empty:
@@ -373,9 +376,9 @@ def render(ctx):
         hovertemplate="<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>",
     )
     angle_wl = -30 if view["opponent_team"].nunique() > 7 else 0
-    fig_wl = _apply_priority_chart_style(fig_wl, height=460, x_tickangle=angle_wl)
+    fig_wl = _apply_priority_chart_style(fig_wl, height=380 if mobile_view else 460, x_tickangle=angle_wl, mobile_view=mobile_view)
     fig_wl.update_layout(
-        margin=dict(t=108, b=80, l=44, r=20),
+        margin=dict(t=100 if mobile_view else 108, b=54 if mobile_view else 80, l=30 if mobile_view else 44, r=12 if mobile_view else 20),
         legend=dict(
             title_text="Result",
             orientation="h",
@@ -417,7 +420,7 @@ def render(ctx):
         hovertemplate="<b>%{x}</b><br>Match Win %: %{y:.1f}%<br>Matches: %{marker.color}<extra></extra>",
     )
     angle_wr = -30 if view["opponent_team"].nunique() > 7 else 0
-    _render_chart_panel(_apply_priority_chart_style(fig_wr, height=460, x_tickangle=angle_wr), "", "")
+    _render_chart_panel(_apply_priority_chart_style(fig_wr, height=370 if mobile_view else 460, x_tickangle=angle_wr, mobile_view=mobile_view), "", "")
 
     bubble = px.scatter(
         view,
@@ -452,7 +455,7 @@ def render(ctx):
         ),
     )
     bubble.update_layout(
-        margin=dict(l=54, r=22, t=92, b=72),
+        margin=dict(l=32 if mobile_view else 54, r=12 if mobile_view else 22, t=84 if mobile_view else 92, b=56 if mobile_view else 72),
         title=dict(x=0.02, xanchor="left", font=dict(size=21, color="#F2F7FF"), pad=dict(t=14, b=20)),
         coloraxis_colorbar=dict(
             title="Round Diff",
@@ -488,11 +491,7 @@ def render(ctx):
         """,
         unsafe_allow_html=True,
     )
-    _render_chart_panel(
-        _apply_priority_chart_style(bubble, height=500, x_tickangle=0),
-        "",
-        "",
-    )
+    _render_chart_panel(_apply_priority_chart_style(bubble, height=400 if mobile_view else 500, x_tickangle=0, mobile_view=mobile_view), "", "")
     st.markdown("</div>", unsafe_allow_html=True)
 
     map_team = (
@@ -554,6 +553,7 @@ def render(ctx):
         zmin=-round_diff_abs if round_diff_abs else None,
         zmax=round_diff_abs if round_diff_abs else None,
         zmid=0,
+        mobile_view=mobile_view,
     )
     _render_heatmap(
         round_win_pct_pivot,
@@ -562,6 +562,7 @@ def render(ctx):
         zmin=0,
         zmax=100,
         zmid=50,
+        mobile_view=mobile_view,
     )
     _render_heatmap(
         match_diff_pivot,
@@ -570,6 +571,7 @@ def render(ctx):
         zmin=-match_diff_abs if match_diff_abs else None,
         zmax=match_diff_abs if match_diff_abs else None,
         zmid=0,
+        mobile_view=mobile_view,
     )
     _render_heatmap(
         match_win_pct_pivot,
@@ -578,6 +580,7 @@ def render(ctx):
         zmin=0,
         zmax=100,
         zmid=50,
+        mobile_view=mobile_view,
     )
 
     weak = grp.nsmallest(3, "win_rate_match")

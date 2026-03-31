@@ -16,7 +16,7 @@ from app.data_loader import get_medisports_player_names, get_medisports_roster_d
 from app.filters import filter_panel_toggle
 from app.image_helpers import image_data_uri, find_team_logo, resolve_player_photo
 from app.match_summaries import build_best_n_matches, build_last_n_matches, resolve_match_result
-from app.presentation_helpers import nationality_label
+from app.presentation_helpers import is_mobile_view, nationality_label
 
 
 def _player_key(name: str) -> str:
@@ -199,6 +199,7 @@ def render(ctx):
     filters = ctx.get("filters", {})
     players = ctx["players"]
     team_name = ctx.get("team_name", "Medisports")
+    mobile_view = is_mobile_view()
 
     if df.empty:
         st.warning("No player data found for current filters.")
@@ -407,15 +408,15 @@ def render(ctx):
             fig = px.line(p, x="date", y="grevscore", title="GrevScore Trend", markers=True)
             fig.update_traces(line_color="#21c77a")
             fig.update_layout(
-                height=320,
-                margin=dict(l=16, r=12, t=56, b=44),
+                height=280 if mobile_view else 320,
+                margin=dict(l=12 if mobile_view else 16, r=12, t=56, b=40 if mobile_view else 44),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
                 hovermode="x unified",
                 hoverlabel=dict(namelength=-1),
             )
-            fig.update_xaxes(automargin=True, tickangle=0)
-            fig.update_yaxes(automargin=True)
-            st.plotly_chart(fig, use_container_width=True)
+            fig.update_xaxes(automargin=True, tickangle=0, tickfont=dict(size=10 if mobile_view else 11))
+            fig.update_yaxes(automargin=True, tickfont=dict(size=10 if mobile_view else 11))
+            st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
         else:
             st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")
     with right:

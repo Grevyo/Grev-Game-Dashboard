@@ -12,11 +12,13 @@ except ModuleNotFoundError:
 from app.components import section_header
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.metrics import confidence_from_sample
+from app.presentation_helpers import is_mobile_view
 
 
 def render(ctx):
     tdf = ctx["tactics"]
     filters = ctx["filters"]
+    mobile_view = is_mobile_view()
     col = get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))
 
     st.title("Medisports vs Tournaments")
@@ -42,21 +44,21 @@ def render(ctx):
     else:
         fig = px.scatter(grp, x="round_diff", y="win_rate", size="rounds", color="confidence", hover_name="competition", title="Over/Under-performance by competition")
         fig.update_layout(
-            height=420,
-            margin=dict(l=14, r=14, t=62, b=40),
+            height=320 if mobile_view else 420,
+            margin=dict(l=12 if mobile_view else 14, r=12 if mobile_view else 14, t=62, b=28 if mobile_view else 40),
             legend=dict(
                 orientation="h",
-                yanchor="bottom",
-                y=1.02,
+                yanchor="top",
+                y=1.0 if mobile_view else 1.02,
                 xanchor="left",
                 x=0,
                 title_text="",
             ),
             hoverlabel=dict(namelength=-1),
         )
-        fig.update_xaxes(automargin=True)
-        fig.update_yaxes(automargin=True, ticksuffix="%", range=[0, 100])
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_xaxes(automargin=True, tickfont=dict(size=10 if mobile_view else 11))
+        fig.update_yaxes(automargin=True, ticksuffix="%", range=[0, 100], tickfont=dict(size=10 if mobile_view else 11))
+        st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
 
     c1, c2 = st.columns(2)
     with c1:
