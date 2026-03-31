@@ -186,15 +186,39 @@ def _render_heatmap(
     heat.update_traces(textfont={"color": "#F5F7FA", "size": 10 if mobile_view else 12})
     map_count = len(pivot.columns)
     team_count = len(pivot.index)
+    max_team_name_len = max((len(str(name)) for name in pivot.index), default=0)
+    longest_map_label_len = max((len(str(name)) for name in pivot.columns), default=0)
+    left_margin = (
+        min(240, 56 + max_team_name_len * 6) if mobile_view else min(420, 88 + max_team_name_len * 8)
+    )
+    base_height = 260 if mobile_view else 320
+    per_team_height = 36 if mobile_view else 44
+    dynamic_height = base_height + team_count * per_team_height
     heat.update_layout(
         template="plotly_dark",
-        height=max(
-            320 if mobile_view else 420,
-            min(600 if mobile_view else 820, (130 if mobile_view else 165) + (26 if mobile_view else 34) * team_count),
+        height=max(420 if mobile_view else 560, min(3200, dynamic_height)),
+        margin=dict(
+            l=left_margin,
+            r=8 if mobile_view else 16,
+            t=66,
+            b=(72 if mobile_view else 100) + (8 if longest_map_label_len > 14 else 0),
         ),
-        margin=dict(l=54 if mobile_view else 70, r=8 if mobile_view else 14, t=66, b=60 if mobile_view else 92),
-        xaxis=dict(tickangle=-30 if map_count > 3 else 0, automargin=True, tickfont=dict(size=10 if mobile_view else 12)),
-        yaxis=dict(automargin=True, tickfont=dict(size=10 if mobile_view else 12)),
+        xaxis=dict(
+            tickangle=-38 if map_count > 3 else 0,
+            automargin=True,
+            tickfont=dict(size=10 if mobile_view else 12),
+            tickmode="linear",
+            dtick=1,
+            side="bottom",
+        ),
+        yaxis=dict(
+            automargin=True,
+            tickfont=dict(size=10 if mobile_view else 12),
+            tickmode="linear",
+            dtick=1,
+            categoryorder="array",
+            categoryarray=list(pivot.index),
+        ),
         coloraxis_colorbar=dict(len=0.80, thickness=14, y=0.52),
     )
     st.markdown("<div class='heatmap-stage'>", unsafe_allow_html=True)
@@ -480,12 +504,41 @@ def render(ctx):
     map_team["match_diff"] = map_team["match_wins"] - map_team["match_losses"]
     map_team["match_win_pct"] = (map_team["match_wins"] / map_team["matches"].clip(lower=1) * 100).fillna(0)
 
-    team_order = (
-        grp.sort_values(["matches_played", "wins", "round_diff", "opponent_team"], ascending=[False, False, False, True])[
-            "opponent_team"
-        ]
-        .tolist()
+    st.markdown("<div class='heatmap-stage--fullbleed'>", unsafe_allow_html=True)
+    st.markdown("### Heatmaps")
+    st.caption(
+        "Metrics: Round Win/Lose uses round differential (rounds won - rounds lost). "
+        "Match Win/Lose uses match differential (wins - losses)."
     )
+
+    sort_col_1, sort_col_2 = st.columns([1.25, 1.4], gap="small")
+    with sort_col_1:
+        sort_choice = st.selectbox(
+            "Team sort order",
+            [
+                "Alphabetical",
+                "Matches played",
+                "Win rate",
+                "Round differential",
+                "Total wins",
+                "Selected heatmap metric",
+            ],
+            help="Sort reorders rows only. All available teams remain included in every heatmap.",
+            key="vs_teams_heatmap_sort_order",
+        )
+    with sort_col_2:
+        metric_sort_choice = st.selectbox(
+            "Heatmap metric for sorting",
+            [
+                "Round Win/Lose by Team and Map",
+                "Round Win % by Team and Map",
+                "Match Win/Lose by Team and Map",
+                "Match Win % by Team and Map",
+            ],
+            help="Used when team sort order is set to 'Selected heatmap metric'.",
+            key="vs_teams_heatmap_metric_sort_target",
+        )
+
     map_order = (
         map_team.groupby("map", dropna=False)["matches"]
         .sum()
@@ -493,27 +546,45 @@ def render(ctx):
         .index.tolist()
     )
 
-    def _build_heatmap_pivot(value_col: str) -> pd.DataFrame:
+    def _build_heatmap_pivot(value_col: str, team_order: list[str]) -> pd.DataFrame:
         return (
             map_team.pivot(index="opponent_team", columns="map", values=value_col)
             .reindex(index=team_order, columns=map_order)
             .fillna(0)
         )
 
-    round_diff_pivot = _build_heatmap_pivot("round_diff")
-    round_win_pct_pivot = _build_heatmap_pivot("round_win_pct")
-    match_diff_pivot = _build_heatmap_pivot("match_diff")
-    match_win_pct_pivot = _build_heatmap_pivot("match_win_pct")
+    sort_values = grp.set_index("opponent_team").copy()
+    if sort_choice == "Alphabetical":
+        team_order = sorted(sort_values.index.tolist(), key=lambda team: str(team).lower())
+    elif sort_choice == "Matches played":
+        team_order = sort_values.sort_values(["matches_played", "opponent_team"], ascending=[False, True]).index.tolist()
+    elif sort_choice == "Win rate":
+        team_order = sort_values.sort_values(["win_rate_match", "opponent_team"], ascending=[False, True]).index.tolist()
+    elif sort_choice == "Round differential":
+        team_order = sort_values.sort_values(["round_diff", "opponent_team"], ascending=[False, True]).index.tolist()
+    elif sort_choice == "Total wins":
+        team_order = sort_values.sort_values(["wins", "opponent_team"], ascending=[False, True]).index.tolist()
+    else:
+        metric_key_map = {
+            "Round Win/Lose by Team and Map": ("round_diff", "sum"),
+            "Round Win % by Team and Map": ("round_win_pct", "mean"),
+            "Match Win/Lose by Team and Map": ("match_diff", "sum"),
+            "Match Win % by Team and Map": ("match_win_pct", "mean"),
+        }
+        metric_col, agg_mode = metric_key_map[metric_sort_choice]
+        grouped_metric = map_team.groupby("opponent_team", dropna=False)[metric_col]
+        metric_scores = grouped_metric.sum() if agg_mode == "sum" else grouped_metric.mean()
+        team_order = (
+            metric_scores.reindex(sort_values.index).fillna(0).sort_values(ascending=False).index.tolist()
+        )
+
+    round_diff_pivot = _build_heatmap_pivot("round_diff", team_order)
+    round_win_pct_pivot = _build_heatmap_pivot("round_win_pct", team_order)
+    match_diff_pivot = _build_heatmap_pivot("match_diff", team_order)
+    match_win_pct_pivot = _build_heatmap_pivot("match_win_pct", team_order)
 
     round_diff_abs = float(round_diff_pivot.abs().to_numpy().max()) if not round_diff_pivot.empty else 0.0
     match_diff_abs = float(match_diff_pivot.abs().to_numpy().max()) if not match_diff_pivot.empty else 0.0
-
-    st.markdown("<div class='heatmap-stage--fullbleed'>", unsafe_allow_html=True)
-    st.markdown("### Heatmaps")
-    st.caption(
-        "Metrics: Round Win/Lose uses round differential (rounds won - rounds lost). "
-        "Match Win/Lose uses match differential (wins - losses)."
-    )
 
     _render_heatmap(
         round_diff_pivot,
