@@ -200,7 +200,7 @@ def _render_heatmap(
 def render(ctx):
     tdf = ctx["tactics"]
     mobile_view = is_mobile_view()
-    st.title("Medisports vs Teams")
+    section_header("Medisports vs Teams", "Opponent matchup intelligence and map-level pressure profile")
 
     if tdf.empty:
         st.warning("No tactics/opponent data after filters.")
