@@ -371,14 +371,14 @@ def render(ctx):
     )
     fig_wl = _apply_priority_chart_style(fig_wl, height=520)
     fig_wl.update_layout(
-        margin=dict(t=108, b=92, l=56, r=240),
+        margin=dict(t=152, b=92, l=56, r=56),
         legend=dict(
             title_text="Result",
-            orientation="v",
+            orientation="h",
             yanchor="top",
-            y=0.98,
-            xanchor="left",
-            x=1.02,
+            y=1.10,
+            xanchor="right",
+            x=1.0,
             bgcolor="rgba(10,16,28,0.55)",
             bordercolor="rgba(125,150,180,0.28)",
             borderwidth=1,
