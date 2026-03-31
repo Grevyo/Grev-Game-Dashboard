@@ -41,6 +41,21 @@ def render(ctx):
         st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")
     else:
         fig = px.scatter(grp, x="round_diff", y="win_rate", size="rounds", color="confidence", hover_name="competition", title="Over/Under-performance by competition")
+        fig.update_layout(
+            height=420,
+            margin=dict(l=14, r=14, t=62, b=40),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                title_text="",
+            ),
+            hoverlabel=dict(namelength=-1),
+        )
+        fig.update_xaxes(automargin=True)
+        fig.update_yaxes(automargin=True, ticksuffix="%", range=[0, 100])
         st.plotly_chart(fig, use_container_width=True)
 
     c1, c2 = st.columns(2)

@@ -406,7 +406,15 @@ def render(ctx):
         if PLOTLY_AVAILABLE:
             fig = px.line(p, x="date", y="grevscore", title="GrevScore Trend", markers=True)
             fig.update_traces(line_color="#21c77a")
-            fig.update_layout(margin=dict(l=10, r=10, t=44, b=10), height=280)
+            fig.update_layout(
+                height=320,
+                margin=dict(l=16, r=12, t=56, b=44),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                hovermode="x unified",
+                hoverlabel=dict(namelength=-1),
+            )
+            fig.update_xaxes(automargin=True, tickangle=0)
+            fig.update_yaxes(automargin=True)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")

@@ -123,6 +123,21 @@ def render(ctx):
         st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")
     else:
         fig = px.bar(view, x="win_rate", y="tactic_name", color="bucket", orientation="h", title="Tactic quality buckets")
+        fig.update_layout(
+            height=max(360, min(680, 180 + 34 * len(view))),
+            margin=dict(l=12, r=12, t=56, b=20),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                title_text="",
+            ),
+            hoverlabel=dict(namelength=-1),
+        )
+        fig.update_xaxes(automargin=True, ticksuffix="%")
+        fig.update_yaxes(automargin=True)
         st.plotly_chart(fig, use_container_width=True)
 
     low = view[view["uses"] < 5]
