@@ -438,7 +438,12 @@ def render(ctx):
     )
     st.dataframe(table.sort_values(["Δ vs Baseline", "Win Rate"], ascending=False), use_container_width=True, hide_index=True)
 
+    active_comp_text = ", ".join(selected_comp[:2]) if selected_comp else "None"
+    if len(selected_comp) > 2:
+        active_comp_text = f"{active_comp_text}, +{len(selected_comp) - 2} more"
+
     st.markdown("<div class='section-title' style='margin-top:10px;'>Tactic Deep-Dive Analyst Tool</div>", unsafe_allow_html=True)
+    st.caption(f"Context locked to {selected_map} • {selected_side} • Competition: {active_comp_text}")
     selected_tactic = st.selectbox("Inspect tactic", options=tactical["tactic_name"].sort_values().tolist())
     one = tactical[tactical["tactic_name"] == selected_tactic].iloc[0]
 
