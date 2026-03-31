@@ -12,6 +12,7 @@ except ModuleNotFoundError:
 
 from app.components import insight_card, section_header
 from app.filters import filter_panel_toggle
+from app.presentation_helpers import is_mobile_view
 from app.tactics import tactic_bucket, tactic_summary
 
 def _format_last_used(value) -> str:
@@ -87,6 +88,7 @@ def _build_display_view(summary: pd.DataFrame, tactics_df: pd.DataFrame, map_nam
 
 def render(ctx):
     tdf = ctx["tactics"]
+    mobile_view = is_mobile_view()
     st.title("Tactics Breakdown (Map + Side Strict)")
     if tdf.empty:
         st.warning("No tactics data after filters.")
@@ -123,22 +125,25 @@ def render(ctx):
         st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")
     else:
         fig = px.bar(view, x="win_rate", y="tactic_name", color="bucket", orientation="h", title="Tactic quality buckets")
+        chart_height = 320 if mobile_view else 360
+        if len(view) > 6:
+            chart_height = min(560 if mobile_view else 680, chart_height + (24 if mobile_view else 34) * len(view))
         fig.update_layout(
-            height=max(360, min(680, 180 + 34 * len(view))),
-            margin=dict(l=12, r=12, t=56, b=20),
+            height=chart_height,
+            margin=dict(l=12, r=12, t=56, b=16 if mobile_view else 20),
             legend=dict(
                 orientation="h",
-                yanchor="bottom",
-                y=1.02,
+                yanchor="top",
+                y=1.0 if mobile_view else 1.02,
                 xanchor="left",
                 x=0,
                 title_text="",
             ),
             hoverlabel=dict(namelength=-1),
         )
-        fig.update_xaxes(automargin=True, ticksuffix="%")
-        fig.update_yaxes(automargin=True)
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_xaxes(automargin=True, ticksuffix="%", tickfont=dict(size=10 if mobile_view else 11))
+        fig.update_yaxes(automargin=True, tickfont=dict(size=10 if mobile_view else 11))
+        st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
 
     low = view[view["uses"] < 5]
     if not low.empty:

@@ -1,5 +1,6 @@
 import re
 import unicodedata
+import streamlit as st
 
 COUNTRY_TO_ISO2 = {
     "argentina": "AR",
@@ -84,3 +85,18 @@ def fame_to_stars(fame_value) -> tuple[str, str]:
     rounded = int(round(clamped))
     stars = "★" * rounded + "☆" * (5 - rounded)
     return stars, f"{raw:.1f}"
+
+
+def is_mobile_view(default: bool = False) -> bool:
+    """Best-effort mobile detection based on request user-agent."""
+    context = getattr(st, "context", None)
+    headers = getattr(context, "headers", None) if context is not None else None
+    if not headers:
+        return default
+
+    user_agent = str(headers.get("user-agent", "")).lower()
+    if not user_agent:
+        return default
+
+    mobile_tokens = ["iphone", "android", "mobile", "ipad", "ipod", "windows phone"]
+    return any(token in user_agent for token in mobile_tokens)

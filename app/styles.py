@@ -252,8 +252,15 @@ def inject_styles(theme_name: str = "Dark"):
       }}
       [data-testid="stPlotlyChart"] {{
         overflow: hidden;
+        padding-bottom: 2px;
       }}
       [data-testid="stPlotlyChart"] > div {{
+        max-width: 100%;
+      }}
+      [data-testid="stPlotlyChart"] .modebar {{
+        right: 4px !important;
+      }}
+      [data-testid="stPlotlyChart"] .legend {{
         max-width: 100%;
       }}
       div[data-testid="stPills"],
