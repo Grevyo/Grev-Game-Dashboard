@@ -463,7 +463,7 @@ def render(ctx):
         with p4:
             insight_card("Avg Team Impact", f"Team baseline is {squad_avg_impact:.1f} impact per match sample.", "warn")
 
-    section_header("Active Roster", "Primary five-man usage core (>10% match appearance share in current context)")
+    section_header("Active Roster")
     if active_summary.empty:
         st.info("No players currently qualify for Active Roster in this filter context.")
     else:
@@ -471,7 +471,7 @@ def render(ctx):
         _render_roster_cards(active_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    section_header("Benched / Academy", "Secondary squad view — lower-usage players in the current filtered context")
+    section_header("Benched / Academy")
     if benched_summary.empty:
         st.info("No Benched / Academy players in this filtered context.")
     else:
@@ -480,7 +480,7 @@ def render(ctx):
         st.markdown("</div>", unsafe_allow_html=True)
 
     if all_streamer_names:
-        section_header("Streamer", "Rostered Medisports streamer profiles from players metadata")
+        section_header("Streamer")
         streamer_cards = pd.DataFrame(
             {
                 "player": streamer_meta_rows.get("player", pd.Series(dtype=object)).astype(str),
