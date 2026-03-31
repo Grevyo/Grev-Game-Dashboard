@@ -276,6 +276,37 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _dedupe_tactics_rows(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    cleaned = df.copy()
+    unnamed_cols = [c for c in cleaned.columns if str(c).strip().lower().startswith("unnamed:")]
+    if unnamed_cols:
+        cleaned = cleaned.drop(columns=unnamed_cols, errors="ignore")
+
+    dedupe_keys = [
+        "match_id",
+        "date",
+        "time",
+        "map",
+        "competition",
+        "my_team",
+        "opponent_team",
+        "side",
+        "tactic_name",
+        "wins",
+        "losses",
+        "total_rounds",
+        "win_rate_pct",
+    ]
+    existing_keys = [col for col in dedupe_keys if col in cleaned.columns]
+    if not existing_keys:
+        return cleaned
+
+    return cleaned.drop_duplicates(subset=existing_keys, keep="first").reset_index(drop=True)
+
+
 @st.cache_data(show_spinner=False)
 def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) -> dict[str, pd.DataFrame]:
     player_matches = _derive_core(_read_flexible_csv(FILES["player_matches"]))
@@ -285,6 +316,7 @@ def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) ->
 
     tactics = tactics.rename(columns={"": "tier"})
     tactics = _safe_numeric(tactics, ["wins", "losses", "total_rounds", "win_rate_pct"])
+    tactics = _dedupe_tactics_rows(tactics)
     player_matches = _safe_numeric(
         player_matches,
         [

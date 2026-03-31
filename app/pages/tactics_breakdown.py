@@ -157,6 +157,37 @@ def _first_existing_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
     return None
 
 
+def _dedupe_tactic_rows(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    cleaned = df.copy()
+    unnamed_cols = [c for c in cleaned.columns if str(c).strip().lower().startswith("unnamed:")]
+    if unnamed_cols:
+        cleaned = cleaned.drop(columns=unnamed_cols, errors="ignore")
+
+    dedupe_keys = [
+        "match_id",
+        "date",
+        "time",
+        "map",
+        "competition",
+        "my_team",
+        "opponent_team",
+        "side",
+        "tactic_name",
+        "wins",
+        "losses",
+        "total_rounds",
+        "win_rate_pct",
+    ]
+    existing_keys = [col for col in dedupe_keys if col in cleaned.columns]
+    if not existing_keys:
+        return cleaned
+
+    return cleaned.drop_duplicates(subset=existing_keys, keep="first").reset_index(drop=True)
+
+
 def _manual_exclusion_key(map_name: str, side: str) -> str:
     return f"tsr_excluded::{map_name}::{side}"
 
@@ -674,6 +705,7 @@ def _render_tactics_breakdown(ctx, *, recent_mode: bool = False):
     tactic_matches = scoped[
         (scoped["tactic_name"] == one["tactic_name"]) & (scoped["map"] == one["map"]) & (scoped["side"] == one["side"])
     ].copy()
+    tactic_matches = _dedupe_tactic_rows(tactic_matches)
     tactic_matches["opponent"] = tactic_matches.get("opponent_team", "Unknown").astype(str).str.strip().replace("", "Unknown")
     tactic_matches["rounds_used"] = tactic_matches["total_rounds"]
     tactic_matches["rounds_won"] = tactic_matches["wins"]
