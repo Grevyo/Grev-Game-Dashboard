@@ -347,105 +347,22 @@ def render(ctx):
         st.plotly_chart(wr_fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
         _frame_end()
     with right:
-        _frame(
-            "Sample Size vs Win Rate vs Round Diff",
-            "X = rounds played, Y = match win rate. Bubble size = matches, color = round differential.",
+        _frame("Sample Size vs Win Rate vs Round Diff", "Bubble size = matches, color = round differential")
+        scatter = px.scatter(
+            scoped,
+            x="rounds",
+            y="win_rate_match",
+            size="matches_played",
+            color="round_diff",
+            hover_name="opponent_team",
+            text="opponent_team",
+            color_continuous_scale=["#ff4d5e", "#d3a85c", "#9FE870"],
         )
-        bubble = scoped.copy()
-        rounds_span = float((bubble["rounds"].max() - bubble["rounds"].min()) or 1.0)
-        rounds_norm = ((bubble["rounds"] - bubble["rounds"].min()) / rounds_span).clip(0, 1)
-        bubble["bubble_size"] = (10 + np.sqrt(rounds_norm) * 22).round(2)
-
-        score_columns = ["rounds", "win_rate_match", "round_diff"]
-        score_frame = bubble[score_columns].copy()
-        score_std = score_frame.std(ddof=0).replace(0, 1)
-        z_scores = (score_frame - score_frame.mean()) / score_std
-        bubble["label_score"] = z_scores["rounds"] * 1.1 + z_scores["win_rate_match"] + z_scores["round_diff"].abs() * 0.65
-        label_count = int(min(6, max(3, np.ceil(len(bubble) * 0.22))))
-        bubble["is_key"] = False
-        bubble.loc[bubble.nlargest(label_count, "label_score").index, "is_key"] = True
-
-        rd_cap = float(max(1.0, np.nanquantile(np.abs(bubble["round_diff"]), 0.95)))
-        win_mid = float(bubble["win_rate_match"].median())
-        rounds_mid = float(bubble["rounds"].median())
-
-        scatter = go.Figure()
-        non_key = bubble[~bubble["is_key"]]
-        key = bubble[bubble["is_key"]]
-
-        scatter.add_trace(
-            go.Scatter(
-                x=non_key["rounds"],
-                y=non_key["win_rate_match"],
-                mode="markers",
-                customdata=np.stack([non_key["opponent_team"], non_key["matches_played"], non_key["round_diff"]], axis=-1),
-                hovertemplate="<b>%{customdata[0]}</b><br>Rounds: %{x}<br>Win rate: %{y:.1f}%<br>Matches: %{customdata[1]}<br>Round diff: %{customdata[2]:+d}<extra></extra>",
-                marker=dict(
-                    size=non_key["bubble_size"],
-                    color=non_key["round_diff"],
-                    cmin=-rd_cap,
-                    cmax=rd_cap,
-                    colorscale=[[0, "#ff4d5e"], [0.5, "#d3a85c"], [1, "#9FE870"]],
-                    opacity=0.44,
-                    line=dict(color="rgba(202,214,230,0.3)", width=1.0),
-                    colorbar=dict(
-                        title="Round Diff",
-                        titleside="top",
-                        tickformat="+d",
-                        thickness=10,
-                        len=0.66,
-                        y=0.5,
-                    ),
-                ),
-                showlegend=False,
-            )
-        )
-        scatter.add_trace(
-            go.Scatter(
-                x=key["rounds"],
-                y=key["win_rate_match"],
-                mode="markers+text",
-                text=key["opponent_team"],
-                textposition="top center",
-                textfont=dict(size=11, color="#eaf2ff"),
-                customdata=np.stack([key["opponent_team"], key["matches_played"], key["round_diff"]], axis=-1),
-                hovertemplate="<b>%{customdata[0]}</b><br>Rounds: %{x}<br>Win rate: %{y:.1f}%<br>Matches: %{customdata[1]}<br>Round diff: %{customdata[2]:+d}<extra></extra>",
-                marker=dict(
-                    size=key["bubble_size"] + 1.5,
-                    color=key["round_diff"],
-                    cmin=-rd_cap,
-                    cmax=rd_cap,
-                    colorscale=[[0, "#ff4d5e"], [0.5, "#d3a85c"], [1, "#9FE870"]],
-                    opacity=0.95,
-                    line=dict(color="rgba(236,244,255,0.95)", width=1.7),
-                    showscale=False,
-                ),
-                showlegend=False,
-            )
-        )
-        scatter.add_hline(y=win_mid, line_dash="dot", line_color="rgba(192,206,224,0.35)", line_width=1.2)
-        scatter.add_vline(x=rounds_mid, line_dash="dot", line_color="rgba(192,206,224,0.35)", line_width=1.2)
-        scatter.update_layout(
-            template="plotly_dark",
-            height=560 if not mobile_view else 440,
-            margin=dict(l=12, r=12, t=8, b=44),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-        )
-        scatter.update_yaxes(
-            range=[0, 100],
-            ticksuffix="%",
-            title="Match Win Rate",
-            gridcolor="rgba(133,147,163,0.2)",
-            zeroline=False,
-        )
-        scatter.update_xaxes(
-            title="Round Sample Size",
-            gridcolor="rgba(133,147,163,0.2)",
-            zeroline=False,
-        )
+        scatter.update_traces(textposition="top center", textfont=dict(size=10), marker=dict(line=dict(color="rgba(231,241,255,.8)", width=1.4), opacity=0.82))
+        scatter.update_layout(template="plotly_dark", height=560 if not mobile_view else 440, margin=dict(l=12, r=12, t=8, b=32), plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        scatter.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
+        scatter.update_xaxes(gridcolor="rgba(133,147,163,0.24)")
         st.plotly_chart(scatter, use_container_width=True, config={"responsive": True, "displayModeBar": True})
-        st.caption("Labels focus on the most informative opponents (highest blend of sample, win-rate edge, and round-diff signal).")
         _frame_end()
 
     row2_left, row2_right = st.columns(2, gap="small")
