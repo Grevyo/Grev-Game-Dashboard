@@ -340,8 +340,8 @@ def render(ctx):
             <div class='player-viewer-head-main'>
               {hero_photo}
               <div class='player-viewer-head-body'>
-                <div class='section-title' style='margin-top:0'>{player}</div>
-                <div class='section-subtitle'>{nation_label} • {role if role else 'Core Roster'} • {team_name}</div>
+                <div class='player-viewer-player-title'>{player}</div>
+                <div class='player-viewer-player-meta'>{nation_label} • {role if role else 'Core Roster'} • {team_name}</div>
                 <div class='player-viewer-chip-row'>
                   <span class='chip'>Role: {role if role else 'N/A'}</span>
                   <span class='chip'>Record: {record_value}</span>
@@ -353,7 +353,7 @@ def render(ctx):
             </div>
             <div class='player-viewer-gauge-panel'>
               <div class='player-viewer-gauge-header'>
-                <div class='section-title player-viewer-mini-title'>GrevScore Gauge ✓</div>
+                <div class='section-title player-viewer-mini-title'>GrevScore Gauge</div>
                 {hero_logo}
               </div>
               <div class='player-viewer-gauge-wrap'>
@@ -379,9 +379,7 @@ def render(ctx):
         """,
         unsafe_allow_html=True,
     )
-    st.markdown(f"<div class='muted'>Best Map: {best_map_value} ({player})</div>", unsafe_allow_html=True)
-
-    section_header("Achievements ✓", "Newest-to-oldest by season, aligned with overview card logic")
+    section_header("Achievements", "Newest-to-oldest by season, aligned with overview card logic")
     ach_items, ach_hidden = achievements_for_player(achievements, player, cap=6, consumer="overview")
     if not ach_items:
         st.caption("No achievements linked for selected player.")
@@ -396,9 +394,9 @@ def render(ctx):
     best_five_matches = build_best_n_matches(df, ctx.get("tactics", pd.DataFrame()), player, n=5)
     m1, m2 = st.columns(2, gap="small")
     with m1:
-        _render_match_list("Last 5 Matches ✓", last_five_matches, "No recent matches in this scope", block_variant="last")
+        _render_match_list("Last 5 Matches", last_five_matches, "No recent matches in this scope", block_variant="last")
     with m2:
-        _render_match_list("Best 5 Matches ✓", best_five_matches, "No best matches in this scope", block_variant="best")
+        _render_match_list("Best 5 Matches", best_five_matches, "No best matches in this scope", block_variant="best")
 
     section_header("Performance Core", "GrevScore feature and headline cards")
     left, right = st.columns([1.3, 1], gap="small")

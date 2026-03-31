@@ -3,7 +3,8 @@ RAW_COMPETITION_COL = "raw_competition_name"
 
 
 def is_grouped_mode(mode: str | None) -> bool:
-    return mode == "Grouped competitions"
+    normalized = str(mode or "").strip().casefold()
+    return normalized in {"grouped", "grouped competitions"}
 
 
 def get_active_competition_col(group_mode: bool) -> str:
