@@ -362,19 +362,7 @@ def render(ctx):
     fig_wl.update_layout(
         legend_title_text="Result",
         bargap=0.25,
-        margin=dict(t=128, b=92, l=56, r=26),
-        title=dict(pad=dict(t=22, b=18)),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.03,
-            xanchor="right",
-            x=1.0,
-            traceorder="normal",
-            bgcolor="rgba(10,16,28,0.55)",
-            bordercolor="rgba(125,150,180,0.28)",
-            borderwidth=1,
-        ),
+        title=dict(pad=dict(t=18, b=10)),
     )
     fig_wl.update_traces(
         marker_line_color="rgba(240,245,255,0.20)",
@@ -383,12 +371,12 @@ def render(ctx):
     )
     fig_wl = _apply_priority_chart_style(fig_wl, height=520)
     fig_wl.update_layout(
-        margin=dict(t=96, b=92, l=56, r=180),
+        margin=dict(t=108, b=92, l=56, r=240),
         legend=dict(
             title_text="Result",
             orientation="v",
             yanchor="top",
-            y=1.0,
+            y=0.98,
             xanchor="left",
             x=1.02,
             bgcolor="rgba(10,16,28,0.55)",
