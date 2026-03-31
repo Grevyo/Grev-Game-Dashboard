@@ -44,7 +44,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .block-container {{
       max-width: min(98vw, 1820px);
-      padding: .65rem .8rem 1.4rem;
+      padding: .85rem .8rem 1.4rem;
     }}
 
     h1,h2,h3,h4 {{ color:var(--text); letter-spacing:.01em; font-weight:760; }}
@@ -64,11 +64,25 @@ def inject_styles(theme_name: str = "Dark"):
       overflow:hidden;
       border:1px solid #304153;
       border-radius: var(--radius-l);
-      padding: 1.05rem 1.15rem;
+      padding: .8rem .95rem;
       background:
         linear-gradient(92deg, rgba(12,20,30,.97) 0%, rgba(10,16,24,.96) 44%, rgba(15,24,34,.98) 100%);
       box-shadow: 0 24px 48px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
     }}
+    .app-topbar {{ padding: .7rem .9rem; }}
+    .app-topbar-row {{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }}
+    .app-topbar-brand {{ display:flex; align-items:center; gap:10px; min-width: 0; }}
+    .app-topbar-copy {{ min-width: 0; }}
+    .app-topbar-kicker {{ margin:0 0 .1rem 0 !important; }}
+    .app-topbar-title {{
+      font-size:1.04rem;
+      line-height:1.12;
+      font-weight:800;
+      letter-spacing:.01em;
+      color:#f4f9ff;
+    }}
+    .app-topbar-subtitle {{ margin:.2rem 0 0 0; font-size:.74rem; max-width:780px; line-height:1.35; }}
+    .app-topbar-chips {{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }}
     .hero-band::before {{
       content:""; position:absolute; inset:0; pointer-events:none;
       background: linear-gradient(90deg, transparent 0%, rgba(159,232,112,.07) 45%, transparent 100%);
@@ -111,6 +125,16 @@ def inject_styles(theme_name: str = "Dark"):
       font-size:.58rem; text-transform:uppercase; letter-spacing:.12em;
       padding:3px 8px;
     }}
+
+    .hero-logo {{
+      width:56px;
+      height:56px;
+      object-fit:contain;
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,.28));
+    }}
+    .overview-hero .hero-logo {{ width:46px; height:46px; }}
+    .player-viewer-hero .hero-logo {{ width:42px; height:42px; }}
+    .app-topbar .hero-logo {{ width:48px; height:48px; }}
     .chip-good {{ border-color:color-mix(in srgb, var(--lime) 55%, #31404f); color:var(--lime); }}
     .chip-mid {{ border-color:color-mix(in srgb, var(--gold) 55%, #31404f); color:var(--gold); }}
     .chip-poor {{ border-color:color-mix(in srgb, var(--ember) 55%, #31404f); color:var(--ember); }}
@@ -120,6 +144,13 @@ def inject_styles(theme_name: str = "Dark"):
       border:1px solid var(--line); border-radius:7px; padding:5px;
       background:#0d141e; box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
       margin-bottom: 10px;
+    }}
+    div[data-testid="stSegmentedControl"] > div,
+    div[data-testid="stPills"] > div,
+    div[data-testid="stRadio"][role="radiogroup"] > div {{
+      display:flex;
+      flex-wrap:nowrap;
+      gap:6px;
     }}
     div[data-testid="stPills"] label[data-baseweb="checkbox"] > div:first-child,
     div[data-testid="stSegmentedControl"] label[data-baseweb="radio"] > div:first-child,
@@ -195,6 +226,37 @@ def inject_styles(theme_name: str = "Dark"):
     .last-match-result-loss, .match-outcome.loss {{ color:var(--crimson); }}
 
     .player-viewer-hero-grid {{ display:grid; grid-template-columns: minmax(0,2fr) minmax(280px,1fr); gap:10px; }}
+    .overview-hero-row {{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }}
+    .overview-hero-brand {{ display:flex; align-items:flex-start; gap:10px; }}
+    .overview-hero-copy {{ display:flex; flex-direction:column; gap:7px; }}
+    .overview-hero-kicker {{ margin:0 !important; }}
+    .overview-hero-title {{
+      font-size:1.02rem;
+      line-height:1.25;
+      font-weight:760;
+      color:#edf4fd;
+      margin:0;
+    }}
+    .overview-hero-meta, .overview-hero-stats {{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }}
+
+    .player-viewer-head-main {{ display:flex; gap:10px; align-items:flex-start; }}
+    .player-viewer-player-title {{
+      margin:0 0 2px 0;
+      font-size:1.18rem;
+      line-height:1.12;
+      font-weight:800;
+      letter-spacing:.01em;
+      color:#f5fbff;
+    }}
+    .player-viewer-player-meta {{
+      margin:0;
+      color:#9db0c4;
+      font-size:.72rem;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }}
+    .player-viewer-chip-row {{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }}
+    .player-viewer-form-note {{ margin-top:8px; }}
     .player-viewer-top-metrics {{ display:grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap:7px; margin-top:10px; }}
     .grev-gauge {{
       --gauge-pct:50%; width:164px; height:164px; border-radius:999px;
@@ -219,6 +281,9 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     @media (max-width: 760px) {{
       .block-container {{ padding:.55rem .5rem 1.05rem; }}
+      .app-topbar-title {{ font-size:.96rem; }}
+      .hero-logo, .app-topbar .hero-logo {{ width:38px; height:38px; }}
+      .overview-hero .hero-logo, .player-viewer-hero .hero-logo {{ width:34px; height:34px; }}
       .player-viewer-top-metrics, .stats-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
       .grev-tier-strip {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
     }}

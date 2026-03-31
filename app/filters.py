@@ -38,7 +38,7 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
     season_options = _int_sorted_values(player_df, "resolved_season")
     current_season = get_current_season(player_df, "resolved_season")
     default_season = [current_season] if current_season and current_season in season_options else season_options
-    default_comp_mode = "Grouped competitions"
+    default_comp_mode = "Grouped"
 
     state_defaults = {
         "global_theme": "Dark",
@@ -54,6 +54,10 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
     for key, default in state_defaults.items():
         if key not in st.session_state:
             st.session_state[key] = default
+    if st.session_state.get("global_comp_mode") == "Grouped competitions":
+        st.session_state["global_comp_mode"] = "Grouped"
+    if st.session_state.get("global_comp_mode") == "Individual competitions":
+        st.session_state["global_comp_mode"] = "Individual"
 
     st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
     st.markdown("<div class='section-title' style='margin-bottom:4px;'>Context Controls</div>", unsafe_allow_html=True)
@@ -66,7 +70,24 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
         with c1:
             theme = st.selectbox("Theme", ["Dark", "Light"], key="global_theme")
         with c2:
-            comp_mode = st.radio("Competition mode", ["Grouped competitions", "Individual competitions"], key="global_comp_mode", horizontal=True)
+            if hasattr(st, "segmented_control"):
+                comp_mode = st.segmented_control(
+                    "Competition mode",
+                    ["Grouped", "Individual"],
+                    key="global_comp_mode",
+                    selection_mode="single",
+                    default=st.session_state.get("global_comp_mode", default_comp_mode),
+                )
+            elif hasattr(st, "pills"):
+                comp_mode = st.pills(
+                    "Competition mode",
+                    ["Grouped", "Individual"],
+                    key="global_comp_mode",
+                    selection_mode="single",
+                    default=st.session_state.get("global_comp_mode", default_comp_mode),
+                )
+            else:
+                comp_mode = st.radio("Competition mode", ["Grouped", "Individual"], key="global_comp_mode", horizontal=True)
         with c3:
             season_vals = st.multiselect("Season", season_options, key="global_season")
 
@@ -131,7 +152,11 @@ def global_filters_from_state(player_df: pd.DataFrame):
     current_season = get_current_season(player_df, "resolved_season")
     default_season = [current_season] if current_season and current_season in season_options else season_options
 
-    comp_mode = st.session_state.get("global_comp_mode", "Grouped competitions")
+    comp_mode = st.session_state.get("global_comp_mode", "Grouped")
+    if comp_mode == "Grouped competitions":
+        comp_mode = "Grouped"
+    elif comp_mode == "Individual competitions":
+        comp_mode = "Individual"
     competitions_col = get_active_competition_col(is_grouped_mode(comp_mode))
     return {
         "theme": st.session_state.get("global_theme", "Dark"),

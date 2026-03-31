@@ -398,18 +398,20 @@ def render(ctx):
 
     st.markdown(
         f"""
-        <div class='hero-band'>
-            <div style='display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;'>
-              <div style='display:flex;align-items:center;gap:14px;'>
+        <div class='hero-band overview-hero'>
+            <div class='overview-hero-row'>
+              <div class='overview-hero-brand'>
                 {team_logo_html}
-                <div>
-                  <div class='section-title' style='margin-top:0'>Squad Command Hub</div>
-                  <div class='section-subtitle' style='margin-bottom:8px;'>Live Medisports pulse across map, side, and form context.</div>
+                <div class='overview-hero-copy'>
+                  <div class='section-title overview-hero-kicker'>Squad Command Hub</div>
+                  <div class='overview-hero-title'>Live Medisports pulse across map, side, and form context.</div>
+                  <div class='overview-hero-meta'>
                   <span class='chip'>Season: {', '.join(map(str, seasons[:2]))}{'…' if len(seasons) > 2 else ''}</span>
                   <span class='chip'>Map scope: {', '.join(map(str, maps[:2]))}{'…' if len(maps) > 2 else ''}</span>
+                  </div>
                 </div>
               </div>
-              <div>
+              <div class='overview-hero-stats'>
                 <span class='chip chip-good'>Active: {active_summary['player'].nunique()}</span>
                 <span class='chip chip-poor'>Benched/Academy: {benched_summary['player'].nunique()}</span>
                 <span class='chip chip-mid'>Streamer: {len(all_streamer_names)}</span>
@@ -463,9 +465,6 @@ def render(ctx):
     if active_summary.empty:
         st.info("No players currently qualify for Active Roster in this filter context.")
     else:
-        proof_player = str(active_summary.iloc[0]["player"])
-        proof_best_map = _overview_best_map_payload(df, proof_player)["best_map"]
-        st.markdown(f"<div class='muted'>Best Map (Overview): {proof_best_map} ({proof_player})</div>", unsafe_allow_html=True)
         st.markdown("<div class='roster-section roster-section-main'>", unsafe_allow_html=True)
         _render_roster_cards(active_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
