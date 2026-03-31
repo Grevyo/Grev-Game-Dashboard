@@ -1,7 +1,7 @@
 import streamlit as st
 
 from app.data_loader import detect_our_team, load_data, validate_columns
-from app.filters import apply_filters, build_global_filters, filter_panel_toggle, filter_summary, global_filters_from_state
+from app.filters import apply_filters, build_global_filters, filter_panel_toggle, global_filters_from_state
 from app.image_helpers import find_team_logo, image_data_uri
 from app.pages import overview, player_viewer, tactic_set_recommendations, tactics_breakdown, vs_teams, vs_tournaments
 from app.styles import inject_styles
@@ -132,6 +132,4 @@ def run_app():
     meta_3.markdown(f"<div class='panel panel-tight accent-poor'><div class='metric-title'>Profiles</div><div class='metric-value'>{len(data['players'])}</div></div>", unsafe_allow_html=True)
     meta_4.markdown(f"<div class='panel panel-tight accent-good'><div class='metric-title'>Latest Match</div><div class='metric-value' style='font-size:1.1rem'>{max_match_date}</div></div>", unsafe_allow_html=True)
 
-    filter_summary(filters)
-    st.markdown("<div class='context-ribbon'><span class='section-title' style='margin-bottom:2px'>Active Workspace</span><span class='muted'>Analyst view: tactical and player intelligence surfaces are now tuned for a dense esports control-room layout.</span></div>", unsafe_allow_html=True)
     PAGES[page](filtered)
