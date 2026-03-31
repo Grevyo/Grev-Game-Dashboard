@@ -58,7 +58,7 @@ MAP_OPTIONAL_PATTERNS = {
     "train": {
         "Ivy": [r"\bIVY\b"],
         "Apps": [r"\bAPPS?\b"],
-        "Connector": [r"\bCONNECTOR\b", r"\bCONN\b"],
+        "Connector": [r"\bCONNECTOR\b", r"\bCONN\b", r"\bCON\b"],
     },
     "castle": {
         "Mid": [r"\bMID\b"],
