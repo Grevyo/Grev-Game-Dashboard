@@ -1,257 +1,86 @@
+import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
+
 from app.metrics import confidence_from_sample
-from app.page_layout import is_mobile_view, section_header
+from app.page_layout import is_mobile_view
 
 
-def _summary_box(label: str, value: str, accent: str, bg: str) -> None:
+HEATMAP_RED_GREEN_SCALE = [
+    [0.0, "#7f1d1d"],
+    [0.5, "#3f4a3f"],
+    [1.0, "#166534"],
+]
+
+
+def _fmt_pct(value: float) -> str:
+    return f"{float(value):.1f}%"
+
+
+def _fmt_signed(value: float) -> str:
+    return f"{int(round(float(value))):+d}"
+
+
+def _hero(total_opponents: int, total_matches: int, total_rounds: int) -> None:
     st.markdown(
         f"""
-        <div class='panel panel-tight stat-widget' style='border-left:4px solid {accent}; min-height:82px;'>
-            <div class='metric-title'>{label}</div>
-            <div class='metric-value' style='margin-top:6px'>{value}</div>
+        <div class='hero-band teams-hero'>
+            <div class='teams-hero-grid'>
+                <div>
+                    <div class='section-title teams-hero-kicker'>Opponent Intelligence Surface</div>
+                    <h1 class='teams-hero-title'>Medisports vs Teams</h1>
+                    <p class='section-subtitle teams-hero-subtitle'>
+                        Premium matchup command board for opponent quality, map pressure points, and sample-backed confidence.
+                    </p>
+                </div>
+                <div class='teams-hero-meta'>
+                    <span class='chip chip-good'>{total_opponents} opponents tracked</span>
+                    <span class='chip chip-mid'>{total_matches} matches</span>
+                    <span class='chip'>{total_rounds} rounds logged</span>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-HEATMAP_RED_GREEN_SCALE = [
-    [0.0, "#7f1d1d"],   # deep red (poor)
-    [0.5, "#3f4a3f"],   # muted dark midpoint (neutral)
-    [1.0, "#166534"],   # deep green (strong)
-]
-
-
-def _apply_priority_chart_style(fig, *, height: int = 500, x_tickangle: int = -20, mobile_view: bool = False):
-    fig.update_layout(
-        template="plotly_dark",
-        height=height,
-        margin=dict(l=30 if mobile_view else 44, r=12 if mobile_view else 18, t=62, b=52 if mobile_view else 78),
-        title=dict(font=dict(size=16, color="#F0F4FA"), x=0.0, xanchor="left"),
-        legend=dict(
-            title_font=dict(size=12, color="#EAF2FF"),
-            font=dict(size=10 if mobile_view else 11, color="#C7D1DD"),
-            orientation="h",
-            yanchor="top",
-            y=1.0 if mobile_view else 1.02,
-            xanchor="left",
-            x=0.0,
-            bgcolor="rgba(13,18,26,0.66)",
-            bordercolor="rgba(97,111,130,0.34)",
-            borderwidth=1,
-        ),
-        plot_bgcolor="rgba(12,17,24,0.88)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        hoverlabel=dict(
-            bgcolor="rgba(14,20,31,0.96)",
-            bordercolor="rgba(123,144,168,0.65)",
-            font=dict(color="#F5F8FF", size=12),
-        ),
-        font=dict(color="#CAD3DF"),
+def _kpi_card(title: str, primary: str, secondary: str, accent: str = "good") -> None:
+    st.markdown(
+        f"""
+        <div class='panel panel-tight stat-widget teams-kpi accent-{accent}'>
+            <div class='metric-title'>{title}</div>
+            <div class='metric-value teams-kpi-value'>{primary}</div>
+            <div class='muted'>{secondary}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    fig.update_xaxes(
-        tickangle=x_tickangle,
-        automargin=True,
-        tickfont=dict(size=10 if mobile_view else 11),
-        title_font=dict(size=13),
-        ticklabelposition="outside",
-        showgrid=False,
-        zeroline=False,
-    )
-    fig.update_yaxes(
-        automargin=True,
-        tickfont=dict(size=10 if mobile_view else 11),
-        title_font=dict(size=13),
-        gridcolor="rgba(104,116,131,0.28)",
-        griddash="dot",
-        zeroline=False,
-    )
-    return fig
 
 
-def _render_chart_panel(fig, heading: str, note: str = ""):
-    st.markdown("<div class='analytics-frame'>", unsafe_allow_html=True)
-    if heading:
-        st.markdown(f"<div class='section-title' style='margin-bottom:4px'>{heading}</div>", unsafe_allow_html=True)
-    if note:
-        st.markdown(f"<div class='section-subtitle' style='margin-bottom:10px'>{note}</div>", unsafe_allow_html=True)
-    st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+def _frame(title: str, subtitle: str = "") -> None:
+    st.markdown("<div class='analytics-frame teams-chart-frame'>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
+    if subtitle:
+        st.markdown(f"<div class='section-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
+
+
+def _frame_end() -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _render_match_record_table(view: pd.DataFrame) -> None:
-    sortable_df = (
-        view[
-            [
-                "opponent_team",
-                "matches_played",
-                "wins",
-                "losses",
-                "draws",
-                "win_rate_match",
-                "win_rate_rounds",
-                "round_diff",
-                "latest_result_label",
-                "confidence",
-            ]
-        ]
-        .copy()
-        .rename(
-            columns={
-                "opponent_team": "Opponent",
-                "matches_played": "Matches",
-                "wins": "Wins",
-                "losses": "Losses",
-                "draws": "Draws",
-                "win_rate_match": "Win% (Match)",
-                "win_rate_rounds": "Win% (Rounds)",
-                "round_diff": "Round Diff",
-                "latest_result_label": "Latest Result",
-                "confidence": "Confidence",
-            }
-        )
-    )
-
-    # Keep this rendered as a native Streamlit dataframe (not styled HTML)
-    # so users can sort by clicking headers in the visible table.
-    st.markdown("<div class='table-frame match-record-premium-shell'>", unsafe_allow_html=True)
-
-    st.dataframe(
-        sortable_df,
-        hide_index=True,
-        use_container_width=True,
-        key="match_record_vs_teams_table",
-        column_config={
-            "Opponent": st.column_config.TextColumn("Opponent"),
-            "Matches": st.column_config.NumberColumn("Matches", format="%d"),
-            "Wins": st.column_config.NumberColumn("Wins", format="%d"),
-            "Losses": st.column_config.NumberColumn("Losses", format="%d"),
-            "Draws": st.column_config.NumberColumn("Draws", format="%d"),
-            "Win% (Match)": st.column_config.ProgressColumn(
-                "Win% (Match)",
-                min_value=0.0,
-                max_value=100.0,
-                format="%.1f%%",
-            ),
-            "Win% (Rounds)": st.column_config.ProgressColumn(
-                "Win% (Rounds)",
-                min_value=0.0,
-                max_value=100.0,
-                format="%.1f%%",
-            ),
-            "Round Diff": st.column_config.NumberColumn("Round Diff", format="%+d"),
-            "Latest Result": st.column_config.TextColumn("Latest Result"),
-            "Confidence": st.column_config.TextColumn("Confidence"),
-        },
-    )
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-def _render_heatmap(
-    pivot: pd.DataFrame,
-    title: str,
-    color_label: str,
-    zmin=None,
-    zmax=None,
-    zmid=None,
-    scale=HEATMAP_RED_GREEN_SCALE,
-    mobile_view: bool = False,
-) -> None:
-    if pivot.empty:
-        st.info(f"No data available for {title}.")
-        return
-
-    numeric_pivot = pivot.apply(pd.to_numeric, errors="coerce")
-    if numeric_pivot.empty or numeric_pivot.notna().sum().sum() == 0:
-        st.info(f"No numeric data available for {title}.")
-        return
-
-    imshow_kwargs = {
-        "img": numeric_pivot,
-        "aspect": "auto",
-        "color_continuous_scale": scale,
-        "labels": {"x": "Map", "y": "Team", "color": color_label},
-        "text_auto": ".1f",
-        "title": title,
-    }
-
-    if zmin is not None or zmax is not None:
-        imshow_kwargs["range_color"] = [zmin, zmax]
-    if zmid is not None:
-        imshow_kwargs["color_continuous_midpoint"] = zmid
-
-    heat = px.imshow(**imshow_kwargs)
-    heat.update_traces(textfont={"color": "#F5F7FA", "size": 10 if mobile_view else 12})
-    map_count = len(pivot.columns)
-    team_count = len(pivot.index)
-    max_team_name_len = max((len(str(name)) for name in pivot.index), default=0)
-    longest_map_label_len = max((len(str(name)) for name in pivot.columns), default=0)
-    left_margin = (
-        min(240, 56 + max_team_name_len * 6) if mobile_view else min(420, 88 + max_team_name_len * 8)
-    )
-    base_height = 260 if mobile_view else 320
-    per_team_height = 36 if mobile_view else 44
-    dynamic_height = base_height + team_count * per_team_height
-    heat.update_layout(
-        template="plotly_dark",
-        height=max(420 if mobile_view else 560, min(3200, dynamic_height)),
-        margin=dict(
-            l=left_margin,
-            r=8 if mobile_view else 16,
-            t=66,
-            b=(72 if mobile_view else 100) + (8 if longest_map_label_len > 14 else 0),
-        ),
-        xaxis=dict(
-            tickangle=-38 if map_count > 3 else 0,
-            automargin=True,
-            tickfont=dict(size=10 if mobile_view else 12),
-            tickmode="linear",
-            dtick=1,
-            side="bottom",
-        ),
-        yaxis=dict(
-            automargin=True,
-            tickfont=dict(size=10 if mobile_view else 12),
-            tickmode="linear",
-            dtick=1,
-            categoryorder="array",
-            categoryarray=list(pivot.index),
-        ),
-        coloraxis_colorbar=dict(len=0.80, thickness=14, y=0.52),
-    )
-    st.markdown("<div class='heatmap-stage'>", unsafe_allow_html=True)
-    st.plotly_chart(heat, use_container_width=True, config={"responsive": True, "displayModeBar": True})
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-def render(ctx):
-    tdf = ctx["tactics"]
-    mobile_view = is_mobile_view()
-    section_header("Medisports vs Teams", "Opponent matchup intelligence and map-level pressure profile")
-
-    if tdf.empty:
-        st.warning("No tactics/opponent data after filters.")
-        return
-
-    base = tdf.copy()
-    base["opponent_team"] = base["opponent_team"].astype(str).str.strip().replace("", "Unknown Opponent")
-    base["map"] = base["map"].astype(str).str.strip().replace("", "Unknown Map")
-    base["date"] = base["date"].astype(str).str.strip()
-    base["time"] = base["time"].astype(str).str.strip()
-    base["match_ts"] = pd.to_datetime((base["date"] + " " + base["time"]).str.strip(), errors="coerce")
-
+def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     match_level = (
         base.groupby(["opponent_team", "match_id"], dropna=False)
         .agg(
-            map=("map", "first"),
-            date=("date", "first"),
-            time=("time", "first"),
             match_ts=("match_ts", "max"),
+            map_count=("map", "nunique"),
             round_wins=("wins", "sum"),
             round_losses=("losses", "sum"),
             rounds=("total_rounds", "sum"),
+            primary_map=("map", lambda s: str(s.dropna().iloc[0]) if len(s.dropna()) else "Unknown Map"),
         )
         .reset_index()
     )
@@ -259,7 +88,7 @@ def render(ctx):
     match_level["match_win"] = (match_level["match_diff"] > 0).astype(int)
     match_level["match_loss"] = (match_level["match_diff"] < 0).astype(int)
     match_level["match_draw"] = (match_level["match_diff"] == 0).astype(int)
-    match_level["latest_result"] = match_level["match_diff"].apply(lambda x: "W" if x > 0 else "L" if x < 0 else "D")
+    match_level["result"] = match_level["match_diff"].apply(lambda x: "W" if x > 0 else "L" if x < 0 else "D")
 
     grp = (
         match_level.groupby("opponent_team", dropna=False)
@@ -272,372 +101,519 @@ def render(ctx):
             round_losses=("round_losses", "sum"),
             round_diff=("match_diff", "sum"),
             rounds=("rounds", "sum"),
+            volatility=("match_diff", "std"),
         )
         .reset_index()
     )
+    grp["volatility"] = grp["volatility"].fillna(0)
     grp["win_rate_match"] = (grp["wins"] / grp["matches_played"].clip(lower=1) * 100).fillna(0)
-    grp["win_rate_rounds"] = (
-        grp["round_wins"] / (grp["round_wins"] + grp["round_losses"]).clip(lower=1) * 100
-    ).fillna(0)
+    grp["win_rate_rounds"] = (grp["round_wins"] / (grp["round_wins"] + grp["round_losses"]).clip(lower=1) * 100).fillna(0)
     grp["confidence"] = grp["rounds"].map(confidence_from_sample)
+    grp["danger_index"] = ((100 - grp["win_rate_match"]) * (1 + 2 / np.sqrt(grp["matches_played"].clip(lower=1)))).round(1)
+
+    recent_form = (
+        match_level.sort_values("match_ts")
+        .groupby("opponent_team", dropna=False)
+        .tail(5)[["opponent_team", "result", "match_ts"]]
+    )
+
+    def _form_line(sub: pd.DataFrame) -> str:
+        return "".join(sub.sort_values("match_ts")["result"].tolist())[-5:] or "-"
+
+    form_df = recent_form.groupby("opponent_team", dropna=False).apply(_form_line).rename("recent_form").reset_index()
+    grp = grp.merge(form_df, on="opponent_team", how="left")
 
     latest = (
         match_level.sort_values("match_ts")
         .groupby("opponent_team", dropna=False)
-        .tail(1)[["opponent_team", "latest_result", "date", "map"]]
-        .rename(columns={"date": "latest_date", "map": "latest_map"})
+        .tail(1)[["opponent_team", "result", "match_ts", "primary_map"]]
     )
-    grp = grp.merge(latest, on="opponent_team", how="left")
-    grp["latest_result_label"] = (
-        grp["latest_result"].fillna("-")
+    latest["latest_result_label"] = (
+        latest["result"].fillna("-")
         + " • "
-        + grp["latest_date"].fillna("n/a")
+        + latest["match_ts"].dt.strftime("%Y-%m-%d").fillna("n/a")
         + " • "
-        + grp["latest_map"].fillna("n/a")
+        + latest["primary_map"].fillna("n/a")
     )
-
-    top_filter_col, _ = st.columns([1, 3], gap="small")
-    with top_filter_col:
-        min_matches_played = st.number_input(
-            "Minimum Matches Played",
-            min_value=1,
-            max_value=max(1, int(grp["matches_played"].max())),
-            value=1,
-            step=1,
-            help="Show only opponents with at least this many full matches played.",
-        )
-
-    eligible_opponents = set(
-        grp.loc[grp["matches_played"] >= int(min_matches_played), "opponent_team"].tolist()
-    )
-    grp = grp[grp["opponent_team"].isin(eligible_opponents)].copy()
-    match_level = match_level[match_level["opponent_team"].isin(eligible_opponents)].copy()
-
-    overall_matches = int(grp["matches_played"].sum())
-    overall_wins = int(grp["wins"].sum())
-    overall_losses = int(grp["losses"].sum())
-    overall_draws = int(grp["draws"].sum())
-    overall_rounds = int(grp["rounds"].sum())
-    overall_win_rate = (overall_wins / max(1, overall_matches)) * 100
-
-    st.subheader("Total Vs Teams")
-    c1, c2, c3, c4, c5 = st.columns(5, gap="small")
-    with c1:
-        _summary_box("Opponents", f"{int(grp['opponent_team'].nunique())}", "#5BC0EB", "rgba(91,192,235,0.10)")
-    with c2:
-        _summary_box("Match W-L-D", f"{overall_wins}-{overall_losses}-{overall_draws}", "#95E06C", "rgba(149,224,108,0.10)")
-    with c3:
-        _summary_box("Matches", f"{overall_matches}", "#C29BFF", "rgba(194,155,255,0.10)")
-    with c4:
-        _summary_box("Match Win %", f"{overall_win_rate:.1f}%", "#FFB86C", "rgba(255,184,108,0.10)")
-    with c5:
-        _summary_box("Tracked Rounds", f"{overall_rounds}", "#7EE2D1", "rgba(126,226,209,0.10)")
-
-    view = grp.sort_values(["win_rate_match", "round_diff", "matches_played"], ascending=[False, False, False]).copy()
-
-    _render_match_record_table(view)
-
-    if view.empty:
-        st.info("No team matchup rows available for charting.")
-        return
-
-    wl_long = view.melt(
-        id_vars=["opponent_team"],
-        value_vars=["wins", "losses", "draws"],
-        var_name="Result",
-        value_name="Matches",
-    )
-    fig_wl = px.bar(
-        wl_long.sort_values(["opponent_team", "Result"]),
-        x="opponent_team",
-        y="Matches",
-        color="Result",
-        barmode="group",
-        color_discrete_map={"wins": "#3ECF8E", "losses": "#FF6B6B", "draws": "#7AA2FF"},
-        title="Wins, Losses, and Draws by Team",
-        labels={"opponent_team": "Opponent"},
-    )
-    fig_wl.update_layout(
-        legend_title_text="Result",
-        bargap=0.25,
-        title=dict(pad=dict(t=18, b=10)),
-    )
-    fig_wl.update_traces(
-        marker_line_color="rgba(240,245,255,0.20)",
-        marker_line_width=1,
-        hovertemplate="<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>",
-    )
-    angle_wl = -30 if view["opponent_team"].nunique() > 7 else 0
-    fig_wl = _apply_priority_chart_style(fig_wl, height=380 if mobile_view else 460, x_tickangle=angle_wl, mobile_view=mobile_view)
-    fig_wl.update_layout(
-        margin=dict(t=100 if mobile_view else 108, b=54 if mobile_view else 80, l=30 if mobile_view else 44, r=12 if mobile_view else 20),
-        legend=dict(
-            title_text="Result",
-            orientation="h",
-            yanchor="top",
-            y=1.05,
-            xanchor="left",
-            x=0.0,
-            bgcolor="rgba(10,16,28,0.55)",
-            bordercolor="rgba(125,150,180,0.28)",
-            borderwidth=1,
-        ),
-    )
-    _render_chart_panel(
-        fig_wl,
-        "",
-        "",
-    )
-
-    fig_wr = px.bar(
-        view.sort_values("win_rate_match", ascending=False),
-        x="opponent_team",
-        y="win_rate_match",
-        color="matches_played",
-        color_continuous_scale="Tealgrn",
-        text="matches_played",
-        title="Match Win % by Team",
-        labels={"opponent_team": "Opponent", "win_rate_match": "Match Win %", "matches_played": "Matches"},
-    )
-    fig_wr.update_layout(
-        coloraxis_colorbar=dict(title="Matches"),
-    )
-    fig_wr.update_yaxes(range=[0, 100], ticksuffix="%")
-    fig_wr.update_traces(
-        textposition="outside",
-        cliponaxis=False,
-        textfont=dict(size=11, color="#ECF3FF"),
-        marker_line_color="rgba(240,245,255,0.22)",
-        marker_line_width=1,
-        hovertemplate="<b>%{x}</b><br>Match Win %: %{y:.1f}%<br>Matches: %{marker.color}<extra></extra>",
-    )
-    angle_wr = -30 if view["opponent_team"].nunique() > 7 else 0
-    _render_chart_panel(_apply_priority_chart_style(fig_wr, height=370 if mobile_view else 460, x_tickangle=angle_wr, mobile_view=mobile_view), "", "")
-
-    bubble = px.scatter(
-        view,
-        x="rounds",
-        y="win_rate_match",
-        size="matches_played",
-        color="round_diff",
-        hover_name="opponent_team",
-        text="opponent_team",
-        color_continuous_scale="RdYlGn",
-        title="Sample Depth Vs Win Efficiency",
-        labels={
-            "rounds": "Tracked Rounds",
-            "win_rate_match": "Match Win %",
-            "matches_played": "Matches",
-            "round_diff": "Round Diff",
-        },
-    )
-    bubble.update_traces(
-        textposition="top center",
-        cliponaxis=False,
-        textfont=dict(size=10, color="#EAF2FF"),
-        marker=dict(
-            symbol="circle",
-            line=dict(color="rgba(233,242,255,0.82)", width=1.9),
-            opacity=0.82,
-            sizemin=10,
-        ),
-        hovertemplate=(
-            "<b>%{hovertext}</b><br>Tracked Rounds: %{x}<br>"
-            "Match Win %: %{y:.1f}%<br>Matches: %{marker.size}<br>Round Diff: %{marker.color}<extra></extra>"
-        ),
-    )
-    bubble.update_layout(
-        margin=dict(l=32 if mobile_view else 54, r=12 if mobile_view else 22, t=84 if mobile_view else 92, b=56 if mobile_view else 72),
-        title=dict(x=0.02, xanchor="left", font=dict(size=21, color="#F2F7FF"), pad=dict(t=14, b=20)),
-        coloraxis_colorbar=dict(
-            title="Round Diff",
-            len=0.62,
-            thickness=12,
-            ticks="outside",
-            tickfont=dict(size=11),
-            y=0.5,
-            yanchor="middle",
-            x=1.0,
-        ),
-    )
-    bubble.update_xaxes(
-        title_text="Tracked Rounds",
-        tickfont=dict(size=12),
-        title_font=dict(size=14),
-        showline=True,
-        linewidth=1,
-        linecolor="rgba(152,173,197,0.35)",
-        gridcolor="rgba(152,173,197,0.16)",
-    )
-    bubble.update_yaxes(
-        range=[0, 100],
-        ticksuffix="%",
-        tickfont=dict(size=12),
-        title_font=dict(size=14),
-        gridcolor="rgba(152,173,197,0.24)",
-    )
-    st.markdown(
-        """
-        <div style="padding:14px 16px 6px; border:1px solid rgba(120,145,172,0.30); border-radius:14px; 
-                    background:linear-gradient(180deg, rgba(15,22,35,0.95) 0%, rgba(10,15,25,0.88) 100%);">
-        """,
-        unsafe_allow_html=True,
-    )
-    _render_chart_panel(_apply_priority_chart_style(bubble, height=400 if mobile_view else 500, x_tickangle=0, mobile_view=mobile_view), "", "")
-    st.markdown("</div>", unsafe_allow_html=True)
+    grp = grp.merge(latest[["opponent_team", "latest_result_label", "match_ts"]], on="opponent_team", how="left")
 
     map_team = (
-        match_level.groupby(["opponent_team", "map"], dropna=False)
+        base.groupby(["opponent_team", "map"], dropna=False)
         .agg(
-            rounds_won=("round_wins", "sum"),
-            rounds_lost=("round_losses", "sum"),
-            match_wins=("match_win", "sum"),
-            match_losses=("match_loss", "sum"),
+            rounds_won=("wins", "sum"),
+            rounds_lost=("losses", "sum"),
+            match_wins=("wins", lambda s: 0),
             matches=("match_id", "nunique"),
         )
         .reset_index()
     )
+    map_match = (
+        match_level.groupby(["opponent_team", "primary_map"], dropna=False)
+        .agg(match_wins=("match_win", "sum"), match_losses=("match_loss", "sum"), match_draws=("match_draw", "sum"), matches=("match_id", "nunique"))
+        .reset_index()
+        .rename(columns={"primary_map": "map"})
+    )
+    map_team = map_team.drop(columns=["match_wins", "matches"]).merge(map_match, on=["opponent_team", "map"], how="outer")
+    for c in ["rounds_won", "rounds_lost", "match_wins", "match_losses", "match_draws", "matches"]:
+        map_team[c] = map_team[c].fillna(0)
+
     map_team["round_diff"] = map_team["rounds_won"] - map_team["rounds_lost"]
-    map_team["round_win_pct"] = (
-        map_team["rounds_won"] / (map_team["rounds_won"] + map_team["rounds_lost"]).clip(lower=1) * 100
-    ).fillna(0)
+    map_team["round_win_pct"] = (map_team["rounds_won"] / (map_team["rounds_won"] + map_team["rounds_lost"]).clip(lower=1) * 100).fillna(0)
     map_team["match_diff"] = map_team["match_wins"] - map_team["match_losses"]
     map_team["match_win_pct"] = (map_team["match_wins"] / map_team["matches"].clip(lower=1) * 100).fillna(0)
 
-    st.markdown("<div class='heatmap-stage--fullbleed'>", unsafe_allow_html=True)
-    st.markdown("### Heatmaps")
-    st.caption(
-        "Metrics: Round Win/Lose uses round differential (rounds won - rounds lost). "
-        "Match Win/Lose uses match differential (wins - losses)."
+    map_rank = map_team.copy()
+    map_rank["score"] = map_rank["match_win_pct"] + map_rank["round_diff"].clip(-20, 20) * 0.6
+    most_played = (
+        map_team.sort_values(["opponent_team", "matches", "round_diff"], ascending=[True, False, False])
+        .groupby("opponent_team", dropna=False)
+        .head(1)[["opponent_team", "map"]]
+        .rename(columns={"map": "most_played_map"})
+    )
+    best_map = (
+        map_rank.sort_values(["opponent_team", "score", "matches"], ascending=[True, False, False])
+        .groupby("opponent_team", dropna=False)
+        .head(1)[["opponent_team", "map"]]
+        .rename(columns={"map": "best_map"})
+    )
+    worst_map = (
+        map_rank.sort_values(["opponent_team", "score", "matches"], ascending=[True, True, False])
+        .groupby("opponent_team", dropna=False)
+        .head(1)[["opponent_team", "map"]]
+        .rename(columns={"map": "worst_map"})
+    )
+    grp = grp.merge(most_played, on="opponent_team", how="left").merge(best_map, on="opponent_team", how="left").merge(worst_map, on="opponent_team", how="left")
+
+    return grp, match_level, map_team
+
+
+def _render_heatmap(pivot: pd.DataFrame, metric_label: str, mobile_view: bool, zmin=None, zmax=None, zmid=None) -> None:
+    if pivot.empty:
+        st.info("No heatmap data for current filters.")
+        return
+    team_count = len(pivot.index)
+    map_count = len(pivot.columns)
+    max_team_len = max((len(str(v)) for v in pivot.index), default=12)
+    max_map_len = max((len(str(v)) for v in pivot.columns), default=8)
+    left_margin = min(460, 94 + max_team_len * (7 if not mobile_view else 5))
+    height = max(540 if not mobile_view else 440, min(3400, 280 + team_count * (40 if not mobile_view else 33)))
+
+    fig = px.imshow(
+        pivot.apply(pd.to_numeric, errors="coerce").fillna(0),
+        aspect="auto",
+        color_continuous_scale=HEATMAP_RED_GREEN_SCALE,
+        labels={"x": "Map", "y": "Opponent", "color": metric_label},
+        text_auto=".1f",
+    )
+    if zmin is not None and zmax is not None:
+        fig.update_coloraxes(cmin=zmin, cmax=zmax)
+    if zmid is not None:
+        fig.update_coloraxes(cmid=zmid)
+
+    fig.update_traces(textfont={"color": "#F2F6FF", "size": 9 if mobile_view else 11})
+    fig.update_layout(
+        template="plotly_dark",
+        height=height,
+        margin=dict(
+            l=left_margin,
+            r=12,
+            t=16,
+            b=max(94, 72 + max_map_len * 2),
+        ),
+        xaxis=dict(tickangle=-32 if map_count > 4 else 0, automargin=True, tickfont=dict(size=10 if mobile_view else 12)),
+        yaxis=dict(automargin=True, tickfont=dict(size=10 if mobile_view else 12), categoryorder="array", categoryarray=list(pivot.index)),
+        coloraxis_colorbar=dict(len=0.86, thickness=14),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
     )
 
-    sort_col_1, sort_col_2 = st.columns([1.25, 1.4], gap="small")
-    with sort_col_1:
+    st.markdown("<div class='heatmap-stage'>", unsafe_allow_html=True)
+    st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render(ctx):
+    tdf = ctx["tactics"]
+    mobile_view = is_mobile_view()
+
+    if tdf.empty:
+        st.warning("No tactics/opponent data after filters.")
+        return
+
+    base = tdf.copy()
+    base["opponent_team"] = base.get("opponent_team", "").astype(str).str.strip().replace("", "Unknown Opponent")
+    base["map"] = base.get("map", "").astype(str).str.strip().replace("", "Unknown Map")
+    base["date"] = base.get("date", "").astype(str).str.strip()
+    base["time"] = base.get("time", "").astype(str).str.strip()
+    base["match_ts"] = pd.to_datetime((base["date"] + " " + base["time"]).str.strip(), errors="coerce")
+
+    _hero(
+        total_opponents=int(base["opponent_team"].nunique()),
+        total_matches=int(base["match_id"].nunique()),
+        total_rounds=int(base["total_rounds"].sum()),
+    )
+
+    grp_all, _, _ = _build_views(base)
+
+    st.markdown("<div class='panel teams-command-zone'>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns([1.15, 1.25, 1.2, 1.15], gap="small")
+    with c1:
+        min_matches = st.slider(
+            "Minimum Matches",
+            min_value=1,
+            max_value=max(1, int(grp_all["matches_played"].max())),
+            value=1,
+            step=1,
+            help="Filter out low-sample opponents.",
+        )
+    with c2:
+        map_options = sorted(base["map"].dropna().unique().tolist())
+        selected_maps = st.multiselect(
+            "Map Context",
+            options=map_options,
+            default=map_options,
+            help="Limit analysis to selected maps.",
+        )
+    with c3:
+        focus_top_n = st.select_slider("Focus Window", options=[8, 10, 12, 16, 20, 30], value=12)
+    with c4:
+        primary_sort = st.selectbox(
+            "Primary Sort",
+            options=["Win Rate", "Round Differential", "Sample Size", "Volatility", "Danger Index"],
+            index=0,
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if selected_maps:
+        base = base[base["map"].isin(selected_maps)].copy()
+
+    grp, match_level, map_team = _build_views(base)
+    grp = grp[grp["matches_played"] >= int(min_matches)].copy()
+    if grp.empty:
+        st.warning("No opponents meet the current filter thresholds.")
+        return
+
+    sort_map = {
+        "Win Rate": ["win_rate_match", "matches_played"],
+        "Round Differential": ["round_diff", "matches_played"],
+        "Sample Size": ["matches_played", "win_rate_match"],
+        "Volatility": ["volatility", "matches_played"],
+        "Danger Index": ["danger_index", "matches_played"],
+    }
+    scoped = grp.sort_values(sort_map[primary_sort], ascending=False).copy()
+    top = scoped.head(int(focus_top_n)).copy()
+
+    best_wr = scoped.sort_values(["win_rate_match", "matches_played"], ascending=[False, False]).head(1).iloc[0]
+    worst_wr = scoped.sort_values(["win_rate_match", "matches_played"], ascending=[True, False]).head(1).iloc[0]
+    most_played = scoped.sort_values("matches_played", ascending=False).head(1).iloc[0]
+    best_rd = scoped.sort_values("round_diff", ascending=False).head(1).iloc[0]
+    worst_rd = scoped.sort_values("round_diff", ascending=True).head(1).iloc[0]
+    volatile = scoped.sort_values("volatility", ascending=False).head(1).iloc[0]
+    high_sample = scoped.sort_values("rounds", ascending=False).head(1).iloc[0]
+
+    k1, k2, k3, k4, k5, k6, k7, k8 = st.columns(8, gap="small")
+    with k1:
+        _kpi_card("Best Opponent WR", _fmt_pct(best_wr["win_rate_match"]), str(best_wr["opponent_team"]), "good")
+    with k2:
+        _kpi_card("Worst Opponent WR", _fmt_pct(worst_wr["win_rate_match"]), str(worst_wr["opponent_team"]), "bad")
+    with k3:
+        _kpi_card("Most Played", f"{int(most_played['matches_played'])}", str(most_played["opponent_team"]), "mid")
+    with k4:
+        _kpi_card("Best Round Diff", _fmt_signed(best_rd["round_diff"]), str(best_rd["opponent_team"]), "good")
+    with k5:
+        _kpi_card("Worst Round Diff", _fmt_signed(worst_rd["round_diff"]), str(worst_rd["opponent_team"]), "bad")
+    with k6:
+        _kpi_card("Most Volatile", f"{volatile['volatility']:.2f}", str(volatile["opponent_team"]), "poor")
+    with k7:
+        _kpi_card("Highest Sample", f"{int(high_sample['rounds'])} rds", str(high_sample["opponent_team"]), "mid")
+    with k8:
+        _kpi_card("Opponents Faced", f"{int(scoped['opponent_team'].nunique())}", "After filters", "mid")
+
+    left, right = st.columns([1.15, 1], gap="small")
+    with left:
+        _frame("Win Rate by Opponent", f"Top {len(top)} opponents by {primary_sort.lower()}.")
+        wr_fig = px.bar(
+            top.sort_values("win_rate_match", ascending=True),
+            x="win_rate_match",
+            y="opponent_team",
+            orientation="h",
+            color="win_rate_match",
+            text=top.sort_values("win_rate_match", ascending=True)["matches_played"].map(lambda x: f"{int(x)} m"),
+            color_continuous_scale=["#ff4d5e", "#d3a85c", "#9FE870"],
+        )
+        wr_fig.update_layout(template="plotly_dark", height=560 if not mobile_view else 440, margin=dict(l=12, r=12, t=8, b=32), coloraxis_showscale=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        wr_fig.update_xaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
+        wr_fig.update_yaxes(automargin=True)
+        st.plotly_chart(wr_fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        _frame_end()
+    with right:
+        _frame("Sample Size vs Win Rate vs Round Diff", "Bubble size = matches, color = round differential")
+        scatter = px.scatter(
+            scoped,
+            x="rounds",
+            y="win_rate_match",
+            size="matches_played",
+            color="round_diff",
+            hover_name="opponent_team",
+            text="opponent_team",
+            color_continuous_scale=["#ff4d5e", "#d3a85c", "#9FE870"],
+        )
+        scatter.update_traces(textposition="top center", textfont=dict(size=10), marker=dict(line=dict(color="rgba(231,241,255,.8)", width=1.4), opacity=0.82))
+        scatter.update_layout(template="plotly_dark", height=560 if not mobile_view else 440, margin=dict(l=12, r=12, t=8, b=32), plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        scatter.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
+        scatter.update_xaxes(gridcolor="rgba(133,147,163,0.24)")
+        st.plotly_chart(scatter, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        _frame_end()
+
+    row2_left, row2_right = st.columns(2, gap="small")
+    with row2_left:
+        _frame("Wins / Losses / Draws by Opponent", "Outcome stack across highest-sample opponents")
+        stacked = scoped.sort_values("matches_played", ascending=False).head(12)
+        fig_stack = go.Figure()
+        fig_stack.add_trace(go.Bar(y=stacked["opponent_team"], x=stacked["wins"], name="Wins", orientation="h", marker_color="#9FE870"))
+        fig_stack.add_trace(go.Bar(y=stacked["opponent_team"], x=stacked["losses"], name="Losses", orientation="h", marker_color="#ff4d5e"))
+        fig_stack.add_trace(go.Bar(y=stacked["opponent_team"], x=stacked["draws"], name="Draws", orientation="h", marker_color="#9fb4ca"))
+        fig_stack.update_layout(barmode="stack", template="plotly_dark", height=440 if not mobile_view else 360, margin=dict(l=12, r=12, t=8, b=32), plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        fig_stack.update_yaxes(autorange="reversed", automargin=True)
+        st.plotly_chart(fig_stack, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        _frame_end()
+    with row2_right:
+        _frame("Round Differential by Opponent", "Where scoreline margin disagrees with simple win rate")
+        rd_df = top.sort_values("round_diff", ascending=True)
+        rd_fig = px.bar(rd_df, x="round_diff", y="opponent_team", orientation="h", color="round_diff", color_continuous_scale=[[0, "#ff4d5e"], [0.48, "#4c5968"], [1, "#9FE870"]])
+        rd_fig.update_layout(template="plotly_dark", height=440 if not mobile_view else 360, margin=dict(l=12, r=12, t=8, b=32), coloraxis_showscale=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        rd_fig.update_yaxes(automargin=True)
+        rd_fig.update_xaxes(gridcolor="rgba(133,147,163,0.24)")
+        st.plotly_chart(rd_fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        _frame_end()
+
+    st.markdown("<div class='section-title'>Opponent × Map Heatmap Lab</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Full-roster matchup matrix with dynamic height, readable labels, and analyst sorting controls.</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='heatmap-stage--fullbleed'>", unsafe_allow_html=True)
+    s1, s2 = st.columns([1.15, 1.1], gap="small")
+    with s1:
         sort_choice = st.selectbox(
             "Team sort order",
-            [
-                "Alphabetical",
-                "Matches played",
-                "Win rate",
-                "Round differential",
-                "Total wins",
-                "Selected heatmap metric",
-            ],
-            help="Sort reorders rows only. All available teams remain included in every heatmap.",
+            ["Alphabetical", "Matches played", "Win rate", "Round differential", "Total wins", "Selected heatmap metric"],
             key="vs_teams_heatmap_sort_order",
         )
-    with sort_col_2:
-        metric_sort_choice = st.selectbox(
-            "Heatmap metric for sorting",
-            [
-                "Round Win/Lose by Team and Map",
-                "Round Win % by Team and Map",
-                "Match Win/Lose by Team and Map",
-                "Match Win % by Team and Map",
-            ],
-            help="Used when team sort order is set to 'Selected heatmap metric'.",
+    with s2:
+        metric_choice = st.selectbox(
+            "Heatmap metric",
+            ["Round Win/Lose by Team and Map", "Round Win % by Team and Map", "Match Win/Lose by Team and Map", "Match Win % by Team and Map"],
             key="vs_teams_heatmap_metric_sort_target",
         )
 
-    map_order = (
-        map_team.groupby("map", dropna=False)["matches"]
-        .sum()
-        .sort_values(ascending=False)
-        .index.tolist()
-    )
+    map_order = map_team.groupby("map", dropna=False)["matches"].sum().sort_values(ascending=False).index.tolist()
+    base_index = grp.set_index("opponent_team")
+    if sort_choice == "Alphabetical":
+        team_order = sorted(base_index.index.tolist(), key=lambda x: str(x).lower())
+    elif sort_choice == "Matches played":
+        team_order = base_index.sort_values(["matches_played", "opponent_team"], ascending=[False, True]).index.tolist()
+    elif sort_choice == "Win rate":
+        team_order = base_index.sort_values(["win_rate_match", "opponent_team"], ascending=[False, True]).index.tolist()
+    elif sort_choice == "Round differential":
+        team_order = base_index.sort_values(["round_diff", "opponent_team"], ascending=[False, True]).index.tolist()
+    elif sort_choice == "Total wins":
+        team_order = base_index.sort_values(["wins", "opponent_team"], ascending=[False, True]).index.tolist()
+    else:
+        metric_map = {
+            "Round Win/Lose by Team and Map": ("round_diff", "sum"),
+            "Round Win % by Team and Map": ("round_win_pct", "mean"),
+            "Match Win/Lose by Team and Map": ("match_diff", "sum"),
+            "Match Win % by Team and Map": ("match_win_pct", "mean"),
+        }
+        mcol, magg = metric_map[metric_choice]
+        g = map_team.groupby("opponent_team", dropna=False)[mcol]
+        scores = g.sum() if magg == "sum" else g.mean()
+        team_order = scores.reindex(base_index.index).fillna(0).sort_values(ascending=False).index.tolist()
 
-    def _build_heatmap_pivot(value_col: str, team_order: list[str]) -> pd.DataFrame:
+    def _pivot(value_col: str) -> pd.DataFrame:
         return (
             map_team.pivot(index="opponent_team", columns="map", values=value_col)
             .reindex(index=team_order, columns=map_order)
             .fillna(0)
         )
 
-    sort_values = grp.set_index("opponent_team").copy()
-    if sort_choice == "Alphabetical":
-        team_order = sorted(sort_values.index.tolist(), key=lambda team: str(team).lower())
-    elif sort_choice == "Matches played":
-        team_order = sort_values.sort_values(["matches_played", "opponent_team"], ascending=[False, True]).index.tolist()
-    elif sort_choice == "Win rate":
-        team_order = sort_values.sort_values(["win_rate_match", "opponent_team"], ascending=[False, True]).index.tolist()
-    elif sort_choice == "Round differential":
-        team_order = sort_values.sort_values(["round_diff", "opponent_team"], ascending=[False, True]).index.tolist()
-    elif sort_choice == "Total wins":
-        team_order = sort_values.sort_values(["wins", "opponent_team"], ascending=[False, True]).index.tolist()
+    p_rd = _pivot("round_diff")
+    p_rwp = _pivot("round_win_pct")
+    p_md = _pivot("match_diff")
+    p_mwp = _pivot("match_win_pct")
+
+    metric_lookup = {
+        "Round Win/Lose by Team and Map": (p_rd, "Round Diff", float(p_rd.abs().to_numpy().max()) if not p_rd.empty else 0.0, 0),
+        "Round Win % by Team and Map": (p_rwp, "Round Win %", 100.0, 50),
+        "Match Win/Lose by Team and Map": (p_md, "Match Diff", float(p_md.abs().to_numpy().max()) if not p_md.empty else 0.0, 0),
+        "Match Win % by Team and Map": (p_mwp, "Match Win %", 100.0, 50),
+    }
+    pivot, label, upper, mid = metric_lookup[metric_choice]
+    if mid == 0:
+        _render_heatmap(pivot, label, mobile_view, zmin=-upper if upper else None, zmax=upper if upper else None, zmid=0)
     else:
-        metric_key_map = {
-            "Round Win/Lose by Team and Map": ("round_diff", "sum"),
-            "Round Win % by Team and Map": ("round_win_pct", "mean"),
-            "Match Win/Lose by Team and Map": ("match_diff", "sum"),
-            "Match Win % by Team and Map": ("match_win_pct", "mean"),
-        }
-        metric_col, agg_mode = metric_key_map[metric_sort_choice]
-        grouped_metric = map_team.groupby("opponent_team", dropna=False)[metric_col]
-        metric_scores = grouped_metric.sum() if agg_mode == "sum" else grouped_metric.mean()
-        team_order = (
-            metric_scores.reindex(sort_values.index).fillna(0).sort_values(ascending=False).index.tolist()
-        )
+        _render_heatmap(pivot, label, mobile_view, zmin=0, zmax=upper, zmid=mid)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    round_diff_pivot = _build_heatmap_pivot("round_diff", team_order)
-    round_win_pct_pivot = _build_heatmap_pivot("round_win_pct", team_order)
-    match_diff_pivot = _build_heatmap_pivot("match_diff", team_order)
-    match_win_pct_pivot = _build_heatmap_pivot("match_win_pct", team_order)
+    st.markdown("<div class='section-title'>Opponent Matchup Table</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Sortable scouting ledger with sample quality and map context per opponent.</div>", unsafe_allow_html=True)
 
-    round_diff_abs = float(round_diff_pivot.abs().to_numpy().max()) if not round_diff_pivot.empty else 0.0
-    match_diff_abs = float(match_diff_pivot.abs().to_numpy().max()) if not match_diff_pivot.empty else 0.0
-
-    _render_heatmap(
-        round_diff_pivot,
-        "Round Win/Lose by Team and Map",
-        "Round Diff",
-        zmin=-round_diff_abs if round_diff_abs else None,
-        zmax=round_diff_abs if round_diff_abs else None,
-        zmid=0,
-        mobile_view=mobile_view,
-    )
-    _render_heatmap(
-        round_win_pct_pivot,
-        "Round Win % by Team and Map",
-        "Round Win %",
-        zmin=0,
-        zmax=100,
-        zmid=50,
-        mobile_view=mobile_view,
-    )
-    _render_heatmap(
-        match_diff_pivot,
-        "Match Win/Lose by Team and Map",
-        "Match Diff",
-        zmin=-match_diff_abs if match_diff_abs else None,
-        zmax=match_diff_abs if match_diff_abs else None,
-        zmid=0,
-        mobile_view=mobile_view,
-    )
-    _render_heatmap(
-        match_win_pct_pivot,
-        "Match Win % by Team and Map",
-        "Match Win %",
-        zmin=0,
-        zmax=100,
-        zmid=50,
-        mobile_view=mobile_view,
+    table = scoped.copy()
+    table["Last Played"] = table["match_ts"].dt.strftime("%Y-%m-%d").fillna("-")
+    st.markdown("<div class='table-frame teams-table-shell'>", unsafe_allow_html=True)
+    st.dataframe(
+        table[
+            [
+                "opponent_team",
+                "matches_played",
+                "wins",
+                "losses",
+                "draws",
+                "win_rate_match",
+                "round_diff",
+                "round_wins",
+                "round_losses",
+                "most_played_map",
+                "best_map",
+                "worst_map",
+                "recent_form",
+                "confidence",
+                "Last Played",
+            ]
+        ].rename(
+            columns={
+                "opponent_team": "Opponent",
+                "matches_played": "Matches",
+                "wins": "Wins",
+                "losses": "Losses",
+                "draws": "Draws",
+                "win_rate_match": "Win Rate",
+                "round_diff": "Round Diff",
+                "round_wins": "Rounds Won",
+                "round_losses": "Rounds Lost",
+                "most_played_map": "Most Played Map",
+                "best_map": "Best Map",
+                "worst_map": "Worst Map",
+                "recent_form": "Recent Form",
+                "confidence": "Confidence",
+            }
+        ),
+        hide_index=True,
+        use_container_width=True,
+        key="match_record_vs_teams_table",
+        column_config={
+            "Opponent": st.column_config.TextColumn("Opponent", width="large"),
+            "Matches": st.column_config.NumberColumn("Matches", format="%d"),
+            "Wins": st.column_config.NumberColumn("Wins", format="%d"),
+            "Losses": st.column_config.NumberColumn("Losses", format="%d"),
+            "Draws": st.column_config.NumberColumn("Draws", format="%d"),
+            "Win Rate": st.column_config.ProgressColumn("Win Rate", min_value=0.0, max_value=100.0, format="%.1f%%"),
+            "Round Diff": st.column_config.NumberColumn("Round Diff", format="%+d"),
+            "Rounds Won": st.column_config.NumberColumn("Rounds Won", format="%d"),
+            "Rounds Lost": st.column_config.NumberColumn("Rounds Lost", format="%d"),
+            "Most Played Map": st.column_config.TextColumn("Most Played Map"),
+            "Best Map": st.column_config.TextColumn("Best Map"),
+            "Worst Map": st.column_config.TextColumn("Worst Map"),
+            "Recent Form": st.column_config.TextColumn("Recent Form"),
+            "Confidence": st.column_config.TextColumn("Confidence"),
+            "Last Played": st.column_config.TextColumn("Last Played"),
+        },
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    weak = grp.nsmallest(3, "win_rate_match")
-    strong = grp.nlargest(3, "win_rate_match")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("Strongest Matchups")
-        st.dataframe(
-            strong[["opponent_team", "matches_played", "wins", "losses", "win_rate_match", "confidence"]],
-            use_container_width=True,
-            hide_index=True,
+    st.markdown("<div class='section-title'>Opponent Deep-Dive Scouting</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Investigate map-specific pressure points, recent results, and reliability for one selected matchup.</div>", unsafe_allow_html=True)
+
+    opponent_options = scoped.sort_values(["matches_played", "win_rate_match"], ascending=[False, False])["opponent_team"].tolist()
+    selected = st.selectbox("Select Opponent", options=opponent_options, index=0)
+
+    s_grp = scoped[scoped["opponent_team"] == selected].head(1)
+    s_match = match_level[match_level["opponent_team"] == selected].sort_values("match_ts", ascending=False).copy()
+    s_map = map_team[map_team["opponent_team"] == selected].copy()
+
+    if s_grp.empty:
+        st.info("No deep-dive data available for the selected opponent.")
+        return
+
+    row = s_grp.iloc[0]
+    d1, d2, d3, d4, d5 = st.columns(5, gap="small")
+    with d1:
+        _kpi_card("Selected Win Rate", _fmt_pct(row["win_rate_match"]), selected, "good")
+    with d2:
+        _kpi_card("Round Differential", _fmt_signed(row["round_diff"]), f"{int(row['matches_played'])} matches", "mid")
+    with d3:
+        _kpi_card("Sample Reliability", str(row["confidence"]), f"{int(row['rounds'])} rounds", "poor")
+    with d4:
+        _kpi_card("Recent Form", str(row["recent_form"] or "-"), f"Last played {row['match_ts'].strftime('%Y-%m-%d') if pd.notna(row['match_ts']) else '-'}", "mid")
+    with d5:
+        _kpi_card("Danger Index", f"{row['danger_index']:.1f}", "Higher = riskier", "bad")
+
+    deep_l, deep_r = st.columns([1.1, 1], gap="small")
+    with deep_l:
+        _frame("Map-by-Map Round Win %", "Highlights where overall matchup hides map weakness")
+        m = s_map.sort_values("round_win_pct", ascending=True).copy()
+        mfig = px.bar(
+            m,
+            x="round_win_pct",
+            y="map",
+            orientation="h",
+            color="round_win_pct",
+            text=m["matches"].map(lambda x: f"{int(x)} m"),
+            color_continuous_scale=["#ff4d5e", "#d3a85c", "#9FE870"],
         )
-    with c2:
-        st.subheader("Needs Fixing")
+        mfig.update_layout(template="plotly_dark", height=400, margin=dict(l=12, r=10, t=8, b=28), coloraxis_showscale=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        mfig.update_xaxes(range=[0, 100], ticksuffix="%")
+        mfig.update_yaxes(automargin=True)
+        st.plotly_chart(mfig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        _frame_end()
+    with deep_r:
+        _frame("Map Pressure Matrix", "Round differential and sample depth by map")
+        map_tbl = s_map[["map", "matches", "round_diff", "match_win_pct", "round_win_pct"]].copy()
+        map_tbl = map_tbl.sort_values(["matches", "round_diff"], ascending=[False, False])
         st.dataframe(
-            weak[["opponent_team", "matches_played", "wins", "losses", "win_rate_match", "confidence"]],
-            use_container_width=True,
+            map_tbl.rename(
+                columns={
+                    "map": "Map",
+                    "matches": "Matches",
+                    "round_diff": "Round Diff",
+                    "match_win_pct": "Match Win %",
+                    "round_win_pct": "Round Win %",
+                }
+            ),
             hide_index=True,
+            use_container_width=True,
+            column_config={
+                "Map": st.column_config.TextColumn("Map"),
+                "Matches": st.column_config.NumberColumn("Matches", format="%d"),
+                "Round Diff": st.column_config.NumberColumn("Round Diff", format="%+d"),
+                "Match Win %": st.column_config.ProgressColumn("Match Win %", min_value=0.0, max_value=100.0, format="%.1f%%"),
+                "Round Win %": st.column_config.ProgressColumn("Round Win %", min_value=0.0, max_value=100.0, format="%.1f%%"),
+            },
+        )
+        _frame_end()
+
+    s_match["Date"] = s_match["match_ts"].dt.strftime("%Y-%m-%d").fillna("-")
+    st.markdown("<div class='table-frame teams-table-shell'>", unsafe_allow_html=True)
+    st.dataframe(
+        s_match[["Date", "primary_map", "round_wins", "round_losses", "match_diff", "result"]]
+        .rename(columns={"primary_map": "Map", "round_wins": "Rounds Won", "round_losses": "Rounds Lost", "match_diff": "Round Diff", "result": "Result"}),
+        hide_index=True,
+        use_container_width=True,
+        key="vs_teams_recent_matches",
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    weak_map = s_map.sort_values("round_win_pct", ascending=True).head(1)
+    strong_map = s_map.sort_values("round_win_pct", ascending=False).head(1)
+    if not weak_map.empty and not strong_map.empty:
+        st.markdown(
+            (
+                "<div class='panel teams-scout-note'>"
+                f"<div class='section-title'>Scouting Readout</div>"
+                f"<div class='section-subtitle'>Pressure point: <b>{weak_map.iloc[0]['map']}</b> "
+                f"({_fmt_pct(weak_map.iloc[0]['round_win_pct'])} round win, {int(weak_map.iloc[0]['matches'])} matches). "
+                f"Best leverage: <b>{strong_map.iloc[0]['map']}</b> "
+                f"({_fmt_pct(strong_map.iloc[0]['round_win_pct'])} round win)."
+                "</div></div>"
+            ),
+            unsafe_allow_html=True,
         )
