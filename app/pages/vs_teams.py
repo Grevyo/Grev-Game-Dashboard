@@ -347,40 +347,56 @@ def render(ctx):
         st.plotly_chart(wr_fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
         _frame_end()
     with right:
-        _frame("Match Sample vs Win Rate (Log Matches)", "X = matches played (log scale), color = round differential, rounds in tooltip")
-        scatter_points = scoped.copy()
+        _frame("Ranked Opponent Analysis", "One row per opponent. Sort by outcome quality, sample depth, or name.")
+        rank_sort = st.selectbox(
+            "Rank opponents by",
+            options=["Win Rate", "Matches Played", "Round Differential", "Alphabetical"],
+            index=0,
+            key="opponent_rank_sort",
+        )
 
-        rd_bound = float(np.nanpercentile(np.abs(scatter_points["round_diff"]), 95)) if not scatter_points.empty else 1.0
+        sort_config = {
+            "Win Rate": (["win_rate_match", "matches_played", "opponent_team"], [False, False, True]),
+            "Matches Played": (["matches_played", "win_rate_match", "opponent_team"], [False, False, True]),
+            "Round Differential": (["round_diff", "matches_played", "opponent_team"], [False, False, True]),
+            "Alphabetical": (["opponent_team"], [True]),
+        }
+        sort_cols, sort_asc = sort_config[rank_sort]
+        ranked = scoped.sort_values(sort_cols, ascending=sort_asc).copy()
+
+        rd_bound = float(np.nanpercentile(np.abs(ranked["round_diff"]), 95)) if not ranked.empty else 1.0
         rd_bound = max(1.0, rd_bound)
+        ranked["sample_label"] = ranked.apply(lambda r: f"{int(r['matches_played'])} m / {int(r['rounds'])} r", axis=1)
 
-        scatter = go.Figure()
-        scatter.add_trace(
-            go.Scatter(
-                x=scatter_points["matches_played"],
-                y=scatter_points["win_rate_match"],
-                mode="markers",
+        ranked_fig = go.Figure(
+            go.Bar(
+                x=ranked["win_rate_match"],
+                y=ranked["opponent_team"],
+                orientation="h",
                 customdata=np.stack(
                     [
-                        scatter_points["opponent_team"],
-                        scatter_points["matches_played"],
-                        scatter_points["rounds"],
-                        scatter_points["wins"],
-                        scatter_points["losses"],
-                        scatter_points["draws"],
-                        scatter_points["win_rate_match"],
-                        scatter_points["round_diff"],
+                        ranked["opponent_team"],
+                        ranked["matches_played"],
+                        ranked["rounds"],
+                        ranked["wins"],
+                        ranked["losses"],
+                        ranked["draws"],
+                        ranked["win_rate_match"],
+                        ranked["round_diff"],
+                        ranked["sample_label"],
                     ],
                     axis=-1,
                 ),
+                text=ranked["sample_label"],
+                textposition="outside",
+                cliponaxis=False,
                 marker=dict(
-                    size=10,
-                    color=scatter_points["round_diff"],
-                    colorscale="RdYlGn",
+                    color=ranked["round_diff"],
+                    colorscale=[[0, "#ff4d5e"], [0.5, "#4c5968"], [1, "#9FE870"]],
                     cmin=-rd_bound,
                     cmax=rd_bound,
-                    line=dict(color="rgba(231,241,255,0.55)", width=0.9),
-                    opacity=0.88,
-                    colorbar=dict(title="Round Diff", len=0.78, thickness=14),
+                    colorbar=dict(title="Round Diff", len=0.76, thickness=12),
+                    line=dict(color="rgba(231,241,255,0.3)", width=0.8),
                 ),
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
@@ -393,19 +409,22 @@ def render(ctx):
                 showlegend=False,
             )
         )
-        scatter.update_layout(
+        dynamic_height = max(440 if mobile_view else 560, min(980, 120 + 34 * len(ranked)))
+        ranked_fig.update_layout(
             template="plotly_dark",
-            height=560 if not mobile_view else 440,
-            margin=dict(l=12, r=12, t=8, b=32),
+            height=dynamic_height,
+            margin=dict(l=12, r=84, t=8, b=32),
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="Matches Played (log scale)",
-            yaxis_title="Match Win Rate",
+            xaxis_title="Match Win Rate",
+            yaxis_title=None,
+            uniformtext_minsize=10,
+            uniformtext_mode="hide",
         )
-        scatter.update_yaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
-        scatter.update_xaxes(type="log", dtick=0.30103, gridcolor="rgba(133,147,163,0.24)")
-        scatter.add_hline(y=50, line_width=1, line_dash="dash", line_color="rgba(211,168,92,0.65)")
-        st.plotly_chart(scatter, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        ranked_fig.update_xaxes(range=[0, 100], ticksuffix="%", gridcolor="rgba(133,147,163,0.24)")
+        ranked_fig.update_yaxes(type="category", categoryorder="array", categoryarray=ranked["opponent_team"][::-1], automargin=True)
+        ranked_fig.add_vline(x=50, line_width=1, line_dash="dash", line_color="rgba(211,168,92,0.65)")
+        st.plotly_chart(ranked_fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
         _frame_end()
 
     row2_left, row2_right = st.columns(2, gap="small")
