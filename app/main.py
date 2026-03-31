@@ -3,7 +3,15 @@ import streamlit as st
 from app.data_loader import detect_our_team, load_data, validate_columns
 from app.filters import apply_filters, build_global_filters, filter_panel_toggle, global_filters_from_state
 from app.image_helpers import find_team_logo, image_data_uri
-from app.pages import overview, player_viewer, tactic_set_recommendations, tactics_breakdown, vs_teams, vs_tournaments
+from app.pages import (
+    overview,
+    player_viewer,
+    recent_tactics_breakdown,
+    tactic_set_recommendations,
+    tactics_breakdown,
+    vs_teams,
+    vs_tournaments,
+)
 from app.styles import inject_styles
 from app.transforms import with_player_metrics
 
@@ -14,6 +22,7 @@ PAGES = {
     "Medisports vs Teams": vs_teams.render,
     "Medisports vs Tournaments": vs_tournaments.render,
     "Tactics Breakdown": tactics_breakdown.render,
+    "Recent Tactics Breakdown": recent_tactics_breakdown.render,
     "Tactical Set Recommendations": tactic_set_recommendations.render,
 }
 

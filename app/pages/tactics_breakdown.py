@@ -272,7 +272,7 @@ def _inject_page_css() -> None:
     )
 
 
-def render(ctx):
+def _render_tactics_breakdown(ctx, *, recent_mode: bool = False):
     tdf = ctx["tactics"].copy()
     mobile_view = is_mobile_view()
 
@@ -303,13 +303,19 @@ def render(ctx):
     tdf["match_ts"] = pd.to_datetime(date_ser.astype(str) + " " + time_ser, errors="coerce")
     tdf["match_ts"] = tdf["match_ts"].fillna(pd.Timestamp("1970-01-01"))
 
+    hero_subtitle = (
+        "Recent-window tactical command centre for map-side decisions in the last N days."
+        if recent_mode
+        else "Analyst command centre for map-side specific tactical decisions: what to keep, what to refine, what to stress-test, and what to drop."
+    )
+
     st.markdown(
         f"""
         <div class='hero-band'>
             <div class='section-title'>Tactical Intelligence Surface</div>
-            <h1 class='tactics-hero-title'>Tactics Breakdown</h1>
+            <h1 class='tactics-hero-title'>{'Recent Tactics Breakdown' if recent_mode else 'Tactics Breakdown'}</h1>
             <p class='tactics-hero-subtitle'>
-                Analyst command centre for map-side specific tactical decisions: what to keep, what to refine, what to stress-test, and what to drop.
+                {hero_subtitle}
             </p>
             <div style='margin-top:6px;'>
                 <span class='chip chip-good'>{tdf['tactic_name'].nunique()} tactics tracked</span>
@@ -339,13 +345,18 @@ def render(ctx):
     with c1:
         tactic_type = st.segmented_control("Tactic Type", options=["All", "Standard", "Eco", "Pistol"], default="All")
     with c2:
-        days_window = st.select_slider("Recent Window", options=[7, 10, 14, 21, 30], value=14)
+        days_window = None
+        if recent_mode:
+            days_window = st.slider("Last N Days", min_value=1, max_value=14, value=7, step=1)
+        else:
+            st.caption("Full-history mode (no recent-window filter)")
     with c3:
         max_scope = tdf.copy()
         if tactic_type != "All":
             max_scope = max_scope[max_scope["tactic_type"] == tactic_type].copy()
-        newest_scope = max_scope["match_ts"].max()
-        max_scope = max_scope[max_scope["match_ts"] >= (newest_scope - pd.Timedelta(days=int(days_window) * 8))].copy()
+        if recent_mode and days_window is not None and not max_scope.empty:
+            newest_scope = max_scope["match_ts"].max()
+            max_scope = max_scope[max_scope["match_ts"] >= (newest_scope - pd.Timedelta(days=int(days_window)))].copy()
         grouped_rounds = (
             max_scope.groupby(["map", "side", "tactic_name", "category", "tactic_type"], dropna=False)["total_rounds"].sum()
             if not max_scope.empty
@@ -376,8 +387,9 @@ def render(ctx):
         st.warning("No tactics remain for the current global filter context.")
         return
 
-    newest = scoped["match_ts"].max()
-    scoped = scoped[scoped["match_ts"] >= (newest - pd.Timedelta(days=int(days_window) * 8))].copy()
+    if recent_mode and days_window is not None:
+        newest = scoped["match_ts"].max()
+        scoped = scoped[scoped["match_ts"] >= (newest - pd.Timedelta(days=int(days_window)))].copy()
 
     tactical, baseline = _build_tactic_views(scoped)
     tactical = tactical[tactical["rounds"] >= int(sample_floor)].copy()
@@ -895,3 +907,11 @@ def render(ctx):
         }
     )
     st.dataframe(pretty_table, use_container_width=True, hide_index=True)
+
+
+def render(ctx):
+    _render_tactics_breakdown(ctx, recent_mode=False)
+
+
+def render_recent(ctx):
+    _render_tactics_breakdown(ctx, recent_mode=True)
