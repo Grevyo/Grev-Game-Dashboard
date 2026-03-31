@@ -340,21 +340,29 @@ def render(ctx):
         .tolist()
     )
     dot_df = scoped.copy()
+    dot_df["rounds_played"] = pd.to_numeric(dot_df["rounds"], errors="coerce").fillna(0)
+    dot_df["matches_played_plot"] = pd.to_numeric(dot_df["matches_played"], errors="coerce").fillna(0)
+    dot_df["round_differential"] = pd.to_numeric(dot_df["round_wins"], errors="coerce").fillna(0) - pd.to_numeric(dot_df["round_losses"], errors="coerce").fillna(0)
+    dot_df["round_win_rate_pct"] = (
+        pd.to_numeric(dot_df["round_wins"], errors="coerce").fillna(0)
+        / dot_df["rounds_played"].clip(lower=1)
+        * 100
+    ).fillna(0)
     dot_df["point_label"] = np.where(dot_df["opponent_team"].isin(label_candidates), dot_df["opponent_team"], "")
     dot = px.scatter(
         dot_df,
-        x="rounds",
-        y="win_rate_rounds",
-        size="matches_played",
-        color="round_diff",
+        x="rounds_played",
+        y="round_win_rate_pct",
+        size="matches_played_plot",
+        color="round_differential",
         hover_name="opponent_team",
         text="point_label",
         color_continuous_scale=[[0, "#ff4d5e"], [0.48, "#4c5968"], [1, "#9FE870"]],
         labels={
-            "rounds": "Rounds Played",
-            "win_rate_rounds": "Round Win Rate (%)",
-            "matches_played": "Matches Played",
-            "round_diff": "Round Diff",
+            "rounds_played": "Rounds Played",
+            "round_win_rate_pct": "Round Win Rate (%)",
+            "matches_played_plot": "Matches Played",
+            "round_differential": "Round Differential",
         },
         custom_data=[
             "wins",
@@ -363,7 +371,9 @@ def render(ctx):
             "round_wins",
             "round_losses",
             "win_rate_match",
-            "win_rate_rounds",
+            "round_win_rate_pct",
+            "matches_played_plot",
+            "round_differential",
         ],
     )
     dot.update_traces(
@@ -372,11 +382,11 @@ def render(ctx):
         textfont=dict(size=10, color="#dce6f7"),
         hovertemplate=(
             "<b>%{hovertext}</b><br>"
-            "Matches Played: %{marker.size:.0f}<br>"
+            "Matches Played: %{customdata[7]:.0f}<br>"
             "Rounds Played: %{x:.0f}<br>"
             "Match Win Rate: %{customdata[5]:.1f}%<br>"
             "Round Win Rate: %{y:.1f}%<br>"
-            "Round Differential: %{marker.color:+.0f}<br>"
+            "Round Differential: %{customdata[8]:+.0f}<br>"
             "W/L/D: %{customdata[0]:.0f} / %{customdata[1]:.0f} / %{customdata[2]:.0f}<br>"
             "Round W-L: %{customdata[3]:.0f}-%{customdata[4]:.0f}<extra></extra>"
         ),
