@@ -338,6 +338,34 @@ def inject_styles(theme_name: str = "Dark"):
       margin-bottom: .4rem;
     }}
 
+    .tournaments-hero {{ padding: 1rem 1.05rem; margin-bottom: .75rem; }}
+    .tournaments-hero-grid {{ display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; align-items:flex-start; }}
+    .tournaments-hero-kicker {{ margin:0 !important; }}
+    .tournaments-hero-title {{
+      margin:.15rem 0 .32rem 0;
+      font-size:1.26rem;
+      letter-spacing:.01em;
+      line-height:1.1;
+      color:#f6fbff;
+    }}
+    .tournaments-hero-subtitle {{ margin:0; max-width:900px; }}
+    .tournaments-hero-meta {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; justify-content:flex-end; }}
+    .tournaments-command-zone {{ margin: .8rem 0 .65rem; padding: .75rem .8rem; }}
+    .tournaments-kpi .metric-value {{ font-size:1.08rem; line-height:1.2; margin-top:3px; }}
+    .tournaments-chart-frame {{ padding:.82rem .9rem; }}
+    .tournaments-table-shell {{ padding:.45rem; margin-top:.38rem; }}
+
+    .tournaments-table-shell [data-testid="stDataFrame"] {{
+      border-color: rgba(124,142,163,.42);
+      background: linear-gradient(180deg, rgba(13,20,31,.96), rgba(10,16,26,.96));
+    }}
+    .tournaments-table-shell [data-testid="stDataFrame"] * {{
+      font-size:.73rem;
+    }}
+    .tournaments-table-shell [data-testid="stDataFrame"] thead tr th {{
+      background: rgba(19,29,43,.9);
+    }}
+
     @media (min-width: 1200px) {{
       .heatmap-stage--fullbleed {{
         width: min(99vw, 2300px);
@@ -362,6 +390,8 @@ def inject_styles(theme_name: str = "Dark"):
       .app-topbar-title {{ font-size:.96rem; }}
       .hero-logo, .app-topbar .hero-logo {{ width:38px; height:38px; }}
       .overview-hero .hero-logo, .player-viewer-hero .hero-logo {{ width:34px; height:34px; }}
+      .tournaments-hero-title {{ font-size:1.02rem; }}
+      .tournaments-hero-meta {{ justify-content:flex-start; }}
       .player-viewer-top-metrics, .stats-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
       .grev-tier-row {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
     }}
