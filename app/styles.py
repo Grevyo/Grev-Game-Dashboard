@@ -323,7 +323,7 @@ def inject_styles(theme_name: str = "Dark"):
 
     .heatmap-stage {{
       margin: 1.05rem 0 1.2rem;
-      padding: .9rem .95rem .55rem;
+      padding: 1rem 1.05rem .65rem;
       border:1px solid rgba(99,122,146,0.38);
       border-radius: 12px;
       background: linear-gradient(180deg, rgba(13,20,31,0.95) 0%, rgba(9,14,24,0.92) 100%);
@@ -340,9 +340,15 @@ def inject_styles(theme_name: str = "Dark"):
 
     @media (min-width: 1200px) {{
       .heatmap-stage--fullbleed {{
-        width: min(99vw, 2100px);
-        margin-left: calc(50% - min(99vw, 2100px) / 2);
-        margin-right: calc(50% - min(99vw, 2100px) / 2);
+        width: min(99vw, 2300px);
+        margin-left: calc(50% - min(99vw, 2300px) / 2);
+        margin-right: calc(50% - min(99vw, 2300px) / 2);
+      }}
+      .heatmap-stage--fullbleed .heatmap-stage {{
+        padding: 1.1rem 1.2rem .75rem;
+      }}
+      .heatmap-stage--fullbleed [data-testid="stPlotlyChart"] {{
+        width: 100%;
       }}
     }}
 
