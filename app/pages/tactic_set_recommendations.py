@@ -348,9 +348,12 @@ def render(ctx):
     tactical = tactical.sort_values(["recommendation_score", "confidence", "rounds"], ascending=False).copy()
 
     exclusion_key = f"tsr_excluded::{map_name}::{side}"
+    override_key = f"tsr_model_override::{map_name}::{side}"
     excluded_tactics = set(st.session_state.get(exclusion_key, []))
+    model_overrides = set(st.session_state.get(override_key, []))
     all_tactics = tactical["tactic_name"].dropna().astype(str).unique().tolist()
     excluded_tactics = {name for name in excluded_tactics if name in all_tactics}
+    model_overrides = {name for name in model_overrides if name in all_tactics}
 
     show_excluded = st.toggle(
         "Show excluded tactics bucket",
@@ -358,9 +361,14 @@ def render(ctx):
         help="Show a dedicated shortlist-management bucket where excluded tactics can be re-included.",
     )
     st.session_state[exclusion_key] = sorted(excluded_tactics)
+    st.session_state[override_key] = sorted(model_overrides)
 
     active_pool = tactical[~tactical["tactic_name"].isin(excluded_tactics)].copy()
-    rec_set = _select_recommended_set(active_pool, max_picks=7)
+    model_excluded_mask = active_pool["status"].isin(["Backup", "Exclude For Now"])
+    model_excluded_names = set(active_pool.loc[model_excluded_mask, "tactic_name"].astype(str).tolist())
+    effective_model_excluded = model_excluded_names - model_overrides
+    recommendation_pool = active_pool[~active_pool["tactic_name"].isin(effective_model_excluded)].copy()
+    rec_set = _select_recommended_set(recommendation_pool, max_picks=7)
 
     st.markdown(
         f"""
@@ -376,7 +384,9 @@ def render(ctx):
                 <span class='chip'>{int(scoped['total_rounds'].sum())} context rounds</span>
                 <span class='chip chip-poor'>{tactical['tactic_name'].nunique()} tactics in pool</span>
                 <span class='chip'>{len(excluded_tactics)} excluded</span>
-                <span class='chip chip-good'>{len(active_pool)} active</span>
+                <span class='chip chip-bad'>{len(effective_model_excluded)} model excluded</span>
+                <span class='chip chip-good'>{len(recommendation_pool)} active</span>
+                <span class='chip chip-mid'>{len(model_overrides)} model overrides</span>
             </div>
         </div>
         """,
@@ -444,7 +454,9 @@ def render(ctx):
         unsafe_allow_html=True,
     )
     if rec_set.empty:
-        st.info("No recommendations available after exclusions for this map+side. Re-include tactics to restore candidate coverage.")
+        st.info(
+            "No recommendations available after exclusions for this map+side. Re-include tactics or override model exclusions to restore candidate coverage."
+        )
     cols = st.columns(3 if not mobile_view else 1, gap="small")
     for i, (_, row) in enumerate(rec_set.iterrows()):
         tone = STATUS_TONE.get(str(row["status"]), "mid")
@@ -512,13 +524,12 @@ def render(ctx):
         )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    included = active_pool[active_pool["tactic_name"].isin(rec_set["tactic_name"])].copy()
-    borderline = active_pool[
-        active_pool["status"].isin(["Viable", "Situational", "Test More"]) & ~active_pool["tactic_name"].isin(rec_set["tactic_name"])
+    included = recommendation_pool[recommendation_pool["tactic_name"].isin(rec_set["tactic_name"])].copy()
+    borderline = recommendation_pool[
+        recommendation_pool["status"].isin(["Viable", "Situational", "Test More"])
+        & ~recommendation_pool["tactic_name"].isin(rec_set["tactic_name"])
     ].head(8)
-    excluded_by_model = active_pool[active_pool["status"].isin(["Backup", "Exclude For Now"])].head(8)
-    manually_excluded = tactical[tactical["tactic_name"].isin(excluded_tactics)].copy()
-
+    excluded_by_model = active_pool[active_pool["tactic_name"].isin(effective_model_excluded)].head(8)
     d1, d2, d3 = st.columns(3, gap="small")
     for col, title, frame in [
         (d1, "Included in Recommended Set", included),
@@ -532,20 +543,39 @@ def render(ctx):
             else:
                 for _, r in frame.iterrows():
                     manual_note = "<div class='excluded-note'>Manually excluded</div>" if r["tactic_name"] in excluded_tactics else ""
+                    override_note = (
+                        "<div class='excluded-note' style='color:#9FE870;'>Manually re-included (model override)</div>"
+                        if r["tactic_name"] in model_overrides
+                        else ""
+                    )
                     st.markdown(
                         f"<div class='decision-item'><strong>{r['tactic_name']}</strong>"
                         f"<span>{r['role']} • {_fmt_pct(r['win_rate'])} • {_fmt_signed(r['delta_vs_baseline'])} • conf {int(r['confidence'])}</span>"
-                        f"{manual_note}</div>",
+                        f"{manual_note}{override_note}</div>",
                         unsafe_allow_html=True,
                     )
-                    if title != "Excluded By Model" and st.button(
-                        "Exclude tactic",
-                        key=f"exclude_bucket_{title}_{map_name}_{side}_{r['tactic_name']}",
-                        use_container_width=True,
-                    ):
-                        excluded_tactics.add(str(r["tactic_name"]))
-                        st.session_state[exclusion_key] = sorted(excluded_tactics)
-                        st.rerun()
+                    if title == "Excluded By Model":
+                        if st.button(
+                            "Override Model",
+                            key=f"override_model_{map_name}_{side}_{r['tactic_name']}",
+                            use_container_width=True,
+                        ):
+                            model_overrides.add(str(r["tactic_name"]))
+                            excluded_tactics.discard(str(r["tactic_name"]))
+                            st.session_state[override_key] = sorted(model_overrides)
+                            st.session_state[exclusion_key] = sorted(excluded_tactics)
+                            st.rerun()
+                    else:
+                        if st.button(
+                            "Exclude tactic",
+                            key=f"exclude_bucket_{title}_{map_name}_{side}_{r['tactic_name']}",
+                            use_container_width=True,
+                        ):
+                            excluded_tactics.add(str(r["tactic_name"]))
+                            model_overrides.discard(str(r["tactic_name"]))
+                            st.session_state[override_key] = sorted(model_overrides)
+                            st.session_state[exclusion_key] = sorted(excluded_tactics)
+                            st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
     if PLOTLY_AVAILABLE:
@@ -553,7 +583,7 @@ def render(ctx):
         with v1:
             st.markdown("<div class='analytics-frame'><div class='section-title'>Recommendation Score vs Confidence</div></div>", unsafe_allow_html=True)
             scatter = px.scatter(
-                active_pool,
+                recommendation_pool,
                 x="recommendation_score",
                 y="confidence",
                 size="rounds",
@@ -580,7 +610,7 @@ def render(ctx):
             role_bar.update_layout(template="plotly_dark", margin=dict(l=8, r=8, t=10, b=8), height=360 if not mobile_view else 320)
             st.plotly_chart(role_bar, use_container_width=True)
 
-    shortlist = active_pool.copy()
+    shortlist = recommendation_pool.copy()
     shortlist["Included?"] = shortlist["tactic_name"].isin(rec_set["tactic_name"]).map({True: "Yes", False: "No"})
     shortlist = shortlist[
         [
