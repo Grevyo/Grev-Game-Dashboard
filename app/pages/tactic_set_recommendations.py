@@ -32,8 +32,6 @@ def render(ctx):
     map_options = sorted(summary["map"].dropna().unique().tolist())
     side_options = sorted(summary["side"].dropna().unique().tolist())
     defaults = {
-        "tactic_reco_map": map_options[0],
-        "tactic_reco_side": side_options[0],
         "tactic_reco_min_sample": 5,
         "tactic_reco_confidence_floor": 55,
         "tactic_reco_include_tentative": True,
@@ -42,24 +40,23 @@ def render(ctx):
     for key, default in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = default
-    if st.session_state.get("tactic_reco_map") not in map_options:
-        st.session_state["tactic_reco_map"] = map_options[0]
-    if st.session_state.get("tactic_reco_side") not in side_options:
-        st.session_state["tactic_reco_side"] = side_options[0]
+
+    top_map = st.session_state.get("tb_map")
+    top_side = st.session_state.get("tb_side")
+    map_name = top_map if top_map in map_options else map_options[0]
+    side = top_side if top_side in side_options else side_options[0]
 
     if filter_panel_toggle("tactic_recommendations"):
         st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
-        c1, c2, c3, c4, c5 = st.columns(5, gap="small")
+        c1, c2, c3 = st.columns([1.8, 1, 1], gap="small")
         with c1:
             season_hint = (filters.get("season") or ["Current"])[0]
-            st.caption(f"Season: {season_hint}")
+            comp_hint = st.session_state.get("tb_comp") or filters.get("competition") or ["All competitions"]
+            context_comp = ", ".join(map(str, comp_hint[:2])) + ("…" if len(comp_hint) > 2 else "")
+            st.caption(f"Locked context: {map_name} • {side} • {context_comp} • Season {season_hint}")
         with c2:
-            st.selectbox("Map", map_options, key="tactic_reco_map")
-        with c3:
-            st.selectbox("Side", side_options, key="tactic_reco_side")
-        with c4:
             st.slider("Min sample", 1, 20, key="tactic_reco_min_sample")
-        with c5:
+        with c3:
             st.slider("Confidence floor", 40, 85, key="tactic_reco_confidence_floor")
 
         t1, t2 = st.columns(2, gap="small")
@@ -68,9 +65,6 @@ def render(ctx):
         with t2:
             st.toggle("Strict confidence", key="tactic_reco_strict_mode")
         st.markdown("</div>", unsafe_allow_html=True)
-
-    map_name = st.session_state.get("tactic_reco_map", map_options[0])
-    side = st.session_state.get("tactic_reco_side", side_options[0])
     min_sample = int(st.session_state.get("tactic_reco_min_sample", 5))
     confidence_floor = int(st.session_state.get("tactic_reco_confidence_floor", 55))
     include_tentative = bool(st.session_state.get("tactic_reco_include_tentative", True))
