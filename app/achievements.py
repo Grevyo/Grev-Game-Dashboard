@@ -5,16 +5,6 @@ import pandas as pd
 
 from app.image_helpers import image_data_uri, image_data_uri_thumbnail, resolve_achievement_image
 
-POSITION_PRIORITY = {
-    "1st": 100,
-    "2nd": 80,
-    "3rd": 65,
-    "4th": 50,
-    "5th": 45,
-    "6th": 40,
-    "7th": 35,
-    "8th": 30,
-}
 TIER_PRIORITY = {"S": 90, "A": 75, "B": 60, "C": 45, "D": 30}
 
 
@@ -68,6 +58,92 @@ def normalize_season_label(season_value: str | int | float | None) -> str:
     return text if text.lower().startswith("season ") else f"Season {text}"
 
 
+def _normalized_text(value) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
+
+
+def _extract_first_int(value) -> int | None:
+    match = re.search(r"\d+", str(value or ""))
+    return int(match.group(0)) if match else None
+
+
+def _placement_sort_value(position_value) -> float:
+    """Return a comparable placement score where lower means better finish."""
+    lower, _ = _placement_bounds(position_value)
+    return float(lower if lower is not None else 9999.0)
+
+
+def _placement_bounds(position_value) -> tuple[int | None, int | None]:
+    """Return (best_possible_finish, worst_possible_finish)."""
+    text = _normalized_text(position_value)
+    if not text:
+        return None, None
+
+    # Top-N / Top N (e.g., "Top 10")
+    top_n = re.search(r"\btop\s*-?\s*(\d+)\b", text)
+    if top_n:
+        n = int(top_n.group(1))
+        n = max(1, n)
+        return 1, n
+
+    # Range forms (e.g., 4th-10th, 9th–16th)
+    numbers = [int(value) for value in re.findall(r"\d+", text)]
+    if numbers:
+        return min(numbers), max(numbers)
+
+    return None, None
+
+
+def _is_cpl_open(achievement_name: str) -> bool:
+    name = _normalized_text(achievement_name)
+    return bool(re.search(r"\bcpl\b", name) and re.search(r"\bopen\b", name))
+
+
+def _is_cpl_ladder(achievement_name: str) -> bool:
+    name = _normalized_text(achievement_name)
+    return bool(re.search(r"\bcpl\b", name) and re.search(r"\bladder\b", name))
+
+
+def _is_top_10_ladder(achievement_name: str, position_value) -> bool:
+    if not _is_cpl_ladder(achievement_name):
+        return False
+    lower, upper = _placement_bounds(position_value)
+    if upper is not None:
+        return upper <= 10
+    return (lower or 9999) <= 10
+
+
+def _achievement_priority_group(row: pd.Series) -> int:
+    """Group order: ladder top-10 first, non-open middle, CPL Open last."""
+    name = str(row.get("achievement_name", "") or "")
+    position = row.get("position", "")
+    if _is_top_10_ladder(name, position):
+        return 0
+    if _is_cpl_open(name):
+        return 2
+    return 1
+
+
+def _achievement_sort_columns(pool: pd.DataFrame) -> pd.DataFrame:
+    season_num = pd.to_numeric(pool.get("season_name"), errors="coerce")
+    season_num = season_num.fillna(pool.get("season_name", "").map(_extract_first_int)).fillna(0)
+
+    placement_rank = pool.get("position", "").map(_placement_sort_value)
+    tier_priority = pool.get("achievement_tier", "").astype(str).str.upper().map(TIER_PRIORITY).fillna(20)
+    name_key = pool.get("achievement_name", "").astype(str).str.strip().str.casefold()
+    position_key = pool.get("position", "").astype(str).str.strip().str.casefold()
+    group_priority = pool.apply(_achievement_priority_group, axis=1)
+
+    return pool.assign(
+        _season=season_num,
+        _placement=placement_rank,
+        _tier=tier_priority,
+        _group=group_priority,
+        _name_key=name_key,
+        _position_key=position_key,
+    )
+
+
 def achievements_for_player(
     achievements_df: pd.DataFrame,
     player_name: str,
@@ -91,12 +167,11 @@ def achievements_for_player(
     if pool.empty:
         return [], 0
 
-    season_num = pd.to_numeric(pool.get("season_name"), errors="coerce").fillna(0)
-    pos_priority = pool.get("position", "").astype(str).str.strip().map(POSITION_PRIORITY).fillna(10)
-    tier_priority = pool.get("achievement_tier", "").astype(str).str.upper().map(TIER_PRIORITY).fillna(20)
-
-    pool = pool.assign(_season=season_num, _pos=pos_priority, _tier=tier_priority)
-    pool = pool.sort_values(["_season", "_pos", "_tier"], ascending=[False, False, False])
+    pool = _achievement_sort_columns(pool)
+    pool = pool.sort_values(
+        ["_group", "_placement", "_tier", "_season", "_name_key", "_position_key"],
+        ascending=[True, True, False, False, True, True],
+    )
 
     if cap is None:
         top = pool

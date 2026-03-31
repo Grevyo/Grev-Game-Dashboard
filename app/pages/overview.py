@@ -284,7 +284,7 @@ def _render_roster_cards(
             ach_list, ach_hidden = achievements_for_player(
                 achievements_df,
                 str(row["player"]),
-                cap=None,
+                cap=4,
                 consumer="overview",
             )
             merged["achievements"] = ach_list
