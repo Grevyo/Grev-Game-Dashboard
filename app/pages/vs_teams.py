@@ -8,10 +8,9 @@ from app.presentation_helpers import is_mobile_view
 def _summary_box(label: str, value: str, accent: str, bg: str) -> None:
     st.markdown(
         f"""
-        <div style=\"background:{bg}; border:1px solid {accent}; border-left:6px solid {accent};
-                    border-radius:12px; padding:10px 12px; min-height:82px;\">
-            <div style=\"font-size:0.78rem; color:#b8c2d0; margin-bottom:4px;\">{label}</div>
-            <div style=\"font-size:1.35rem; font-weight:700; color:#f5f7fa; line-height:1.2;\">{value}</div>
+        <div class='panel panel-tight stat-widget' style='border-left:4px solid {accent}; min-height:82px;'>
+            <div class='metric-title'>{label}</div>
+            <div class='metric-value' style='margin-top:6px'>{value}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -30,27 +29,27 @@ def _apply_priority_chart_style(fig, *, height: int = 500, x_tickangle: int = -2
         template="plotly_dark",
         height=height,
         margin=dict(l=30 if mobile_view else 44, r=12 if mobile_view else 18, t=62, b=52 if mobile_view else 78),
-        title=dict(font=dict(size=17, color="#EAF2FF"), x=0.0, xanchor="left"),
+        title=dict(font=dict(size=16, color="#F0F4FA"), x=0.0, xanchor="left"),
         legend=dict(
             title_font=dict(size=12, color="#EAF2FF"),
-            font=dict(size=10 if mobile_view else 11, color="#DCE7F5"),
+            font=dict(size=10 if mobile_view else 11, color="#C7D1DD"),
             orientation="h",
             yanchor="top",
             y=1.0 if mobile_view else 1.02,
             xanchor="left",
             x=0.0,
-            bgcolor="rgba(10,16,29,0.45)",
-            bordercolor="rgba(123,144,168,0.26)",
+            bgcolor="rgba(13,18,26,0.66)",
+            bordercolor="rgba(97,111,130,0.34)",
             borderwidth=1,
         ),
-        plot_bgcolor="rgba(9,13,22,0.82)",
+        plot_bgcolor="rgba(12,17,24,0.88)",
         paper_bgcolor="rgba(0,0,0,0)",
         hoverlabel=dict(
             bgcolor="rgba(14,20,31,0.96)",
             bordercolor="rgba(123,144,168,0.65)",
             font=dict(color="#F5F8FF", size=12),
         ),
-        font=dict(color="#D6DFEA"),
+        font=dict(color="#CAD3DF"),
     )
     fig.update_xaxes(
         tickangle=x_tickangle,
@@ -65,7 +64,7 @@ def _apply_priority_chart_style(fig, *, height: int = 500, x_tickangle: int = -2
         automargin=True,
         tickfont=dict(size=10 if mobile_view else 11),
         title_font=dict(size=13),
-        gridcolor="rgba(123,144,168,0.20)",
+        gridcolor="rgba(104,116,131,0.28)",
         griddash="dot",
         zeroline=False,
     )
@@ -73,7 +72,7 @@ def _apply_priority_chart_style(fig, *, height: int = 500, x_tickangle: int = -2
 
 
 def _render_chart_panel(fig, heading: str, note: str = ""):
-    st.markdown("<div class='panel'>", unsafe_allow_html=True)
+    st.markdown("<div class='analytics-frame'>", unsafe_allow_html=True)
     if heading:
         st.markdown(f"<div class='section-title' style='margin-bottom:4px'>{heading}</div>", unsafe_allow_html=True)
     if note:
@@ -117,43 +116,7 @@ def _render_match_record_table(view: pd.DataFrame) -> None:
 
     # Keep this rendered as a native Streamlit dataframe (not styled HTML)
     # so users can sort by clicking headers in the visible table.
-    st.markdown(
-        """
-        <style>
-          .match-record-premium-shell {
-            margin-top: 8px;
-            border: 1px solid rgba(141, 168, 200, 0.34);
-            border-radius: 18px;
-            padding: 12px;
-            background:
-              radial-gradient(1300px 220px at 50% -40%, rgba(110, 201, 255, 0.12), transparent 44%),
-              linear-gradient(170deg, rgba(7, 13, 22, 0.97) 0%, rgba(12, 20, 33, 0.94) 100%);
-            box-shadow:
-              0 18px 42px rgba(0, 0, 0, 0.40),
-              inset 0 1px 0 rgba(226, 237, 255, 0.07);
-          }
-          .match-record-premium-shell [data-testid="stDataFrame"] {
-            border: 1px solid rgba(139, 165, 195, 0.38);
-            border-radius: 14px;
-            overflow: hidden;
-            background: rgba(8, 14, 25, 0.72);
-          }
-          .match-record-premium-shell [data-testid="stDataFrame"] [data-testid="stElementToolbar"] {
-            background: linear-gradient(180deg, rgba(16, 26, 41, 0.88), rgba(12, 21, 35, 0.82));
-            border-bottom: 1px solid rgba(135, 161, 192, 0.34);
-          }
-          .match-record-premium-shell [data-testid="stDataFrame"] [data-testid="stDataFrameGlideDataEditor"] {
-            padding: 4px;
-            background: transparent;
-          }
-          .match-record-premium-shell [data-testid="stDataFrame"] canvas {
-            border-radius: 10px;
-          }
-        </style>
-        <div class='match-record-premium-shell'>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown("<div class='table-frame match-record-premium-shell'>", unsafe_allow_html=True)
 
     st.dataframe(
         sortable_df,

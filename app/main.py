@@ -78,7 +78,7 @@ def run_app():
     team_logo_uri = image_data_uri(find_team_logo(team_name) or find_team_logo("Medisports"))
     logo_html = f"<img class='hero-logo' src='{team_logo_uri}' alt='Medisports logo'/>" if team_logo_uri else ""
     st.markdown(
-        f"<div class='hero-band' style='margin-bottom:12px;'><div style='display:flex;align-items:center;gap:12px;'><div>{logo_html}</div><div><div class='section-title' style='margin-top:0;'>Medisports Analytics Dashboard</div><div class='section-subtitle' style='margin-bottom:0;'>Unified command layer with page-native controls and full-width layout.</div></div></div></div>",
+        f"<div class='hero-band' style='margin-bottom:12px;'><div style='display:flex;align-items:center;gap:12px;'><div>{logo_html}</div><div><div class='section-title' style='margin-top:0;'>Medisports Tactical Analytics Hub</div><div class='section-subtitle' style='margin-bottom:0;'>Broadcast-style command surface with integrated filters and tactical intelligence</div></div></div></div>",
         unsafe_allow_html=True,
     )
     page = _render_page_navigation()
