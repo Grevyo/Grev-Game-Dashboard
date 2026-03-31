@@ -1,9 +1,8 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from app.components import section_header
 from app.metrics import confidence_from_sample
-from app.presentation_helpers import is_mobile_view
+from app.page_layout import is_mobile_view, section_header
 
 
 def _summary_box(label: str, value: str, accent: str, bg: str) -> None:
