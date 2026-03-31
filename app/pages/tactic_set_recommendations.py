@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
+import re
 
 try:
     import plotly.express as px
@@ -36,6 +37,32 @@ STATUS_TONE = {
     "Exclude For Now": "bad",
 }
 TIER_COLORS = {"S": "#d4b15d", "A": "#9b6ef3", "B": "#4d8dff", "C": "#59b67a"}
+REQUIRED_CORE_BUCKETS = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B"]
+MAP_OPTIONAL_BUCKETS = {
+    "train": ["Ivy", "Apps", "Connector"],
+    "castle": ["Mid", "B Halls", "B Doors", "A Main"],
+    "mill": ["Mid", "A Halls", "A Long", "B Long", "2nd Mid"],
+}
+MAP_OPTIONAL_PATTERNS = {
+    "train": {
+        "Ivy": [r"\bIVY\b"],
+        "Apps": [r"\bAPPS?\b"],
+        "Connector": [r"\bCONNECTOR\b", r"\bCONN\b"],
+    },
+    "castle": {
+        "Mid": [r"\bMID\b"],
+        "B Halls": [r"\bB[\s\-_]*HALLS?\b"],
+        "B Doors": [r"\bB[\s\-_]*DOORS?\b"],
+        "A Main": [r"\bA[\s\-_]*MAIN\b"],
+    },
+    "mill": {
+        "2nd Mid": [r"\b2ND[\s\-_]*MID\b", r"\bB[\s\-_]*MID\b"],
+        "Mid": [r"\bMID\b"],
+        "A Halls": [r"\bA[\s\-_]*(HALLS?|TUNS?|TUNNELS?)\b"],
+        "A Long": [r"\bA[\s\-_]*LONG\b"],
+        "B Long": [r"\bB[\s\-_]*LONG\b"],
+    },
+}
 
 
 def _fmt_pct(value: float) -> str:
@@ -71,6 +98,42 @@ def _route_role(name: str) -> str:
     if "B" in n:
         return "Standard B"
     return "Standard"
+
+
+def _canonical_map_name(map_name: str) -> str:
+    return str(map_name).strip().lower()
+
+
+def _has_lane_token(name: str, lane: str) -> bool:
+    return bool(re.search(rf"\b{lane}\b", str(name).upper()))
+
+
+def _infer_core_bucket(name: str) -> str:
+    n = str(name).upper()
+    if "PISTOL" in n or "(P)" in n or re.match(r"^\s*P[\s\-_]", n):
+        return "Pistol"
+    if "ECO" in n or "(E)" in n or re.match(r"^\s*E[\s\-_]", n):
+        if _has_lane_token(n, "A"):
+            return "Eco A"
+        if _has_lane_token(n, "B"):
+            return "Eco B"
+        return "Eco"
+    if _has_lane_token(n, "A") and not _has_lane_token(n, "B"):
+        return "Standard A"
+    if _has_lane_token(n, "B") and not _has_lane_token(n, "A"):
+        return "Standard B"
+    return "Standard"
+
+
+def _infer_optional_buckets(name: str, map_name: str) -> list[str]:
+    map_key = _canonical_map_name(map_name)
+    config = MAP_OPTIONAL_PATTERNS.get(map_key, {})
+    norm_name = str(name).upper()
+    matched: list[str] = []
+    for bucket, patterns in config.items():
+        if any(re.search(pattern, norm_name) for pattern in patterns):
+            matched.append(bucket)
+    return matched
 
 
 def _role_priority(role: str) -> int:
@@ -113,7 +176,7 @@ def _status_logic(row: pd.Series) -> tuple[str, str]:
 
 
 def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    group_cols = ["map", "side", "tactic_name", "category", "tactic_type", "role"]
+    group_cols = ["map", "side", "tactic_name", "category", "tactic_type", "role", "core_bucket"]
 
     tactical = (
         base.groupby(group_cols, dropna=False)
@@ -187,47 +250,67 @@ def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return tactical, baseline
 
 
-def _select_recommended_set(pool: pd.DataFrame, max_picks: int = 7) -> pd.DataFrame:
+def _select_recommended_set(pool: pd.DataFrame, map_name: str, max_picks: int = 7) -> pd.DataFrame:
     if pool.empty:
         return pool
 
     candidates = pool.sort_values(["recommendation_score", "confidence", "rounds"], ascending=False).copy()
+    map_optional = MAP_OPTIONAL_BUCKETS.get(_canonical_map_name(map_name), [])
     selected_idx = []
-    role_counts: dict[str, int] = {}
+    core_counts: dict[str, int] = {}
+    covered_optional: set[str] = set()
 
-    required_roles = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B"]
-    for role in required_roles:
-        role_rows = candidates[candidates["role"] == role]
+    for role in REQUIRED_CORE_BUCKETS:
+        role_rows = candidates[candidates["core_bucket"] == role]
         if role_rows.empty:
             continue
         idx = int(role_rows.index[0])
         if idx not in selected_idx:
             selected_idx.append(idx)
-            role_counts[role] = role_counts.get(role, 0) + 1
-
-    lane_roles = ["Mid Lane", "Ivy Lane"]
-    for lane in lane_roles:
-        lane_rows = candidates[candidates["role"] == lane]
-        if lane_rows.empty or len(selected_idx) >= max_picks:
-            continue
-        idx = int(lane_rows.index[0])
-        if idx not in selected_idx:
-            selected_idx.append(idx)
-            role_counts[lane] = role_counts.get(lane, 0) + 1
+            core_counts[role] = core_counts.get(role, 0) + 1
+            covered_optional.update(candidates.at[idx, "optional_buckets"])
 
     for idx, row in candidates.iterrows():
         if len(selected_idx) >= max_picks:
             break
         if int(idx) in selected_idx:
             continue
-        role = str(row["role"])
-        if role_counts.get(role, 0) >= 2:
+        missing_required = [r for r in REQUIRED_CORE_BUCKETS if core_counts.get(r, 0) == 0]
+        row_core = str(row["core_bucket"])
+        row_optional = [b for b in row["optional_buckets"] if b in map_optional]
+        gain_required = 1 if row_core in missing_required else 0
+        gain_optional = len([b for b in row_optional if b not in covered_optional])
+        role_penalty = 35 if core_counts.get(row_core, 0) >= 2 else 0
+
+        adjusted_score = float(row["recommendation_score"]) + gain_required * 1000
+        if not missing_required:
+            adjusted_score += gain_optional * 120
+        adjusted_score -= role_penalty
+        candidates.at[idx, "_adjusted_score"] = adjusted_score
+
+    if "_adjusted_score" in candidates.columns:
+        ordered = candidates.sort_values(
+            ["_adjusted_score", "confidence", "rounds"],
+            ascending=False,
+        )
+    else:
+        ordered = candidates
+
+    for idx, row in ordered.iterrows():
+        if len(selected_idx) >= max_picks:
+            break
+        if int(idx) in selected_idx:
+            continue
+        missing_required = [r for r in REQUIRED_CORE_BUCKETS if core_counts.get(r, 0) == 0]
+        row_core = str(row["core_bucket"])
+        if missing_required and row_core not in missing_required and core_counts.get(row_core, 0) >= 2:
             continue
         selected_idx.append(int(idx))
-        role_counts[role] = role_counts.get(role, 0) + 1
+        core_counts[row_core] = core_counts.get(row_core, 0) + 1
+        covered_optional.update(row["optional_buckets"])
 
     out = candidates.loc[selected_idx].copy()
-    return out.sort_values(["role"], key=lambda s: s.map(_role_priority))
+    return out.sort_values(["core_bucket", "role"], key=lambda s: s.map(_role_priority))
 
 
 def _inject_page_css() -> None:
@@ -298,6 +381,7 @@ def render(ctx):
     tdf["category"] = tdf["tactic_name"].map(tactic_category)
     tdf["tactic_type"] = tdf["category"].replace({"Standard": "Standard", "Eco": "Eco", "Pistol": "Pistol"})
     tdf["role"] = tdf["tactic_name"].map(_route_role)
+    tdf["core_bucket"] = tdf["tactic_name"].map(_infer_core_bucket)
 
     tdf = attach_normalized_tier(tdf, fallback="C")
 
@@ -324,6 +408,7 @@ def render(ctx):
         return
 
     tactical = tactical.sort_values(["recommendation_score", "confidence", "rounds"], ascending=False).copy()
+    tactical["optional_buckets"] = tactical["tactic_name"].map(lambda n: _infer_optional_buckets(n, map_name))
 
     exclusion_key = f"tsr_excluded::{map_name}::{side}"
     override_key = f"tsr_model_override::{map_name}::{side}"
@@ -347,7 +432,7 @@ def render(ctx):
     model_excluded_names = set(active_pool.loc[model_excluded_mask, "tactic_name"].astype(str).tolist())
     effective_model_excluded = model_excluded_names - model_overrides
     recommendation_pool = active_pool[~active_pool["tactic_name"].isin(effective_model_excluded)].copy()
-    rec_set = _select_recommended_set(recommendation_pool, max_picks=7)
+    rec_set = _select_recommended_set(recommendation_pool, map_name=map_name, max_picks=7)
 
     st.markdown(
         f"""
@@ -480,27 +565,69 @@ def render(ctx):
                 st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-    coverage_roles = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B", "Mid Lane", "Ivy Lane"]
-    coverage_df = pd.DataFrame({"role": coverage_roles})
-    counts = rec_set.groupby("role")["tactic_name"].count().to_dict()
-    coverage_df["count"] = coverage_df["role"].map(counts).fillna(0).astype(int)
-    coverage_df["target"] = coverage_df["role"].apply(lambda r: 1 if r in coverage_roles[:5] else 0)
-    coverage_df["complete"] = coverage_df["count"] >= coverage_df["target"]
+    map_optional_buckets = MAP_OPTIONAL_BUCKETS.get(_canonical_map_name(map_name), [])
+    core_counts = rec_set.groupby("core_bucket")["tactic_name"].count().to_dict()
+
+    optional_count_map: dict[str, int] = {}
+    for optional in map_optional_buckets:
+        optional_count_map[optional] = int(
+            rec_set["optional_buckets"].apply(lambda vals: optional in vals if isinstance(vals, list) else False).sum()
+        )
 
     st.markdown("<div class='panel'><div class='section-title'>Coverage & Completeness Board</div>", unsafe_allow_html=True)
-    for _, row in coverage_df.iterrows():
-        fill = min(100, row["count"] * 100)
-        badge = "Covered" if row["count"] > 0 else "Missing"
+    st.markdown("<div class='section-subtitle'>Required core coverage is prioritized first. Optional map coverage is used to improve tactical completeness within the 7-call cap.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='brief-label' style='margin-top:10px;'>Required Core Coverage</div>", unsafe_allow_html=True)
+    for bucket in REQUIRED_CORE_BUCKETS:
+        count = int(core_counts.get(bucket, 0))
+        fill = min(100, count * 100)
+        if count > 0:
+            badge = "Covered"
+            chip_class = "chip-good"
+            detail = ""
+        else:
+            candidates_for_bucket = recommendation_pool[
+                recommendation_pool["core_bucket"] == bucket
+            ].sort_values(["recommendation_score", "confidence"], ascending=False)
+            if candidates_for_bucket.empty:
+                badge = "Missing"
+                chip_class = "chip-bad"
+                detail = "No viable candidate currently available."
+            else:
+                nearest = candidates_for_bucket.iloc[0]
+                badge = "Weak / Borderline"
+                chip_class = "chip-mid"
+                detail = f"Nearest fit: {nearest['tactic_name']} ({nearest['status']})."
         st.markdown(
             f"""
             <div class='coverage-row'>
-              <div class='brief-label'>{row['role']}</div>
+              <div class='brief-label'>{bucket}</div>
               <div class='coverage-track'><div class='coverage-fill' style='width:{fill}%;'></div></div>
-              <div><span class='chip {'chip-good' if badge == 'Covered' else 'chip-bad'}'>{badge}</span></div>
+              <div><span class='chip {chip_class}'>{badge}</span></div>
             </div>
+            {f"<div class='muted' style='margin:-4px 0 8px 0;'>{detail}</div>" if detail else ""}
             """,
             unsafe_allow_html=True,
         )
+
+    st.markdown("<div class='brief-label' style='margin-top:12px;'>Map-Specific Optional Coverage</div>", unsafe_allow_html=True)
+    if not map_optional_buckets:
+        st.markdown("<div class='muted'>No optional coverage buckets configured for this map.</div>", unsafe_allow_html=True)
+    else:
+        for bucket in map_optional_buckets:
+            count = int(optional_count_map.get(bucket, 0))
+            fill = min(100, count * 100)
+            badge = "Covered" if count > 0 else "Open"
+            chip_class = "chip-good" if count > 0 else "chip-mid"
+            st.markdown(
+                f"""
+                <div class='coverage-row'>
+                  <div class='brief-label'>{bucket}</div>
+                  <div class='coverage-track'><div class='coverage-fill' style='width:{fill}%;'></div></div>
+                  <div><span class='chip {chip_class}'>{badge}</span></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
     st.markdown("</div>", unsafe_allow_html=True)
 
     included = recommendation_pool[recommendation_pool["tactic_name"].isin(rec_set["tactic_name"])].copy()
