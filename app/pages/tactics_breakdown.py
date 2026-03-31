@@ -157,6 +157,21 @@ def _first_existing_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
     return None
 
 
+def _manual_exclusion_key(map_name: str, side: str) -> str:
+    return f"tsr_excluded::{map_name}::{side}"
+
+
+def _get_excluded_for_context(map_name: str, side: str, available: set[str]) -> set[str]:
+    key = _manual_exclusion_key(map_name, side)
+    stored = set(st.session_state.get(key, []))
+    return {name for name in stored if name in available}
+
+
+def _set_excluded_for_context(map_name: str, side: str, excluded: set[str]) -> None:
+    key = _manual_exclusion_key(map_name, side)
+    st.session_state[key] = sorted(excluded)
+
+
 def _build_tactic_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     group_cols = ["map", "side", "tactic_name", "category", "tactic_type"]
     tactical = (
@@ -238,6 +253,7 @@ def _inject_page_css() -> None:
         .status-pill.mid{color:#d3a85c;border-color:#78603b;background:#2a2418;}
         .status-pill.poor{color:#ff9f43;border-color:#865830;background:#2a1f14;}
         .status-pill.bad{color:#ff4d5e;border-color:#7a3540;background:#2a171d;}
+        .status-pill.excluded{color:#f7c6ce;border-color:#7a3540;background:#2a171d;}
         .tactic-mini{font-size:.64rem;color:#94a6bb;margin-top:4px;}
         .recommend-slot{border:1px solid #34485f;border-radius:7px;background:#101c2a;padding:.55rem;}
         .tier-filter-wrap{display:flex;align-items:center;justify-content:flex-end;}
@@ -246,6 +262,8 @@ def _inject_page_css() -> None:
         .status-group h3{margin:0;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:#d6e3f2;}
         .status-group-meta{font-size:.64rem;color:#95a8bc;}
         .tactic-card .grev-tier-row{margin-top:7px;grid-template-columns:repeat(4,minmax(0,1fr));}
+        .tactic-card.excluded{opacity:.58;border-color:#72515c;background:linear-gradient(180deg,#281924,#181019);}
+        .tactic-card.selected.excluded{border-color:#d18897;box-shadow:0 0 0 1px rgba(209,136,151,.35),0 0 18px rgba(148,71,87,.2);}
         .wr-tier-box{min-height:54px;padding:6px 5px;}
         .tactic-reason{margin-top:8px;font-size:.68rem;color:#d2deea;line-height:1.35;}
         </style>
@@ -367,6 +385,7 @@ def render(ctx):
         st.warning("No tactics meet the minimum sample threshold for this map + side.")
         return
     tactical["tactic_uid"] = tactical.apply(_tactic_selection_key, axis=1)
+    tactical["is_excluded"] = False
     selection_state_key = "tactics_breakdown_selected_tactic_uid"
     if selection_state_key not in st.session_state:
         st.session_state[selection_state_key] = None
@@ -457,6 +476,16 @@ def render(ctx):
         - np.where(tactical["days_since_used"] > 18, 2.6, 0)
     )
     tactical["reason"] = tactical.apply(_compose_reason, axis=1)
+    available_names_by_context = (
+        tactical.groupby(["map", "side"], dropna=False)["tactic_name"].apply(lambda names: set(names.astype(str))).to_dict()
+    )
+    excluded_by_context: dict[tuple[str, str], set[str]] = {}
+    for context, names in available_names_by_context.items():
+        excluded_by_context[context] = _get_excluded_for_context(context[0], context[1], names)
+    tactical["is_excluded"] = tactical.apply(
+        lambda row: str(row["tactic_name"]) in excluded_by_context.get((str(row["map"]), str(row["side"])), set()),
+        axis=1,
+    )
     group_cap = 3 if not mobile_view else 2
     remaining = []
     for status in STATUS_PRIORITY:
@@ -476,9 +505,13 @@ def render(ctx):
             with cols[i % len(cols)]:
                 selected = st.session_state[selection_state_key] == row["tactic_uid"]
                 selected_class = " selected" if selected else ""
+                excluded = bool(row["is_excluded"])
+                excluded_class = " excluded" if excluded else ""
+                excluded_badge = "<div class='status-pill excluded'>Excluded</div>" if excluded else ""
                 st.markdown(
-                    f"<div class='tactic-card{selected_class}'><h4>{row['tactic_name']}</h4>"
+                    f"<div class='tactic-card{selected_class}{excluded_class}'><h4>{row['tactic_name']}</h4>"
                     f"<div class='status-pill {accent}'>{row['status']}</div>"
+                    f"{excluded_badge}"
                     f"<div class='tactic-mini'>{row['tactic_type']} • {row['coverage']}</div>"
                     f"<div class='tactic-mini'>WR {_fmt_pct(row['win_rate'])} | Δ {_fmt_signed(row['delta_vs_baseline'])}</div>"
                     f"<div class='tactic-mini'>Rounds {int(row['rounds'])} | Recent {_fmt_pct(row['recent_wr'])} ({_fmt_signed(row['recent_delta'])})</div>"
@@ -494,6 +527,23 @@ def render(ctx):
                     use_container_width=True,
                 ):
                     st.session_state[selection_state_key] = row["tactic_uid"]
+                action_label = "Re-include tactic" if excluded else "Exclude tactic"
+                if st.button(
+                    action_label,
+                    key=f"exclude_tactic_{status}_{i}_{row['tactic_uid']}",
+                    type="secondary",
+                    use_container_width=True,
+                ):
+                    context_key = (str(row["map"]), str(row["side"]))
+                    current = set(excluded_by_context.get(context_key, set()))
+                    tactic_name = str(row["tactic_name"])
+                    if excluded:
+                        current.discard(tactic_name)
+                    else:
+                        current.add(tactic_name)
+                    excluded_by_context[context_key] = current
+                    _set_excluded_for_context(context_key[0], context_key[1], current)
+                    st.rerun()
         if not overflow.empty:
             with st.expander(f"{status}: show {len(overflow)} additional lower-priority tactics"):
                 reduced = overflow[["tactic_name", "rounds", "win_rate", "delta_vs_baseline", "recent_wr", "last_used_label", "reason"]].rename(
@@ -511,7 +561,9 @@ def render(ctx):
         remaining.append(len(overflow))
 
     st.markdown("<div class='section-title' style='margin-top:10px;'>Recommended 6–7 Tactic Set (Current Global Context)</div>", unsafe_allow_html=True)
-    rec_pool = tactical[tactical["status"].isin(["Strong Keep", "Keep", "Refine", "Situational", "Test More"])].copy()
+    rec_pool = tactical[
+        tactical["status"].isin(["Strong Keep", "Keep", "Refine", "Situational", "Test More"]) & ~tactical["is_excluded"]
+    ].copy()
     rec_pool["pick_score"] = rec_pool["weighted_wr"] * 0.52 + rec_pool["delta_vs_baseline"] * 2.1 + np.log1p(rec_pool["rounds"]) * 6
     slots = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B", "Mid", "Ivy"]
     picks = []
@@ -606,6 +658,7 @@ def render(ctx):
         return
 
     one = tactical[tactical["tactic_uid"] == selected_uid].iloc[0]
+    selected_excluded = bool(one["is_excluded"])
     tactic_matches = scoped[
         (scoped["tactic_name"] == one["tactic_name"]) & (scoped["map"] == one["map"]) & (scoped["side"] == one["side"])
     ].copy()
@@ -673,6 +726,23 @@ def render(ctx):
             f"<div class='muted'>Status: {one['status']}. {one['analyst_note']}</div></div>",
             unsafe_allow_html=True,
         )
+        drill_label = "Re-include tactic in recommendation pool" if selected_excluded else "Exclude tactic from recommendation pool"
+        if st.button(
+            drill_label,
+            key=f"drilldown_exclusion_{selected_uid}",
+            use_container_width=True,
+        ):
+            context_key = (str(one["map"]), str(one["side"]))
+            current = set(excluded_by_context.get(context_key, set()))
+            tactic_name = str(one["tactic_name"])
+            if selected_excluded:
+                current.discard(tactic_name)
+            else:
+                current.add(tactic_name)
+            _set_excluded_for_context(context_key[0], context_key[1], current)
+            st.rerun()
+        if selected_excluded:
+            st.caption("This tactic is currently excluded from the shared recommendation candidate pool for this map+side context.")
 
     if PLOTLY_AVAILABLE and not match_table.empty:
         g1, g2 = st.columns([1.3, 1], gap="small")

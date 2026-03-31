@@ -364,6 +364,7 @@ def render(ctx):
     st.session_state[override_key] = sorted(model_overrides)
 
     active_pool = tactical[~tactical["tactic_name"].isin(excluded_tactics)].copy()
+    manually_excluded = tactical[tactical["tactic_name"].isin(excluded_tactics)].copy()
     model_excluded_mask = active_pool["status"].isin(["Backup", "Exclude For Now"])
     model_excluded_names = set(active_pool.loc[model_excluded_mask, "tactic_name"].astype(str).tolist())
     effective_model_excluded = model_excluded_names - model_overrides
