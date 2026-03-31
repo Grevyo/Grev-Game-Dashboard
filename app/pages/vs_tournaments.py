@@ -37,7 +37,9 @@ def render(ctx):
     grp["confidence"] = grp["rounds"].map(confidence_from_sample)
 
     section_header("Tournament Performance")
+    st.markdown("<div class='table-frame'>", unsafe_allow_html=True)
     st.dataframe(grp.sort_values("win_rate", ascending=False), use_container_width=True, hide_index=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if not PLOTLY_AVAILABLE:
         st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")
@@ -58,12 +60,18 @@ def render(ctx):
         )
         fig.update_xaxes(automargin=True, tickfont=dict(size=10 if mobile_view else 11))
         fig.update_yaxes(automargin=True, ticksuffix="%", range=[0, 100], tickfont=dict(size=10 if mobile_view else 11))
+        st.markdown("<div class='analytics-frame'>", unsafe_allow_html=True)
         st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        st.markdown("</div>", unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Best Events")
+        st.markdown("<div class='table-frame'>", unsafe_allow_html=True)
         st.dataframe(grp.nlargest(5, "win_rate"), use_container_width=True, hide_index=True)
+        st.markdown("</div>", unsafe_allow_html=True)
     with c2:
         st.subheader("Worst Events")
+        st.markdown("<div class='table-frame'>", unsafe_allow_html=True)
         st.dataframe(grp.nsmallest(5, "win_rate"), use_container_width=True, hide_index=True)
+        st.markdown("</div>", unsafe_allow_html=True)

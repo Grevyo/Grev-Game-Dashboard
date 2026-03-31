@@ -23,7 +23,7 @@ def stat_card(label: str, value, help_text: str = "", quality_override: str | No
     quality = quality_override or (classify_quality(num_value) if isinstance(num_value, (int, float)) and not math.isnan(num_value) else "mid")
     st.markdown(
         f"""
-        <div class='panel panel-tight accent-{quality}'>
+        <div class='panel panel-tight stat-widget accent-{quality}'>
             <div class='metric-title'>{label}</div>
             <div class='metric-value stat-{quality}'>{value}</div>
             <div class='muted'>{help_text}</div>
@@ -333,7 +333,7 @@ def insight_card(title: str, body: str, level: str = "info"):
     tone = {"info": "mid", "warn": "poor", "good": "good", "bad": "bad"}.get(level, "mid")
     icon = {"info": "ℹ", "warn": "⚠", "good": "▲", "bad": "▼"}.get(level, "ℹ")
     st.markdown(
-        f"<div class='panel panel-tight accent-{tone}'><strong>{icon} {title}</strong><br><span class='muted'>{body}</span></div>",
+        f"<div class='panel panel-tight insight-module accent-{tone}'><strong>{icon} {title}</strong><br><span class='muted'>{body}</span></div>",
         unsafe_allow_html=True,
     )
 

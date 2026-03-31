@@ -108,18 +108,22 @@ def render(ctx):
         st.session_state["tactics_breakdown_side"] = side_options[0]
 
     if filter_panel_toggle("tactics_breakdown"):
+        st.markdown("<div class='toolbar-shell'>", unsafe_allow_html=True)
         f1, f2 = st.columns(2, gap="small")
         with f1:
             st.selectbox("Map", map_options, key="tactics_breakdown_map")
         with f2:
             st.selectbox("Side", side_options, key="tactics_breakdown_side")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     map_name = st.session_state.get("tactics_breakdown_map", map_options[0])
     side = st.session_state.get("tactics_breakdown_side", side_options[0])
     view = _build_display_view(summary, tdf, map_name, side)
 
     section_header("Context-locked tactic buckets", f"Showing exact context: {map_name} + {side}")
+    st.markdown("<div class='table-frame'>", unsafe_allow_html=True)
     st.dataframe(view.sort_values("score", ascending=False), use_container_width=True, hide_index=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if not PLOTLY_AVAILABLE:
         st.warning("Plotly is not installed in this environment. Interactive charts are unavailable.")
@@ -143,7 +147,9 @@ def render(ctx):
         )
         fig.update_xaxes(automargin=True, ticksuffix="%", tickfont=dict(size=10 if mobile_view else 11))
         fig.update_yaxes(automargin=True, tickfont=dict(size=10 if mobile_view else 11))
+        st.markdown("<div class='analytics-frame'>", unsafe_allow_html=True)
         st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": True})
+        st.markdown("</div>", unsafe_allow_html=True)
 
     low = view[view["uses"] < 5]
     if not low.empty:
