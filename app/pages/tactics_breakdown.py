@@ -240,7 +240,27 @@ def render(ctx):
     with c2:
         days_window = st.select_slider("Recent Window", options=[7, 10, 14, 21, 30], value=14)
     with c3:
-        sample_floor = st.slider("Min Rounds", min_value=1, max_value=max(1, int(tdf["total_rounds"].max())), value=3, step=1)
+        max_scope = tdf.copy()
+        if tactic_type != "All":
+            max_scope = max_scope[max_scope["tactic_type"] == tactic_type].copy()
+        newest_scope = max_scope["match_ts"].max()
+        max_scope = max_scope[max_scope["match_ts"] >= (newest_scope - pd.Timedelta(days=int(days_window) * 8))].copy()
+        grouped_rounds = (
+            max_scope.groupby(["map", "side", "tactic_name", "category", "tactic_type"], dropna=False)["total_rounds"].sum()
+            if not max_scope.empty
+            else pd.Series(dtype=float)
+        )
+        data_max_rounds = int(grouped_rounds.max()) if not grouped_rounds.empty else 1
+        sample_floor_cap = max(100, data_max_rounds)
+        sample_floor_step = 1 if sample_floor_cap <= 100 else 5 if sample_floor_cap <= 300 else 10
+        sample_floor = st.number_input(
+            "Min Rounds",
+            min_value=1,
+            max_value=sample_floor_cap,
+            value=min(3, sample_floor_cap),
+            step=sample_floor_step,
+            help=f"Current scoped data max: {data_max_rounds} rounds.",
+        )
     st.markdown("</div>", unsafe_allow_html=True)
 
     scoped = tdf.copy()
