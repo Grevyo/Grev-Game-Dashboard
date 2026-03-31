@@ -352,36 +352,6 @@ def inject_styles(theme_name: str = "Dark"):
     .teams-command-zone {{ margin: .8rem 0 .65rem; padding: .75rem .8rem; }}
     .teams-kpi .metric-value {{ font-size:1.04rem; line-height:1.2; margin-top:3px; }}
     .teams-chart-frame {{ padding:.82rem .9rem; }}
-    .teams-intel-panel {{
-      display:flex;
-      flex-direction:column;
-      gap:.5rem;
-      padding:.2rem .15rem;
-    }}
-    .intel-group {{
-      border:1px solid rgba(108,126,150,.35);
-      border-radius:10px;
-      padding:.42rem .5rem;
-      background: linear-gradient(180deg, rgba(12,19,30,.92), rgba(9,14,24,.9));
-    }}
-    .intel-title {{
-      font-size:.6rem;
-      letter-spacing:.12em;
-      text-transform:uppercase;
-      margin-bottom:.22rem;
-      color:#c6d4e8;
-    }}
-    .intel-item {{
-      font-size:.68rem;
-      color:#e4edf8;
-      padding:.12rem 0;
-      border-top:1px dashed rgba(122,142,166,.22);
-    }}
-    .intel-item:first-of-type {{ border-top:none; }}
-    .intel-good {{ border-color: rgba(106,198,133,.55); box-shadow: inset 0 0 0 1px rgba(106,198,133,.14); }}
-    .intel-caution {{ border-color: rgba(229,179,107,.5); box-shadow: inset 0 0 0 1px rgba(229,179,107,.12); }}
-    .intel-bad {{ border-color: rgba(232,112,125,.55); box-shadow: inset 0 0 0 1px rgba(232,112,125,.14); }}
-    .intel-mixed {{ border-color: rgba(124,156,232,.5); box-shadow: inset 0 0 0 1px rgba(124,156,232,.13); }}
     .teams-table-shell {{ padding:.45rem; margin-top:.38rem; }}
     .teams-table-shell [data-testid="stDataFrame"] {{
       border-color: rgba(124,142,163,.42);
