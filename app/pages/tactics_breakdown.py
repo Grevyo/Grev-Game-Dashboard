@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 
 try:
@@ -12,6 +13,76 @@ except ModuleNotFoundError:
 from app.components import insight_card, section_header
 from app.filters import filter_panel_toggle
 from app.tactics import tactic_bucket, tactic_summary
+
+def _format_last_used(value) -> str:
+    if pd.isna(value):
+        return "N/A"
+    ts = pd.to_datetime(value, errors="coerce")
+    if pd.isna(ts):
+        return "N/A"
+    return ts.strftime("%Y-%m-%d")
+
+
+def _reason_without_tactic_name(score: float, trend: str, sample: float) -> str:
+    sample = int(sample or 0)
+    if sample >= 10:
+        sample_note = "Strong sample"
+    elif sample >= 5:
+        sample_note = "Usable sample"
+    else:
+        sample_note = "Low sample"
+
+    if score >= 70:
+        quality_note = "above-baseline conversion"
+    elif score >= 55:
+        quality_note = "stable conversion"
+    elif score >= 40:
+        quality_note = "mixed conversion"
+    else:
+        quality_note = "weak conversion"
+
+    trend_note = {
+        "Rising": "with improving results",
+        "Flat": "with stable round volume",
+        "Falling": "with recent decline",
+    }.get(str(trend), "with limited trend clarity")
+
+    return f"{sample_note} and {quality_note} {trend_note}."
+
+
+def _build_display_view(summary: pd.DataFrame, tactics_df: pd.DataFrame, map_name: str, side: str) -> pd.DataFrame:
+    view = summary[(summary["map"] == map_name) & (summary["side"] == side)].copy()
+
+    last_used = (
+        tactics_df.assign(date=pd.to_datetime(tactics_df.get("date"), errors="coerce"))
+        .groupby(["map", "side", "tactic_name"], dropna=False)["date"]
+        .max()
+        .reset_index()
+        .rename(columns={"date": "date_last_used"})
+    )
+
+    view = view.merge(last_used, on=["map", "side", "tactic_name"], how="left")
+    view["date_last_used"] = view["date_last_used"].map(_format_last_used)
+    view["reason"] = view.apply(
+        lambda r: _reason_without_tactic_name(r["score"], r["trend"], r["uses"]), axis=1
+    )
+    view["bucket"] = view.apply(tactic_bucket, axis=1)
+
+    return view[[
+        "tactic_name",
+        "category",
+        "map",
+        "side",
+        "uses",
+        "wins",
+        "losses",
+        "win_rate",
+        "score",
+        "trend",
+        "bucket",
+        "date_last_used",
+        "reason",
+    ]]
 
 
 def render(ctx):
@@ -43,8 +114,7 @@ def render(ctx):
 
     map_name = st.session_state.get("tactics_breakdown_map", map_options[0])
     side = st.session_state.get("tactics_breakdown_side", side_options[0])
-    view = summary[(summary["map"] == map_name) & (summary["side"] == side)].copy()
-    view["bucket"] = view.apply(tactic_bucket, axis=1)
+    view = _build_display_view(summary, tdf, map_name, side)
 
     section_header("Context-locked tactic buckets", f"Showing exact context: {map_name} + {side}")
     st.dataframe(view.sort_values("score", ascending=False), use_container_width=True, hide_index=True)
