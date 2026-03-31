@@ -142,6 +142,19 @@ def _wr_tier_box(tier: str, value: float | None) -> str:
     )
 
 
+def _tactic_selection_key(row: pd.Series) -> str:
+    return f"{row['map']}||{row['side']}||{row['tactic_name']}"
+
+
+def _first_existing_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    normalized = {str(col).strip().lower(): col for col in df.columns}
+    for cand in candidates:
+        col = normalized.get(cand.strip().lower())
+        if col is not None:
+            return col
+    return None
+
+
 def _build_tactic_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     group_cols = ["map", "side", "tactic_name", "category", "tactic_type"]
     tactical = (
@@ -216,6 +229,7 @@ def _inject_page_css() -> None:
         .context-chip{display:inline-block;border:1px solid #3f556d;background:#112132;padding:4px 10px;border-radius:4px;font-size:.62rem;letter-spacing:.11em;text-transform:uppercase;color:#cfe1f5;margin-right:6px;}
         .context-chip strong{color:#9FE870;}
         .tactic-card{border:1px solid #2d3e51;background:linear-gradient(180deg,#122031,#0d1825);border-radius:8px;padding:.62rem;min-height:196px;}
+        .tactic-card.selected{border-color:#9FE870;box-shadow:0 0 0 1px rgba(159,232,112,.35),0 0 18px rgba(159,232,112,.16);}
         .tactic-card h4{margin:0;color:#f4f8ff;font-size:.87rem;line-height:1.25;}
         .status-pill{display:inline-block;font-size:.56rem;letter-spacing:.11em;text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid #42596f;margin-top:6px;}
         .status-pill.good{color:#9FE870;border-color:#4a7242;background:#1a2b1b;}
@@ -350,6 +364,12 @@ def render(ctx):
     if tactical.empty:
         st.warning("No tactics meet the minimum sample threshold for this map + side.")
         return
+    tactical["tactic_uid"] = tactical.apply(_tactic_selection_key, axis=1)
+    selection_state_key = "tactics_breakdown_selected_tactic_uid"
+    if selection_state_key not in st.session_state:
+        st.session_state[selection_state_key] = None
+    if st.session_state[selection_state_key] not in set(tactical["tactic_uid"]):
+        st.session_state[selection_state_key] = None
 
     tactical["is_recent_5d"] = tactical["days_since_used"] <= 5
     viable_status = {"Strong Keep", "Keep", "Refine", "Situational"}
@@ -452,8 +472,10 @@ def render(ctx):
         cols = st.columns(3 if not mobile_view else 1, gap="small")
         for i, row in priority.iterrows():
             with cols[i % len(cols)]:
+                selected = st.session_state[selection_state_key] == row["tactic_uid"]
+                selected_class = " selected" if selected else ""
                 st.markdown(
-                    f"<div class='tactic-card'><h4>{row['tactic_name']}</h4>"
+                    f"<div class='tactic-card{selected_class}'><h4>{row['tactic_name']}</h4>"
                     f"<div class='status-pill {accent}'>{row['status']}</div>"
                     f"<div class='tactic-mini'>{row['tactic_type']} • {row['coverage']}</div>"
                     f"<div class='tactic-mini'>WR {_fmt_pct(row['win_rate'])} | Δ {_fmt_signed(row['delta_vs_baseline'])}</div>"
@@ -463,6 +485,13 @@ def render(ctx):
                     f"<div class='tactic-reason'>{row['reason']}</div></div>",
                     unsafe_allow_html=True,
                 )
+                if st.button(
+                    "Inspect tactic" if not selected else "Selected • viewing below",
+                    key=f"inspect_tactic_{status}_{i}_{row['tactic_uid']}",
+                    type="primary" if selected else "secondary",
+                    use_container_width=True,
+                ):
+                    st.session_state[selection_state_key] = row["tactic_uid"]
         if not overflow.empty:
             with st.expander(f"{status}: show {len(overflow)} additional lower-priority tactics"):
                 reduced = overflow[["tactic_name", "rounds", "win_rate", "delta_vs_baseline", "recent_wr", "last_used_label", "reason"]].rename(
@@ -569,36 +598,201 @@ def render(ctx):
 
     st.markdown("<div class='section-title' style='margin-top:10px;'>Tactic Deep-Dive Analyst Tool</div>", unsafe_allow_html=True)
     st.caption(f"Context locked to Map: {map_context} • Side: {side_context} • Competition: {comp_context}")
-    selected_tactic = st.selectbox("Inspect tactic", options=tactical["tactic_name"].sort_values().tolist())
-    one = tactical[tactical["tactic_name"] == selected_tactic].iloc[0]
+    selected_uid = st.session_state.get(selection_state_key)
+    if not selected_uid:
+        st.info("Select a tactic to inspect full match history, tactic-specific trend graphs, and per-match outcomes.")
+        return
+
+    one = tactical[tactical["tactic_uid"] == selected_uid].iloc[0]
+    tactic_matches = scoped[
+        (scoped["tactic_name"] == one["tactic_name"]) & (scoped["map"] == one["map"]) & (scoped["side"] == one["side"])
+    ].copy()
+    tactic_matches["opponent"] = tactic_matches.get("opponent_team", "Unknown").astype(str).str.strip().replace("", "Unknown")
+    tactic_matches["rounds_used"] = tactic_matches["total_rounds"]
+    tactic_matches["rounds_won"] = tactic_matches["wins"]
+    tactic_matches["rounds_lost"] = tactic_matches["losses"]
+
+    team_score_col = _first_existing_col(tactic_matches, ["team_score", "my_team_score", "score_for", "our_score"])
+    opp_score_col = _first_existing_col(tactic_matches, ["opponent_score", "opp_score", "score_against"])
+    match_result_col = _first_existing_col(tactic_matches, ["match_result", "result"])
+
+    agg = {
+        "competition": "first",
+        "map": "first",
+        "side": "first",
+        "opponent": "first",
+        "tier": "first",
+        "rounds_used": "sum",
+        "rounds_won": "sum",
+        "rounds_lost": "sum",
+    }
+    if team_score_col:
+        agg[team_score_col] = "first"
+    if opp_score_col:
+        agg[opp_score_col] = "first"
+    if match_result_col:
+        agg[match_result_col] = "first"
+
+    match_table = (
+        tactic_matches.groupby(["match_id", "date", "time", "match_ts"], dropna=False)
+        .agg(agg)
+        .reset_index()
+        .sort_values(["match_ts", "match_id"], ascending=[False, False])
+    )
+    match_table["win_rate_pct"] = (match_table["rounds_won"] / match_table["rounds_used"].clip(lower=1) * 100).fillna(0)
+    if match_result_col is None and team_score_col and opp_score_col:
+        match_table["derived_result"] = np.where(
+            match_table[team_score_col] > match_table[opp_score_col],
+            "Win",
+            np.where(match_table[team_score_col] < match_table[opp_score_col], "Loss", "Draw"),
+        )
+        match_result_col = "derived_result"
 
     d1, d2, d3 = st.columns([1.1, 1.1, 1.8], gap="small")
     with d1:
         st.markdown(
-            f"<div class='panel'><div class='metric-title'>Performance Summary</div>"
-            f"<div class='metric-value'>{_fmt_pct(one['win_rate'])}</div>"
-            f"<div class='muted'>Baseline {_fmt_pct(one['baseline_wr'])} • Δ {_fmt_signed(one['delta_vs_baseline'])}</div>"
-            f"<div class='muted'>Rounds {int(one['rounds'])} • Last used {one['last_used_label']}</div></div>",
+            f"<div class='panel'><div class='metric-title'>Selected Tactic Context</div>"
+            f"<div class='metric-value'>{one['tactic_name']}</div>"
+            f"<div class='muted'>{one['map']} • {one['side']} • {one['tactic_type']}</div>"
+            f"<div class='muted'>Status: {one['status']} | Rounds {int(one['rounds'])}</div></div>",
             unsafe_allow_html=True,
         )
     with d2:
         st.markdown(
-            f"<div class='panel'><div class='metric-title'>Tier Split & Risk Read</div>"
-            f"<div class='muted'>S-tier {_fmt_pct(one['S']) if pd.notna(one['S']) else 'N/A'} | A-tier {_fmt_pct(one['A']) if pd.notna(one['A']) else 'N/A'}</div>"
-            f"<div class='muted'>B-tier {_fmt_pct(one['B']) if pd.notna(one['B']) else 'N/A'} | C-tier {_fmt_pct(one['C']) if pd.notna(one['C']) else 'N/A'}</div>"
-            f"<div class='muted'>Weighted WR {_fmt_pct(one['weighted_wr'])} emphasizes S/A outcomes.</div></div>",
+            f"<div class='panel'><div class='metric-title'>Performance Summary</div>"
+            f"<div class='metric-value'>{_fmt_pct(one['win_rate'])}</div>"
+            f"<div class='muted'>Baseline {_fmt_pct(one['baseline_wr'])} • Δ {_fmt_signed(one['delta_vs_baseline'])}</div>"
+            f"<div class='muted'>Weighted WR {_fmt_pct(one['weighted_wr'])} • Last used {one['last_used_label']}</div></div>",
             unsafe_allow_html=True,
         )
     with d3:
-        trend_data = scoped[scoped["tactic_name"] == selected_tactic].copy().sort_values("match_ts")
-        trend_data["wr"] = (trend_data["wins"] / (trend_data["wins"] + trend_data["losses"]).clip(lower=1) * 100).fillna(0)
-        if PLOTLY_AVAILABLE and not trend_data.empty:
-            tfig = px.line(trend_data, x="match_ts", y="wr", markers=True)
-            tfig.update_layout(template="plotly_dark", margin=dict(l=8, r=8, t=8, b=8), height=220)
-            tfig.add_hline(y=float(one["baseline_wr"]), line_dash="dot", line_color="#9fb4ca")
-            st.plotly_chart(tfig, use_container_width=True)
         st.markdown(
             f"<div class='panel panel-tight'><div class='metric-title'>Analyst Rationale</div>"
             f"<div class='muted'>Status: {one['status']}. {one['analyst_note']}</div></div>",
             unsafe_allow_html=True,
         )
+
+    if PLOTLY_AVAILABLE and not match_table.empty:
+        g1, g2 = st.columns([1.3, 1], gap="small")
+        with g1:
+            usage_fig = go.Figure()
+            usage_fig.add_bar(
+                x=match_table["match_ts"],
+                y=match_table["rounds_used"],
+                name="Rounds Used",
+                marker_color="#53a7ff",
+            )
+            usage_fig.add_scatter(
+                x=match_table["match_ts"],
+                y=match_table["win_rate_pct"],
+                name="Win Rate %",
+                yaxis="y2",
+                mode="lines+markers",
+                line=dict(color="#9FE870", width=2),
+            )
+            usage_fig.update_layout(
+                template="plotly_dark",
+                margin=dict(l=8, r=8, t=8, b=8),
+                height=360 if not mobile_view else 300,
+                yaxis=dict(title="Rounds Used"),
+                yaxis2=dict(title="Win Rate %", overlaying="y", side="right", range=[0, 100]),
+            )
+            st.plotly_chart(usage_fig, use_container_width=True)
+        with g2:
+            opp_perf = (
+                match_table.groupby("opponent", dropna=False)
+                .agg(matches=("match_id", "count"), rounds_won=("rounds_won", "sum"), rounds_used=("rounds_used", "sum"))
+                .reset_index()
+            )
+            opp_perf["win_rate_pct"] = (opp_perf["rounds_won"] / opp_perf["rounds_used"].clip(lower=1) * 100).fillna(0)
+            opp_perf = opp_perf.sort_values("win_rate_pct", ascending=False)
+            opp_fig = px.bar(
+                opp_perf,
+                x="win_rate_pct",
+                y="opponent",
+                orientation="h",
+                color="matches",
+                color_continuous_scale="Tealgrn",
+                labels={"win_rate_pct": "Win Rate %", "opponent": "Opponent"},
+            )
+            opp_fig.update_layout(template="plotly_dark", margin=dict(l=8, r=8, t=8, b=8), height=360 if not mobile_view else 300)
+            st.plotly_chart(opp_fig, use_container_width=True)
+
+        g3, g4 = st.columns([1, 1], gap="small")
+        with g3:
+            tier_perf = (
+                match_table.groupby("tier", dropna=False)
+                .agg(matches=("match_id", "count"), rounds_won=("rounds_won", "sum"), rounds_used=("rounds_used", "sum"))
+                .reset_index()
+            )
+            tier_perf["win_rate_pct"] = (tier_perf["rounds_won"] / tier_perf["rounds_used"].clip(lower=1) * 100).fillna(0)
+            tier_fig = px.bar(tier_perf, x="tier", y="win_rate_pct", color="matches", labels={"tier": "Tier", "win_rate_pct": "Win Rate %"})
+            tier_fig.update_layout(template="plotly_dark", margin=dict(l=8, r=8, t=8, b=8), height=310 if not mobile_view else 270)
+            st.plotly_chart(tier_fig, use_container_width=True)
+        with g4:
+            comp_perf = (
+                match_table.groupby("competition", dropna=False)
+                .agg(matches=("match_id", "count"), rounds_won=("rounds_won", "sum"), rounds_used=("rounds_used", "sum"))
+                .reset_index()
+            )
+            comp_perf["win_rate_pct"] = (comp_perf["rounds_won"] / comp_perf["rounds_used"].clip(lower=1) * 100).fillna(0)
+            comp_perf = comp_perf.sort_values(["matches", "win_rate_pct"], ascending=[False, False]).head(10)
+            comp_fig = px.bar(
+                comp_perf,
+                x="competition",
+                y="win_rate_pct",
+                color="matches",
+                labels={"competition": "Competition", "win_rate_pct": "Win Rate %"},
+            )
+            comp_fig.update_layout(template="plotly_dark", margin=dict(l=8, r=8, t=8, b=8), height=310 if not mobile_view else 270, xaxis_tickangle=-30)
+            st.plotly_chart(comp_fig, use_container_width=True)
+    elif not PLOTLY_AVAILABLE:
+        st.warning("Plotly unavailable in this environment; tactic-specific drill-down charts are disabled.")
+
+    st.markdown("<div class='section-title' style='margin-top:8px;'>Selected Tactic Match History</div>", unsafe_allow_html=True)
+    columns_order = [
+        "date",
+        "time",
+        "competition",
+        "map",
+        "side",
+        "opponent",
+        "tier",
+        "rounds_used",
+        "rounds_won",
+        "win_rate_pct",
+        "match_id",
+    ]
+    if match_result_col:
+        columns_order.insert(10, match_result_col)
+    if team_score_col:
+        columns_order.insert(11, team_score_col)
+    if opp_score_col:
+        columns_order.insert(12, opp_score_col)
+    present_cols = [c for c in columns_order if c in match_table.columns]
+    pretty_table = match_table[present_cols].rename(
+        columns={
+            "date": "Date",
+            "time": "Time",
+            "competition": "Competition",
+            "map": "Map",
+            "side": "Side",
+            "opponent": "Opponent",
+            "tier": "Tier",
+            "rounds_used": "Rounds Used",
+            "rounds_won": "Rounds Won",
+            "win_rate_pct": "Win Rate %",
+            "match_id": "match_id",
+            "derived_result": "Match Result",
+            "match_result": "Match Result",
+            "result": "Match Result",
+            "team_score": "Team Score",
+            "my_team_score": "Team Score",
+            "score_for": "Team Score",
+            "our_score": "Team Score",
+            "opponent_score": "Opponent Score",
+            "opp_score": "Opponent Score",
+            "score_against": "Opponent Score",
+        }
+    )
+    st.dataframe(pretty_table, use_container_width=True, hide_index=True)
