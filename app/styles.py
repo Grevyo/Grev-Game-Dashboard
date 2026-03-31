@@ -321,6 +321,31 @@ def inject_styles(theme_name: str = "Dark"):
     .breakdown-table th, .breakdown-table td {{ border-bottom:1px solid #273544; padding:8px 7px; text-align:left; }}
     .breakdown-table th {{ background:#121d29; color:#b4c4d7; font-size:.58rem; letter-spacing:.13em; text-transform:uppercase; }}
 
+    .heatmap-stage {{
+      margin: 1.05rem 0 1.2rem;
+      padding: .9rem .95rem .55rem;
+      border:1px solid rgba(99,122,146,0.38);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(13,20,31,0.95) 0%, rgba(9,14,24,0.92) 100%);
+      box-shadow: 0 16px 28px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.04);
+    }}
+    .heatmap-stage .section-title {{
+      font-size: .69rem;
+      letter-spacing: .14em;
+      margin-bottom: .28rem;
+    }}
+    .heatmap-stage .section-subtitle {{
+      margin-bottom: .4rem;
+    }}
+
+    @media (min-width: 1200px) {{
+      .heatmap-stage--fullbleed {{
+        width: min(99vw, 2100px);
+        margin-left: calc(50% - min(99vw, 2100px) / 2);
+        margin-right: calc(50% - min(99vw, 2100px) / 2);
+      }}
+    }}
+
     @media (max-width: 1120px) {{
       .player-viewer-hero-grid {{ grid-template-columns:1fr; }}
       .player-viewer-top-metrics {{ grid-template-columns:repeat(3,minmax(0,1fr)); }}
