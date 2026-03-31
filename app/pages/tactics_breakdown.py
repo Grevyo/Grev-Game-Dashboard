@@ -236,7 +236,7 @@ def render(ctx):
         days_window = st.select_slider("Recent Window", options=[7, 10, 14, 21, 30], value=14)
     with c5:
         competitions = sorted(tdf["competition"].dropna().unique().tolist())
-        selected_comp = st.multiselect("Competition Context", competitions, default=competitions)
+        selected_comp = st.multiselect("Competition Context", competitions, default=competitions, key="tb_comp")
     with c6:
         sample_floor = st.slider("Min Rounds", min_value=1, max_value=max(1, int(tdf["total_rounds"].max())), value=3, step=1)
     st.markdown("</div>", unsafe_allow_html=True)
