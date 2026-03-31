@@ -338,6 +338,33 @@ def inject_styles(theme_name: str = "Dark"):
       margin-bottom: .4rem;
     }}
 
+    .teams-hero {{ padding: 1rem 1.05rem; margin-bottom: .75rem; }}
+    .teams-hero-grid {{ display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; align-items:flex-start; }}
+    .teams-hero-title {{
+      margin:.15rem 0 .32rem 0;
+      font-size:1.26rem;
+      letter-spacing:.01em;
+      line-height:1.1;
+      color:#f6fbff;
+    }}
+    .teams-hero-subtitle {{ margin:0; max-width:920px; }}
+    .teams-hero-meta {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; justify-content:flex-end; }}
+    .teams-command-zone {{ margin: .8rem 0 .65rem; padding: .75rem .8rem; }}
+    .teams-kpi .metric-value {{ font-size:1.04rem; line-height:1.2; margin-top:3px; }}
+    .teams-chart-frame {{ padding:.82rem .9rem; }}
+    .teams-table-shell {{ padding:.45rem; margin-top:.38rem; }}
+    .teams-table-shell [data-testid="stDataFrame"] {{
+      border-color: rgba(124,142,163,.42);
+      background: linear-gradient(180deg, rgba(13,20,31,.96), rgba(10,16,26,.96));
+    }}
+    .teams-table-shell [data-testid="stDataFrame"] * {{
+      font-size:.73rem;
+    }}
+    .teams-table-shell [data-testid="stDataFrame"] thead tr th {{
+      background: rgba(19,29,43,.9);
+    }}
+    .teams-scout-note {{ margin-top: .6rem; }}
+
     .tournaments-hero {{ padding: 1rem 1.05rem; margin-bottom: .75rem; }}
     .tournaments-hero-grid {{ display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; align-items:flex-start; }}
     .tournaments-hero-kicker {{ margin:0 !important; }}
@@ -390,6 +417,8 @@ def inject_styles(theme_name: str = "Dark"):
       .app-topbar-title {{ font-size:.96rem; }}
       .hero-logo, .app-topbar .hero-logo {{ width:38px; height:38px; }}
       .overview-hero .hero-logo, .player-viewer-hero .hero-logo {{ width:34px; height:34px; }}
+      .teams-hero-title {{ font-size:1.02rem; }}
+      .teams-hero-meta {{ justify-content:flex-start; }}
       .tournaments-hero-title {{ font-size:1.02rem; }}
       .tournaments-hero-meta {{ justify-content:flex-start; }}
       .player-viewer-top-metrics, .stats-grid {{ grid-template-columns:repeat(2,minmax(0,1fr)); }}
