@@ -861,115 +861,191 @@ def inject_styles(theme_name: str = "Dark"):
     div[data-testid="stHorizontalBlock"] > div {{ align-self: stretch; }}
 
 
-    /* --- Redesign override: broadcast control-room system --- */
+    /* --- Obsidian League design system override --- */
     .stApp {
       background:
-        linear-gradient(160deg, rgba(5,8,12,0.98) 0%, rgba(8,11,16,0.98) 55%, rgba(7,9,13,1) 100%),
-        repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 140px);
+        radial-gradient(circle at 8% 8%, rgba(158, 94, 45, 0.17) 0%, transparent 38%),
+        radial-gradient(circle at 92% 2%, rgba(41, 92, 76, 0.14) 0%, transparent 32%),
+        linear-gradient(160deg, #080b10 0%, #0a1017 45%, #070a0f 100%);
+      color: #f2f5f9;
     }
-    .block-container { max-width: 99%; padding-top: 1.1rem; }
-    .section-title {
-      font-size: 1.02rem;
-      font-weight: 780;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: color-mix(in srgb, var(--text) 95%, #ffffff 5%);
+    .block-container {
+      max-width: 99.2%;
+      padding: 1rem 1rem 1.3rem 1rem;
     }
-    .section-subtitle { color: color-mix(in srgb, var(--muted) 92%, #ced7e3 8%); letter-spacing: 0.02em; }
 
-    .panel, .lower-card, .toolbar-shell, .context-ribbon, .breakdown-table-wrap, .map-breakdown-card,
-    .map-performance-table-wrap, .player-viewer-gauge-panel, .achievement-strip-viewer {
-      border-radius: 8px;
-      border: 1px solid color-mix(in srgb, var(--border) 88%, #4b5567 12%);
-      background:
-        linear-gradient(180deg, rgba(16,22,30,0.96) 0%, rgba(11,16,23,0.98) 100%),
-        linear-gradient(90deg, rgba(255,255,255,0.016), rgba(255,255,255,0.006));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 14px 26px rgba(0,0,0,0.34);
+    h1, h2, h3 {
+      letter-spacing: 0.01em;
+      font-weight: 760;
+      color: #f7fbff;
+    }
+    .section-title {
+      font-size: 0.88rem;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      color: #a7b3c4;
+      margin-bottom: 8px;
+    }
+    .section-subtitle {
+      font-size: 0.82rem;
+      color: #6f8096;
     }
 
     .hero-band {
       border-radius: 10px;
-      border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+      border: 1px solid rgba(121, 136, 159, 0.38);
+      padding: 20px 22px;
       background:
-        linear-gradient(135deg, rgba(18,23,31,0.98) 0%, rgba(14,18,24,0.99) 60%),
-        radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 36%);
+        linear-gradient(100deg, rgba(17,24,34,0.96), rgba(13,18,27,0.94)),
+        linear-gradient(180deg, rgba(210,143,84,0.08), rgba(40,102,79,0.05));
+      box-shadow: 0 22px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+      position: relative;
+      overflow: hidden;
     }
-    .chip {
-      border-radius: 5px;
-      background: rgba(17,23,31,0.92);
-      border-color: color-mix(in srgb, var(--border) 78%, #7d8897 22%);
-      color: color-mix(in srgb, var(--text) 92%, #fff 8%);
+    .hero-band::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(90deg, transparent 0%, rgba(240,188,136,0.08) 42%, transparent 100%);
+      mix-blend-mode: screen;
+      opacity: .45;
+    }
+
+    .panel, .lower-card, .toolbar-shell, .context-ribbon, .breakdown-table-wrap, .map-breakdown-card,
+    .map-performance-table-wrap, .player-viewer-gauge-panel, .achievement-strip-viewer,
+    .analytics-frame, .table-frame, .roster-section {
+      border-radius: 9px !important;
+      border: 1px solid rgba(101, 116, 139, 0.44) !important;
+      background:
+        linear-gradient(180deg, rgba(14,20,30,0.95), rgba(10,15,23,0.98)) !important;
+      box-shadow:
+        0 16px 34px rgba(0,0,0,0.34),
+        inset 0 1px 0 rgba(255,255,255,0.05),
+        inset 3px 0 0 rgba(224, 145, 82, 0.24);
+    }
+    .panel-tight {
+      padding: 12px !important;
+    }
+
+    .metric-title, .label {
+      color: #91a0b4;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      font-size: 10px;
-      font-weight: 640;
+      font-size: 0.64rem;
+      font-weight: 680;
     }
-    .chip-good { border-color: color-mix(in srgb, var(--good) 58%, var(--border)); background: color-mix(in srgb, var(--good) 18%, #0b1216 82%); }
-    .chip-mid { border-color: color-mix(in srgb, var(--mid) 58%, var(--border)); background: color-mix(in srgb, var(--mid) 18%, #12100b 82%); }
-    .chip-poor { border-color: color-mix(in srgb, var(--poor) 58%, var(--border)); background: color-mix(in srgb, var(--poor) 18%, #14100c 82%); }
-    .chip-bad { border-color: color-mix(in srgb, var(--bad) 58%, var(--border)); background: color-mix(in srgb, var(--bad) 18%, #140d10 82%); }
-
-    .metric-title, .label { color: #99a7ba; letter-spacing: 0.09em; font-weight: 680; }
-
-    .stat-widget { border-left: 3px solid color-mix(in srgb, var(--accent) 70%, var(--border)); }
-    .insight-module { border-left: 3px solid color-mix(in srgb, var(--mid) 68%, var(--border)); }
-    .metric-value { font-size: 1.55rem; font-weight: 780; }
-    .stat-item {
-      border-radius: 7px;
-      border-left: 3px solid color-mix(in srgb, var(--border) 70%, #6f7d90 30%);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
-      background: linear-gradient(180deg, rgba(17,24,32,0.96), rgba(12,17,24,0.98));
+    .metric-value {
+      font-size: 1.45rem;
+      font-weight: 780;
+      letter-spacing: -0.01em;
+    }
+    .stat-widget, .stat-item {
+      border-radius: 6px !important;
+      border: 1px solid rgba(102, 116, 136, 0.44) !important;
+      background: linear-gradient(180deg, rgba(15,22,32,0.96), rgba(10,15,22,0.98)) !important;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
     }
     .stat-item::before { display: none; }
-    .tone-good { border-left-color: color-mix(in srgb, var(--good) 78%, #b5e4c7 22%); }
-    .tone-mid { border-left-color: color-mix(in srgb, var(--mid) 78%, #f0d7a5 22%); }
-    .tone-poor { border-left-color: color-mix(in srgb, var(--poor) 78%, #e3b08f 22%); }
-    .tone-bad { border-left-color: color-mix(in srgb, var(--bad) 78%, #e8a1a1 22%); }
+    .tone-good { border-left: 3px solid #2fa471 !important; }
+    .tone-mid { border-left: 3px solid #cf9f56 !important; }
+    .tone-poor { border-left: 3px solid #bf7347 !important; }
+    .tone-bad { border-left: 3px solid #be4f4f !important; }
 
-    .player-card, .roster-section { border-radius: 8px; }
-    .player-avatar-frame, .hero-player-photo-frame { border-radius: 6px; }
-    .achievement-tile, .achievement-tile-lg, .grev-tier-box { border-radius: 6px; }
+    .chip {
+      border-radius: 4px;
+      border: 1px solid rgba(113, 128, 152, 0.56);
+      background: rgba(13,19,28,0.96);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .player-card, .player-avatar-frame, .hero-player-photo-frame,
+    .achievement-tile, .achievement-tile-lg, .grev-tier-box,
+    .last-match-block, .best-match-block, .map-breakdown-stat {
+      border-radius: 6px !important;
+    }
+
+    div[data-testid="stSidebar"] {
+      background: linear-gradient(180deg, rgba(9,13,20,0.98), rgba(6,10,16,0.98));
+      border-right: 1px solid rgba(101, 116, 139, 0.4);
+    }
+    div[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+      color: #9cabc0;
+    }
 
     div[data-testid="stPills"],
     div[data-testid="stSegmentedControl"],
     div[data-testid="stRadio"][role="radiogroup"] {
-      border-radius: 8px;
-      background: linear-gradient(180deg, rgba(17,22,30,0.95), rgba(11,15,21,0.95));
-      border-color: color-mix(in srgb, var(--border) 78%, #617086 22%);
-      padding: 6px;
+      border-radius: 7px;
+      border: 1px solid rgba(101, 116, 139, 0.5);
+      background: linear-gradient(180deg, rgba(13,19,28,0.95), rgba(9,14,21,0.96));
+      padding: 7px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04), 0 10px 20px rgba(0,0,0,0.25);
     }
     div[data-testid="stPills"] label[data-baseweb="checkbox"] > div:last-child,
     div[data-testid="stSegmentedControl"] label[data-baseweb="radio"] > div:last-child,
     div[data-testid="stRadio"] label[data-baseweb="radio"] > div:last-child {
-      border-radius: 5px;
-      padding: 7px 12px;
+      border-radius: 4px;
+      border: 1px solid rgba(108, 123, 145, 0.52);
+      background: rgba(13,19,28,0.92);
+      color: #9eacc0;
       text-transform: uppercase;
-      font-size: 0.76rem;
-      letter-spacing: 0.06em;
-      background: rgba(16,21,28,0.95);
+      font-size: 0.73rem;
+      letter-spacing: 0.08em;
+    }
+    div[data-testid="stPills"] input[type="checkbox"]:checked + div,
+    div[data-testid="stSegmentedControl"] input[type="radio"]:checked + div,
+    div[data-testid="stRadio"] input[type="radio"]:checked + div {
+      background: linear-gradient(180deg, rgba(166,108,65,0.44), rgba(72,98,86,0.28));
+      border-color: rgba(220, 171, 120, 0.7);
+      color: #f4f8ff;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.27), inset 0 0 0 1px rgba(255,255,255,0.08);
     }
 
     div[data-testid="stSelectbox"] > div,
     div[data-testid="stMultiSelect"] > div,
     div[data-testid="stNumberInput"] > div,
     div[data-testid="stTextInput"] > div {
-      border-radius: 6px !important;
-      border-color: color-mix(in srgb, var(--border) 78%, #6e7d92 22%) !important;
-      background: rgba(13,18,25,0.96) !important;
+      border-radius: 5px !important;
+      border: 1px solid rgba(105, 121, 144, 0.55) !important;
+      background: rgba(10,16,24,0.95) !important;
     }
-
-    .analytics-frame, .table-frame {
-      border: 1px solid color-mix(in srgb, var(--border) 80%, #5f6e83 20%);
-      border-radius: 8px;
-      padding: 12px;
-      background: linear-gradient(180deg, rgba(16,22,30,0.95), rgba(10,15,21,0.98));
-      box-shadow: 0 14px 30px rgba(0,0,0,0.33), inset 0 1px 0 rgba(255,255,255,0.04);
+    .stButton > button {
+      border-radius: 5px;
+      border: 1px solid rgba(220, 165, 114, 0.6);
+      background: linear-gradient(180deg, rgba(36,52,68,0.95), rgba(20,31,45,0.95));
+      color: #f6f9ff;
+      letter-spacing: 0.04em;
+      font-weight: 680;
+      transition: all .16s ease;
+    }
+    .stButton > button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(227, 186, 140, 0.86);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.28);
     }
 
     [data-testid="stDataFrame"] {
-      border: 1px solid color-mix(in srgb, var(--border) 72%, #64758b 28%);
-      border-radius: 6px;
-      background: rgba(8,12,17,0.95);
+      border-radius: 7px;
+      border: 1px solid rgba(107, 122, 145, 0.56);
+      background: rgba(9,14,22,0.94);
+    }
+    [data-testid="stDataFrame"] * {
+      border-color: rgba(96, 111, 133, 0.38) !important;
+    }
+
+    .breakdown-table th {
+      background: linear-gradient(180deg, rgba(34,48,65,0.96), rgba(19,29,42,0.96));
+      color: #d5deea;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+    }
+    .breakdown-row.even td { background: rgba(12,18,27,0.78); }
+    .breakdown-row.odd td { background: rgba(9,15,23,0.88); }
+    .breakdown-table tr:hover td {
+      background: rgba(41, 57, 74, 0.72) !important;
     }
     </style>
     """

@@ -21,7 +21,7 @@ def render(ctx):
     mobile_view = is_mobile_view()
     col = get_active_competition_col(is_grouped_mode(filters.get("competition_mode")))
 
-    st.title("Medisports vs Tournaments")
+    section_header("Medisports vs Tournaments", "Event-level performance positioning and confidence distribution")
     if tdf.empty or col not in tdf.columns:
         st.warning("Tournament data unavailable for current mode.")
         return

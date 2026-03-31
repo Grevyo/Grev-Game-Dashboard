@@ -89,7 +89,7 @@ def _build_display_view(summary: pd.DataFrame, tactics_df: pd.DataFrame, map_nam
 def render(ctx):
     tdf = ctx["tactics"]
     mobile_view = is_mobile_view()
-    st.title("Tactics Breakdown (Map + Side Strict)")
+    section_header("Tactics Breakdown", "Strict context matrix by map and side")
     if tdf.empty:
         st.warning("No tactics data after filters.")
         return

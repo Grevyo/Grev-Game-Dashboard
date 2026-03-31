@@ -78,7 +78,27 @@ def run_app():
     team_logo_uri = image_data_uri(find_team_logo(team_name) or find_team_logo("Medisports"))
     logo_html = f"<img class='hero-logo' src='{team_logo_uri}' alt='Medisports logo'/>" if team_logo_uri else ""
     st.markdown(
-        f"<div class='hero-band' style='margin-bottom:12px;'><div style='display:flex;align-items:center;gap:12px;'><div>{logo_html}</div><div><div class='section-title' style='margin-top:0;'>Medisports Tactical Analytics Hub</div><div class='section-subtitle' style='margin-bottom:0;'>Broadcast-style command surface with integrated filters and tactical intelligence</div></div></div></div>",
+        (
+            "<div class='hero-band' style='margin-bottom:14px;'>"
+            "<div style='display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;'>"
+            "<div style='display:flex;align-items:center;gap:14px;'>"
+            f"<div>{logo_html}</div>"
+            "<div>"
+            "<div class='section-title' style='margin:0;'>Medisports Command Surface</div>"
+            "<div style='font-size:1.35rem;font-weight:800;letter-spacing:0.01em;'>Competitive Intelligence Studio</div>"
+            "<div class='section-subtitle' style='margin:4px 0 0 0;'>"
+            "Esports analytics environment for roster, opponent, and tactical command decisions."
+            "</div>"
+            "</div>"
+            "</div>"
+            "<div style='display:flex;gap:7px;flex-wrap:wrap;align-items:center;'>"
+            "<span class='chip chip-mid'>Live Data Ops</span>"
+            "<span class='chip chip-good'>Tactical Intelligence</span>"
+            "<span class='chip chip-poor'>Roster Context</span>"
+            "</div>"
+            "</div>"
+            "</div>"
+        ),
         unsafe_allow_html=True,
     )
     page = _render_page_navigation()
