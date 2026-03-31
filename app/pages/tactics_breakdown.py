@@ -12,6 +12,7 @@ except ModuleNotFoundError:
     go = None
     PLOTLY_AVAILABLE = False
 
+from app.config import TIER_COLORS
 from app.page_layout import is_mobile_view
 from app.tactics import tactic_category
 
@@ -26,6 +27,7 @@ STATUS_COLORS = {
     "Risky": "poor",
     "Drop": "bad",
 }
+TIER_ORDER = ["S", "A", "B", "C"]
 TIER_COLOR_CLASS = {"S": "grev-tier-s", "A": "grev-tier-a", "B": "grev-tier-b", "C": "grev-tier-c"}
 STATUS_PRIORITY = ["Strong Keep", "Keep", "Refine", "Test More", "Situational", "Risky", "Drop"]
 
@@ -187,12 +189,12 @@ def _build_tactic_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
     tier_view["tier_wr"] = (tier_view["twins"] / (tier_view["twins"] + tier_view["tlosses"]).clip(lower=1) * 100).fillna(0)
 
     tier_pivot = tier_view.pivot_table(index=group_cols, columns="tier", values="tier_wr", aggfunc="mean").reset_index()
-    for t in ["S", "A", "B", "C"]:
+    for t in TIER_ORDER:
         if t not in tier_pivot.columns:
             tier_pivot[t] = np.nan
 
     tactical = tactical.merge(recent[group_cols + ["recent_wr", "rrounds"]], on=group_cols, how="left").merge(
-        tier_pivot[group_cols + ["S", "A", "B", "C"]], on=group_cols, how="left"
+        tier_pivot[group_cols + TIER_ORDER], on=group_cols, how="left"
     )
 
     weighted_num = sum(tactical[t].fillna(tactical["win_rate"]) * w for t, w in TIER_WEIGHTS.items())
@@ -721,13 +723,40 @@ def render(ctx):
         g3, g4 = st.columns([1, 1], gap="small")
         with g3:
             tier_perf = (
-                match_table.groupby("tier", dropna=False)
+                match_table.assign(tier=_normalize_tier_values(match_table["tier"]).fillna("C"))
+                .groupby("tier", dropna=False)
                 .agg(matches=("match_id", "count"), rounds_won=("rounds_won", "sum"), rounds_used=("rounds_used", "sum"))
+                .reindex(TIER_ORDER, fill_value=0)
+                .rename_axis("tier")
                 .reset_index()
             )
             tier_perf["win_rate_pct"] = (tier_perf["rounds_won"] / tier_perf["rounds_used"].clip(lower=1) * 100).fillna(0)
-            tier_fig = px.bar(tier_perf, x="tier", y="win_rate_pct", color="matches", labels={"tier": "Tier", "win_rate_pct": "Win Rate %"})
-            tier_fig.update_layout(template="plotly_dark", margin=dict(l=8, r=8, t=8, b=8), height=310 if not mobile_view else 270)
+            tier_perf["tier_label"] = tier_perf["tier"].map(lambda tier: f"{tier} Tier")
+            tier_fig = px.bar(
+                tier_perf,
+                x="tier",
+                y="win_rate_pct",
+                color="tier",
+                text=tier_perf["win_rate_pct"].map(lambda val: f"{val:.1f}%"),
+                category_orders={"tier": TIER_ORDER},
+                color_discrete_map=TIER_COLORS,
+                labels={"tier": "Tier", "win_rate_pct": "Win Rate %"},
+                hover_data={"matches": True, "tier_label": True, "tier": False},
+            )
+            tier_fig.update_traces(
+                marker_line_width=1.25,
+                marker_line_color="#0f1823",
+                textposition="outside",
+                cliponaxis=False,
+            )
+            tier_fig.update_layout(
+                template="plotly_dark",
+                margin=dict(l=8, r=8, t=8, b=8),
+                height=310 if not mobile_view else 270,
+                legend_title_text="Tier",
+                showlegend=True,
+                yaxis=dict(range=[0, max(100, float(tier_perf["win_rate_pct"].max()) + 8)]),
+            )
             st.plotly_chart(tier_fig, use_container_width=True)
         with g4:
             comp_perf = (
