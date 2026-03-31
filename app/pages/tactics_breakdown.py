@@ -221,32 +221,34 @@ def render(ctx):
         unsafe_allow_html=True,
     )
 
-    st.markdown("<div class='panel tactics-command'>", unsafe_allow_html=True)
-    c1, c2, c3, c4, c5, c6 = st.columns([1.15, 1.0, 1.0, 1.1, 1.2, 1.0], gap="small")
-    maps = sorted(tdf["map"].dropna().unique().tolist())
-    sides = sorted(tdf["side"].dropna().unique().tolist())
+    global_filters = ctx.get("filters", {})
+    active_maps = global_filters.get("map") or []
+    active_sides = global_filters.get("side") or []
+    active_competitions = global_filters.get("competition") or []
+    map_context = ", ".join(active_maps[:2]) + (f", +{len(active_maps) - 2} more" if len(active_maps) > 2 else "") if active_maps else "All Maps"
+    side_context = ", ".join(active_sides[:2]) + (f", +{len(active_sides) - 2} more" if len(active_sides) > 2 else "") if active_sides else "All Sides"
+    comp_context = (
+        ", ".join(active_competitions[:2]) + (f", +{len(active_competitions) - 2} more" if len(active_competitions) > 2 else "")
+        if active_competitions
+        else "All Competitions"
+    )
 
+    st.markdown("<div class='panel tactics-command'>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1.2, 1.2, 1.0], gap="small")
     with c1:
-        selected_map = st.selectbox("Map", maps, key="tb_map")
-    with c2:
-        selected_side = st.selectbox("Side", sides, key="tb_side")
-    with c3:
         tactic_type = st.segmented_control("Tactic Type", options=["All", "Standard", "Eco", "Pistol"], default="All")
-    with c4:
+    with c2:
         days_window = st.select_slider("Recent Window", options=[7, 10, 14, 21, 30], value=14)
-    with c5:
-        competitions = sorted(tdf["competition"].dropna().unique().tolist())
-        selected_comp = st.multiselect("Competition Context", competitions, default=competitions, key="tb_comp")
-    with c6:
+    with c3:
         sample_floor = st.slider("Min Rounds", min_value=1, max_value=max(1, int(tdf["total_rounds"].max())), value=3, step=1)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    scoped = tdf[(tdf["map"] == selected_map) & (tdf["side"] == selected_side) & (tdf["competition"].isin(selected_comp))].copy()
+    scoped = tdf.copy()
     if tactic_type != "All":
         scoped = scoped[scoped["tactic_type"] == tactic_type].copy()
 
     if scoped.empty:
-        st.warning("No tactics remain for this exact map + side context.")
+        st.warning("No tactics remain for the current global filter context.")
         return
 
     newest = scoped["match_ts"].max()
@@ -262,8 +264,8 @@ def render(ctx):
     viable_status = {"Strong Keep", "Keep", "Refine", "Situational"}
 
     st.markdown(
-        f"<div style='margin:6px 0 8px 0;'><span class='context-chip'>ACTIVE MAP: <strong>{selected_map}</strong></span>"
-        f"<span class='context-chip'>ACTIVE SIDE: <strong>{selected_side}</strong></span>"
+        f"<div style='margin:6px 0 8px 0;'><span class='context-chip'>ACTIVE MAP: <strong>{map_context}</strong></span>"
+        f"<span class='context-chip'>ACTIVE SIDE: <strong>{side_context}</strong></span>"
         f"<span class='context-chip'>BASELINE WR: <strong>{_fmt_pct(tactical['baseline_wr'].iloc[0])}</strong></span></div>",
         unsafe_allow_html=True,
     )
@@ -350,7 +352,7 @@ def render(ctx):
                 unsafe_allow_html=True,
             )
 
-    st.markdown("<div class='section-title' style='margin-top:10px;'>Recommended 6–7 Tactic Set (Current Map + Side)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title' style='margin-top:10px;'>Recommended 6–7 Tactic Set (Current Global Context)</div>", unsafe_allow_html=True)
     rec_pool = tactical[tactical["status"].isin(["Strong Keep", "Keep", "Refine", "Situational", "Test More"])].copy()
     rec_pool["pick_score"] = rec_pool["weighted_wr"] * 0.52 + rec_pool["delta_vs_baseline"] * 2.1 + np.log1p(rec_pool["rounds"]) * 6
     slots = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B", "Mid", "Ivy"]
@@ -374,7 +376,7 @@ def render(ctx):
                 f"<div class='recommend-slot'><div class='metric-title'>{row['coverage']}</div>"
                 f"<div style='font-weight:760;color:#f2f8ff;font-size:.82rem'>{row['tactic_name']}</div>"
                 f"<div class='muted'>Status: {row['status']} • WR {_fmt_pct(row['win_rate'])} • Δ {_fmt_signed(row['delta_vs_baseline'])}</div>"
-                f"<div class='muted'>Included for coverage balance and weighted tier reliability in this map+side only.</div></div>",
+                f"<div class='muted'>Included for coverage balance and weighted tier reliability in this active global context.</div></div>",
                 unsafe_allow_html=True,
             )
 
@@ -438,12 +440,8 @@ def render(ctx):
     )
     st.dataframe(table.sort_values(["Δ vs Baseline", "Win Rate"], ascending=False), use_container_width=True, hide_index=True)
 
-    active_comp_text = ", ".join(selected_comp[:2]) if selected_comp else "None"
-    if len(selected_comp) > 2:
-        active_comp_text = f"{active_comp_text}, +{len(selected_comp) - 2} more"
-
     st.markdown("<div class='section-title' style='margin-top:10px;'>Tactic Deep-Dive Analyst Tool</div>", unsafe_allow_html=True)
-    st.caption(f"Context locked to {selected_map} • {selected_side} • Competition: {active_comp_text}")
+    st.caption(f"Context locked to Map: {map_context} • Side: {side_context} • Competition: {comp_context}")
     selected_tactic = st.selectbox("Inspect tactic", options=tactical["tactic_name"].sort_values().tolist())
     one = tactical[tactical["tactic_name"] == selected_tactic].iloc[0]
 
