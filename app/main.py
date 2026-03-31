@@ -1,6 +1,5 @@
 import streamlit as st
 
-from app.config import FILES
 from app.data_loader import detect_our_team, load_data, validate_columns
 from app.filters import apply_filters, build_global_filters, filter_panel_toggle, filter_summary, global_filters_from_state
 from app.image_helpers import find_team_logo, image_data_uri
@@ -127,16 +126,12 @@ def run_app():
         else:
             max_match_date = str(max_date)
 
-    with st.expander("Data Load Debug (temporary)", expanded=False):
-        st.write("Active player data path:", str(FILES["player_matches"]))
-        st.write("Active tactics data path:", str(FILES["tactics"]))
-        st.write("Active achievements data path:", str(FILES["achievements"]))
-        st.write("Active players metadata path:", str(FILES["players"]))
-        st.write("Player matches rows:", len(data["player_matches"]))
-        st.write("Tactics rows:", len(data["tactics"]))
-        st.write("Achievements rows:", len(data["achievements"]))
-        st.write("Players metadata rows:", len(data["players"]))
-        st.write("Max player match date loaded:", max_match_date)
+    meta_1, meta_2, meta_3, meta_4 = st.columns(4, gap="small")
+    meta_1.markdown(f"<div class='panel panel-tight accent-good'><div class='metric-title'>Matches Loaded</div><div class='metric-value'>{len(data['player_matches'])}</div></div>", unsafe_allow_html=True)
+    meta_2.markdown(f"<div class='panel panel-tight accent-mid'><div class='metric-title'>Tactic Logs</div><div class='metric-value'>{len(data['tactics'])}</div></div>", unsafe_allow_html=True)
+    meta_3.markdown(f"<div class='panel panel-tight accent-poor'><div class='metric-title'>Profiles</div><div class='metric-value'>{len(data['players'])}</div></div>", unsafe_allow_html=True)
+    meta_4.markdown(f"<div class='panel panel-tight accent-good'><div class='metric-title'>Latest Match</div><div class='metric-value' style='font-size:1.1rem'>{max_match_date}</div></div>", unsafe_allow_html=True)
 
     filter_summary(filters)
+    st.markdown("<div class='context-ribbon'><span class='section-title' style='margin-bottom:2px'>Active Workspace</span><span class='muted'>Analyst view: tactical and player intelligence surfaces are now tuned for a dense esports control-room layout.</span></div>", unsafe_allow_html=True)
     PAGES[page](filtered)
