@@ -1,4 +1,4 @@
-"match_id","date","time","map","competition","my_team","opponent_team","side","tactic_name","wins","losses","total_rounds","win_rate_pct",
+"match_id","date","time","map","competition","my_team","opponent_team","side","tactic_name","wins","losses","total_rounds","win_rate_pct","tier"
 "cpl_2026-02-27_2000_Train_769572",2026-02-27,"20:00","Train","ᴍᴀᴅᴍᴇɴ ɪɴʜᴏᴜꜱᴇ ᴄᴜᴘ ꜱ9","ᴍᴇᴅɪꜱᴘᴏʀᴛꜱ ⓜ","Dragon Army","Red","(S)A - Fast Flash (DD)",4,1,5,80,"C"
 "cpl_2026-02-27_2000_Train_769572",2026-02-27,"20:00","Train","ᴍᴀᴅᴍᴇɴ ɪɴʜᴏᴜꜱᴇ ᴄᴜᴘ ꜱ9","ᴍᴇᴅɪꜱᴘᴏʀᴛꜱ ⓜ","Dragon Army","Red","(S)A/B-Lurker A > Ex B",10,0,10,100,"C"
 "cpl_2026-02-27_2000_Train_769572",2026-02-27,"20:00","Train","ᴍᴀᴅᴍᴇɴ ɪɴʜᴏᴜꜱᴇ ᴄᴜᴘ ꜱ9","ᴍᴇᴅɪꜱᴘᴏʀᴛꜱ ⓜ","Dragon Army","Blue","(F)(P)A - AntiRush > PopDog Hold",2,0,2,100,"C"
