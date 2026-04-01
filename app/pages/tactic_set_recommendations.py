@@ -126,19 +126,34 @@ def _has_lane_token(name: str, lane: str) -> bool:
     return bool(re.search(rf"\b{lane}\b", str(name).upper()))
 
 
+def _has_lane_hint(name: str, lane: str) -> bool:
+    norm = str(name).upper()
+    return bool(re.search(rf"(?<![A-Z0-9]){lane}(?:\d+)?(?![A-Z])", norm))
+
+
+def _role_to_core_bucket(role: str) -> str | None:
+    return {
+        "Pistol": "Pistol",
+        "Eco A": "Eco A",
+        "Eco B": "Eco B",
+        "Standard A": "Standard A",
+        "Standard B": "Standard B",
+    }.get(str(role))
+
+
 def _infer_core_bucket(name: str) -> str:
     n = str(name).upper()
     if "PISTOL" in n or "(P)" in n or re.match(r"^\s*P[\s\-_]", n):
         return "Pistol"
     if "ECO" in n or "(E)" in n or re.match(r"^\s*E[\s\-_]", n):
-        if _has_lane_token(n, "A"):
+        if _has_lane_hint(n, "A"):
             return "Eco A"
-        if _has_lane_token(n, "B"):
+        if _has_lane_hint(n, "B"):
             return "Eco B"
         return "Eco"
-    if _has_lane_token(n, "A") and not _has_lane_token(n, "B"):
+    if _has_lane_hint(n, "A") and not _has_lane_hint(n, "B"):
         return "Standard A"
-    if _has_lane_token(n, "B") and not _has_lane_token(n, "A"):
+    if _has_lane_hint(n, "B") and not _has_lane_hint(n, "A"):
         return "Standard B"
     return "Standard"
 
@@ -179,7 +194,15 @@ def _ensure_tactic_classification_fields(
     out["category"] = out.get("category", out["tactic_name"].map(tactic_category))
     out["tactic_type"] = out.get("tactic_type", out["category"]).replace({"Standard": "Standard", "Eco": "Eco", "Pistol": "Pistol"})
     out["role"] = out.get("role", out["tactic_name"].map(_route_role))
-    out["core_bucket"] = out.get("core_bucket", out["tactic_name"].map(_infer_core_bucket))
+    inferred_core = out["tactic_name"].map(_infer_core_bucket)
+    role_core = out["role"].map(_role_to_core_bucket)
+    existing_core = out.get("core_bucket")
+    if existing_core is None:
+        out["core_bucket"] = role_core.fillna(inferred_core)
+    else:
+        existing_series = pd.Series(existing_core, index=out.index).astype(str)
+        existing_specific = existing_series.where(existing_series.isin(REQUIRED_CORE_BUCKETS))
+        out["core_bucket"] = existing_specific.fillna(role_core).fillna(inferred_core)
 
     split_col = out.get("is_split_site", out["tactic_name"].map(_is_split_site_tactic))
     out["is_split_site"] = pd.Series(split_col, index=out.index).fillna(False).astype(bool)
