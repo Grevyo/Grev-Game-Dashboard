@@ -159,6 +159,39 @@ def _is_split_site_tactic(name: str) -> bool:
     return any(re.search(pattern, norm_name) for pattern in SPLIT_STYLE_PATTERNS)
 
 
+def _ensure_tactic_classification_fields(
+    frame: pd.DataFrame,
+    *,
+    map_name: str | None = None,
+    include_optional_buckets: bool = False,
+) -> pd.DataFrame:
+    out = frame.copy()
+    if "tactic_name" not in out.columns:
+        out["tactic_name"] = "Unknown Tactic"
+    out["tactic_name"] = out["tactic_name"].astype(str).str.strip().replace("", "Unknown Tactic")
+
+    out["category"] = out.get("category", out["tactic_name"].map(tactic_category))
+    out["tactic_type"] = out.get("tactic_type", out["category"]).replace({"Standard": "Standard", "Eco": "Eco", "Pistol": "Pistol"})
+    out["role"] = out.get("role", out["tactic_name"].map(_route_role))
+    out["core_bucket"] = out.get("core_bucket", out["tactic_name"].map(_infer_core_bucket))
+
+    split_col = out.get("is_split_site", out["tactic_name"].map(_is_split_site_tactic))
+    out["is_split_site"] = pd.Series(split_col, index=out.index).fillna(False).astype(bool)
+    out["split_site_label"] = np.where(out["is_split_site"], SPLIT_STYLE_LABEL, "")
+    out["split_site_bucket"] = np.where(out["is_split_site"], "Split-Site", "Single-Site")
+
+    if include_optional_buckets:
+        if map_name is None:
+            out["optional_buckets"] = out.get("optional_buckets", pd.Series([[] for _ in range(len(out))], index=out.index))
+        else:
+            existing_optional = out.get("optional_buckets")
+            if existing_optional is None:
+                out["optional_buckets"] = out["tactic_name"].map(lambda n: _infer_optional_buckets(n, map_name))
+            else:
+                out["optional_buckets"] = existing_optional.map(lambda vals: vals if isinstance(vals, list) else [])
+    return out
+
+
 def _role_priority(role: str) -> int:
     order = {
         "Pistol": 0,
@@ -279,6 +312,14 @@ def _select_recommended_set(
     max_picks: int = 7,
     required_fallback_pool: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
+    pool = _ensure_tactic_classification_fields(pool, map_name=map_name, include_optional_buckets=True)
+    if required_fallback_pool is not None:
+        required_fallback_pool = _ensure_tactic_classification_fields(
+            required_fallback_pool,
+            map_name=map_name,
+            include_optional_buckets=True,
+        )
+
     if pool.empty and (required_fallback_pool is None or required_fallback_pool.empty):
         return pool
 
@@ -439,11 +480,7 @@ def render(ctx):
     tdf["wins"] = pd.to_numeric(tdf.get("wins", 0), errors="coerce").fillna(0)
     tdf["losses"] = pd.to_numeric(tdf.get("losses", 0), errors="coerce").fillna(0)
     tdf["total_rounds"] = pd.to_numeric(tdf.get("total_rounds", 0), errors="coerce").fillna(0)
-    tdf["category"] = tdf["tactic_name"].map(tactic_category)
-    tdf["tactic_type"] = tdf["category"].replace({"Standard": "Standard", "Eco": "Eco", "Pistol": "Pistol"})
-    tdf["role"] = tdf["tactic_name"].map(_route_role)
-    tdf["core_bucket"] = tdf["tactic_name"].map(_infer_core_bucket)
-    tdf["is_split_site"] = tdf["tactic_name"].map(_is_split_site_tactic)
+    tdf = _ensure_tactic_classification_fields(tdf)
 
     tdf = attach_normalized_tier(tdf, fallback="C")
 
@@ -470,7 +507,7 @@ def render(ctx):
         return
 
     tactical = tactical.sort_values(["recommendation_score", "confidence", "rounds"], ascending=False).copy()
-    tactical["optional_buckets"] = tactical["tactic_name"].map(lambda n: _infer_optional_buckets(n, map_name))
+    tactical = _ensure_tactic_classification_fields(tactical, map_name=map_name, include_optional_buckets=True)
 
     exclusion_key = f"tsr_excluded::{map_name}::{side}"
     override_key = f"tsr_model_override::{map_name}::{side}"
@@ -500,6 +537,7 @@ def render(ctx):
         max_picks=7,
         required_fallback_pool=active_pool,
     )
+    rec_set = _ensure_tactic_classification_fields(rec_set, map_name=map_name, include_optional_buckets=True)
 
     st.markdown(
         f"""
