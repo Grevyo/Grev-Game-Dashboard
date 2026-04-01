@@ -53,8 +53,8 @@ SPLIT_STYLE_LABEL = "AB / BA Split"
 SPLIT_STYLE_PATTERNS = [
     r"(?<![A-Z0-9])AB(?![A-Z0-9])",
     r"(?<![A-Z0-9])BA(?![A-Z0-9])",
-    r"\bA\s*[-/]\s*B\b",
-    r"\bB\s*[-/]\s*A\b",
+    r"(?<![A-Z0-9])A\s*[/_-]\s*B(?![A-Z0-9])",
+    r"(?<![A-Z0-9])B\s*[/_-]\s*A(?![A-Z0-9])",
 ]
 MAP_OPTIONAL_BUCKETS = {
     "train": ["Ivy", "Apps", "Connector"],
@@ -156,7 +156,13 @@ def _infer_optional_buckets(name: str, map_name: str) -> list[str]:
 
 def _is_split_site_tactic(name: str) -> bool:
     norm_name = str(name).upper()
-    return any(re.search(pattern, norm_name) for pattern in SPLIT_STYLE_PATTERNS)
+    if any(re.search(pattern, norm_name) for pattern in SPLIT_STYLE_PATTERNS):
+        return True
+
+    # Also catch compact/segmented shorthand in tactic tokens (e.g., "[AB]", "A_B", "BA-").
+    normalized = re.sub(r"[^A-Z0-9]+", " ", norm_name)
+    tokens = [token for token in normalized.split() if token]
+    return any(token in {"AB", "BA"} for token in tokens)
 
 
 def _ensure_tactic_classification_fields(
