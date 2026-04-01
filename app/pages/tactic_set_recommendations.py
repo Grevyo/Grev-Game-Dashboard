@@ -49,6 +49,13 @@ STRONG_COVERAGE_STATUSES = {"Locked In", "Strong Pick"}
 WEAK_COVERAGE_STATUSES = {"Situational", "Risky", "Drop", "Backup", EXCLUDE_FOR_NOW_STATUS}
 TIER_COLORS = {"S": "#d4b15d", "A": "#9b6ef3", "B": "#4d8dff", "C": "#59b67a"}
 REQUIRED_CORE_BUCKETS = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B"]
+SPLIT_STYLE_LABEL = "AB / BA Split"
+SPLIT_STYLE_PATTERNS = [
+    r"(?<![A-Z0-9])AB(?![A-Z0-9])",
+    r"(?<![A-Z0-9])BA(?![A-Z0-9])",
+    r"\bA\s*[-/]\s*B\b",
+    r"\bB\s*[-/]\s*A\b",
+]
 MAP_OPTIONAL_BUCKETS = {
     "train": ["Ivy", "Apps", "Connector"],
     "castle": ["Mid", "B Halls", "B Doors", "A Main"],
@@ -145,6 +152,11 @@ def _infer_optional_buckets(name: str, map_name: str) -> list[str]:
         if any(re.search(pattern, norm_name) for pattern in patterns):
             matched.append(bucket)
     return matched
+
+
+def _is_split_site_tactic(name: str) -> bool:
+    norm_name = str(name).upper()
+    return any(re.search(pattern, norm_name) for pattern in SPLIT_STYLE_PATTERNS)
 
 
 def _role_priority(role: str) -> int:
@@ -282,6 +294,7 @@ def _select_recommended_set(
     selected_names: list[str] = []
     core_counts: dict[str, int] = {}
     covered_optional: set[str] = set()
+    split_selected = False
 
     for role in REQUIRED_CORE_BUCKETS:
         role_rows = candidates[candidates["core_bucket"] == role]
@@ -295,6 +308,7 @@ def _select_recommended_set(
             selected_names.append(chosen_name)
             core_counts[role] = core_counts.get(role, 0) + 1
             covered_optional.update(chosen["optional_buckets"] if isinstance(chosen["optional_buckets"], list) else [])
+            split_selected = split_selected or bool(chosen.get("is_split_site", False))
 
     for idx, row in candidates.iterrows():
         if len(selected_names) >= max_picks:
@@ -307,11 +321,13 @@ def _select_recommended_set(
         row_optional = [b for b in row["optional_buckets"] if b in map_optional]
         gain_required = 1 if row_core in missing_required else 0
         gain_optional = len([b for b in row_optional if b not in covered_optional])
+        gain_split = 1 if (not split_selected and bool(row.get("is_split_site", False))) else 0
         role_penalty = 35 if core_counts.get(row_core, 0) >= 2 else 0
 
         adjusted_score = float(row["recommendation_score"]) + gain_required * 1000
         if not missing_required:
             adjusted_score += gain_optional * 120
+            adjusted_score += gain_split * 165
         adjusted_score -= role_penalty
         candidates.at[idx, "_adjusted_score"] = adjusted_score
 
@@ -334,6 +350,7 @@ def _select_recommended_set(
         selected_names.append(row_name)
         core_counts[row_core] = core_counts.get(row_core, 0) + 1
         covered_optional.update(row["optional_buckets"] if isinstance(row["optional_buckets"], list) else [])
+        split_selected = split_selected or bool(row.get("is_split_site", False))
 
     if not selected_names:
         return candidates.head(0)
@@ -399,6 +416,7 @@ def _inject_page_css() -> None:
         .coverage-chip-weak{background:#3a2615 !important;border-color:#915c28 !important;color:#ffbe72 !important;}
         .coverage-detail{margin:-4px 0 8px 0;padding:6px 8px;border-radius:6px;border:1px solid #27394d;background:#111c29;font-size:.67rem;color:#c5d3e2;}
         .coverage-detail.weak{border-color:#7a4f2b;background:#1d1611;color:#ffca86;}
+        .style-badge{display:inline-block;margin-top:6px;font-size:.56rem;letter-spacing:.11em;text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid #35587a;background:#122235;color:#9ec6ff;}
         </style>
         """,
         unsafe_allow_html=True,
@@ -425,6 +443,7 @@ def render(ctx):
     tdf["tactic_type"] = tdf["category"].replace({"Standard": "Standard", "Eco": "Eco", "Pistol": "Pistol"})
     tdf["role"] = tdf["tactic_name"].map(_route_role)
     tdf["core_bucket"] = tdf["tactic_name"].map(_infer_core_bucket)
+    tdf["is_split_site"] = tdf["tactic_name"].map(_is_split_site_tactic)
 
     tdf = attach_normalized_tier(tdf, fallback="C")
 
@@ -589,6 +608,7 @@ def render(ctx):
                 <div class='reco-tile'>
                   <h4 class='reco-name'>{row['tactic_name']}</h4>
                   <div class='reco-role'>{row['role']} • {row['tactic_type']}</div>
+                  {"<span class='style-badge'>AB / BA Split</span>" if bool(row.get("is_split_site", False)) else ""}
                   <span class='status-pill {tone}'>{_display_status(row['status'])}</span>
                   <div class='mini-grid'>
                     <div class='mini-cell'><div class='mini-l'>Win Rate</div><div class='mini-v'>{_fmt_pct(row['win_rate'])}</div></div>
@@ -623,7 +643,7 @@ def render(ctx):
         )
 
     st.markdown("<div class='panel'><div class='section-title'>Coverage & Completeness Board</div>", unsafe_allow_html=True)
-    st.markdown("<div class='section-subtitle'>Required core coverage is prioritized first. Optional map coverage is used to improve tactical completeness within the 7-call cap.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-subtitle'>Required core coverage is prioritized first. Optional map coverage and AB / BA split coverage are used to improve tactical completeness within the 7-call cap.</div>", unsafe_allow_html=True)
     st.markdown("<div class='brief-label' style='margin-top:10px;'>Required Core Coverage</div>", unsafe_allow_html=True)
     for bucket in REQUIRED_CORE_BUCKETS:
         chosen_candidates = rec_set[rec_set["core_bucket"] == bucket].sort_values(
@@ -681,6 +701,31 @@ def render(ctx):
                 """,
                 unsafe_allow_html=True,
             )
+
+    st.markdown("<div class='brief-label' style='margin-top:12px;'>Split-Site Tactical Coverage</div>", unsafe_allow_html=True)
+    split_candidates = rec_set[rec_set["is_split_site"] == True].sort_values(  # noqa: E712
+        ["recommendation_score", "confidence", "rounds"],
+        ascending=False,
+    )
+    split_fill = 100 if not split_candidates.empty else 0
+    split_badge = "Available" if not split_candidates.empty else "Gap"
+    split_chip = "chip-good" if not split_candidates.empty else "chip-mid"
+    split_detail = (
+        f"{split_candidates.iloc[0]['tactic_name']} • {_display_status(split_candidates.iloc[0]['status'])}"
+        if not split_candidates.empty
+        else "No AB / BA split tactic currently included in the recommended set."
+    )
+    st.markdown(
+        f"""
+        <div class='coverage-row'>
+          <div class='brief-label'>{SPLIT_STYLE_LABEL}</div>
+          <div class='coverage-track'><div class='coverage-fill' style='width:{split_fill}%;'></div></div>
+          <div><span class='chip {split_chip}'>{split_badge}</span></div>
+        </div>
+        <div class='coverage-detail'>{split_detail}</div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.markdown("</div>", unsafe_allow_html=True)
 
     included = recommendation_pool[recommendation_pool["tactic_name"].isin(rec_set["tactic_name"])].copy()
@@ -707,9 +752,11 @@ def render(ctx):
                         if r["tactic_name"] in model_overrides
                         else ""
                     )
+                    split_note = "<div class='style-badge'>AB / BA Split</div>" if bool(r.get("is_split_site", False)) else ""
                     st.markdown(
                         f"<div class='decision-item'><strong>{r['tactic_name']}</strong>"
                         f"<span>{r['role']} • {_fmt_pct(r['win_rate'])} • {_fmt_signed(r['delta_vs_baseline'])} • conf {int(r['confidence'])}</span>"
+                        f"{split_note}"
                         f"{manual_note}{override_note}</div>",
                         unsafe_allow_html=True,
                     )
@@ -789,6 +836,7 @@ def render(ctx):
             "confidence",
             "status",
             "role",
+            "is_split_site",
             "Included?",
         ]
     ].rename(
@@ -805,9 +853,11 @@ def render(ctx):
             "confidence": "Confidence",
             "status": "Recommendation Status",
             "role": "Set Role",
+            "is_split_site": "AB / BA Split",
         }
     )
     shortlist["Excluded?"] = "No"
+    shortlist["AB / BA Split"] = shortlist["AB / BA Split"].map({True: "Yes", False: "No"})
     shortlist["Recommendation Status"] = shortlist["Recommendation Status"].map(_display_status)
 
     st.markdown("<div class='panel'><div class='section-title'>Premium Recommendation Shortlist</div>", unsafe_allow_html=True)
@@ -847,6 +897,7 @@ def render(ctx):
                 "confidence",
                 "status",
                 "role",
+                "is_split_site",
             ]
         ].rename(
             columns={
@@ -862,10 +913,12 @@ def render(ctx):
                 "confidence": "Confidence",
                 "status": "Recommendation Status",
                 "role": "Set Role",
+                "is_split_site": "AB / BA Split",
             }
         )
         excluded_shortlist["Included?"] = "No"
         excluded_shortlist["Excluded?"] = "Yes"
+        excluded_shortlist["AB / BA Split"] = excluded_shortlist["AB / BA Split"].map({True: "Yes", False: "No"})
         excluded_shortlist["Recommendation Status"] = excluded_shortlist["Recommendation Status"].map(_display_status)
         st.markdown("<div class='panel'><div class='section-title'>Excluded Tactics</div>", unsafe_allow_html=True)
         st.dataframe(
