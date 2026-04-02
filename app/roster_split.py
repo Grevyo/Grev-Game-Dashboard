@@ -14,10 +14,6 @@ _NON_A_TEAM_MARKERS = (
     "trial",
     "coach",
 )
-_HARDCODED_A_TEAM_DESTINATIONS = {
-    "rulethemall",
-}
-
 
 def _player_key(name: str) -> str:
     text = str(name or "").strip()
@@ -108,37 +104,20 @@ def _extract_metadata_new_team_by_player_key(players_meta: pd.DataFrame) -> dict
     }
 
 
-def _extract_new_team_by_player_key(df: pd.DataFrame) -> dict[str, str]:
-    if df.empty:
-        return {}
+def is_transferred_out_from_new_team(metadata_row: dict | pd.Series | None) -> bool:
+    """Hard override for transfer classification based on metadata New_team/new_team."""
+    if metadata_row is None:
+        return False
 
-    player_col = "player" if "player" in df.columns else None
-    if player_col is None:
-        return {}
+    if isinstance(metadata_row, pd.Series):
+        row = metadata_row.to_dict()
+    else:
+        row = dict(metadata_row)
 
-    new_team_col = None
-    for candidate in ["new_team", "New_team"]:
-        if candidate in df.columns:
-            new_team_col = candidate
-            break
-    if new_team_col is None:
-        return {}
+    new_team_value = row.get("new_team")
+    if new_team_value is None:
+        new_team_value = row.get("New_team")
 
-    trimmed = df[[player_col, new_team_col]].copy()
-    trimmed[player_col] = trimmed[player_col].astype(str).map(_player_key)
-    trimmed[new_team_col] = trimmed[new_team_col].fillna("").astype(str).str.strip()
-    trimmed = trimmed[trimmed[player_col] != ""]
-    if trimmed.empty:
-        return {}
-
-    # Keep the first non-empty destination per normalized player key.
-    non_empty = trimmed[trimmed[new_team_col] != ""]
-    source = non_empty if not non_empty.empty else trimmed
-    source = source.drop_duplicates(subset=[player_col], keep="first")
-    return {str(row[player_col]): str(row[new_team_col]).strip() for _, row in source.iterrows()}
-
-
-def _is_a_team_transfer_destination(new_team_value: str | None) -> bool:
     raw = str(new_team_value or "").strip()
     if raw.casefold() in _EMPTY_NEW_TEAM_VALUES:
         return False
@@ -150,7 +129,7 @@ def _is_a_team_transfer_destination(new_team_value: str | None) -> bool:
     if any(marker in normalized for marker in _NON_A_TEAM_MARKERS):
         return False
 
-    return normalized in _HARDCODED_A_TEAM_DESTINATIONS
+    return True
 
 
 def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
@@ -254,6 +233,8 @@ def classify_roster_bucket(
     in_metadata: bool,
     last_played_season: int | None,
     current_season: int | None,
+    is_transferred_out: bool,
+    is_streamer: bool,
     can_classify_transferred: bool,
     appearance_share: float,
     active_threshold: float,
@@ -261,11 +242,19 @@ def classify_roster_bucket(
     """Centralized roster bucket rules.
 
     Order:
+    - transferred (hard override from metadata New_team/new_team)
+    - streamer (explicit metadata role)
     - streamer (metadata member with no game data)
     - transferred (only if safety guard passes and last_played <= current - 3)
     - active / benched_academy by current-context appearance share
     """
     _ = player  # explicit argument for readability in call-sites/debugging
+
+    if is_transferred_out:
+        return "transferred"
+
+    if is_streamer:
+        return "streamer"
 
     if in_metadata and last_played_season is None:
         return "streamer"
@@ -304,7 +293,6 @@ def split_roster_active_benched_streamer_transferred(
     meta_players = _extract_metadata_players(players_meta)
     streamer_keys = _extract_metadata_streamer_keys(players_meta)
     new_team_by_key = _extract_metadata_new_team_by_player_key(players_meta)
-    new_team_from_summary = _extract_new_team_by_player_key(merged)
 
     usage = (
         full_medisports_matches[["player", "match_id"]].copy()
@@ -340,20 +328,10 @@ def split_roster_active_benched_streamer_transferred(
         player_key = _player_key(player)
         in_metadata = player_key in meta_by_key
 
-        player_new_team = new_team_by_key.get(player_key) or new_team_from_summary.get(player_key)
-        is_transferred_out = _is_a_team_transfer_destination(player_new_team)
+        metadata_row = {"new_team": new_team_by_key.get(player_key)}
+        is_transferred_out = is_transferred_out_from_new_team(metadata_row)
 
-        # 2) Transferred out: hard-coded New_team destination mapped to an A-team.
-        if is_transferred_out:
-            classified[player] = "transferred"
-            continue
-
-        # 3) Streamer: explicit role in players metadata.
-        if player_key in streamer_keys:
-            classified[player] = "streamer"
-            continue
-
-        # 4/5/6) Centralized classification; transferred requires safety guard + resolved seasons.
+        # 2/3/4) Centralized classification; transferred includes metadata override + season-history rule.
         appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
         appearance_share = float(appearance.iloc[0]) if not appearance.empty else 0.0
         classified[player] = classify_roster_bucket(
@@ -361,6 +339,8 @@ def split_roster_active_benched_streamer_transferred(
             in_metadata=in_metadata,
             last_played_season=last_season_by_key.get(player_key),
             current_season=latest_dataset_season,
+            is_transferred_out=is_transferred_out,
+            is_streamer=(player_key in streamer_keys),
             can_classify_transferred=can_transfer_safely,
             appearance_share=appearance_share,
             active_threshold=active_threshold,
