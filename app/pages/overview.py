@@ -375,7 +375,7 @@ def render(ctx):
 
     full_medisports_matches = get_medisports_roster_df(full_history_df, player_col="player")
     selected_medisports_matches = get_medisports_roster_df(df, player_col="player")
-    active_summary, benched_summary, streamer_summary, transferred_summary, _ = split_roster_active_benched_streamer_transferred(
+    active_summary, benched_summary, streamer_summary, transferred_summary, roster_bucket_debug = split_roster_active_benched_streamer_transferred(
         summary=summary,
         player_match_counts=player_match_counts,
         selected_medisports_matches=selected_medisports_matches,
@@ -383,56 +383,27 @@ def render(ctx):
         players_meta=players_meta,
         active_threshold=0.10,
     )
-    if "is_transferred_out" in active_summary.columns:
-        active_summary = active_summary[~active_summary["is_transferred_out"]].copy()
-    if "is_transferred_out" in benched_summary.columns:
-        benched_summary = benched_summary[~benched_summary["is_transferred_out"]].copy()
-    if "is_transferred_out" in streamer_summary.columns:
-        streamer_summary = streamer_summary[~streamer_summary["is_transferred_out"]].copy()
-    if "is_transferred_out" in transferred_summary.columns:
-        transferred_summary = transferred_summary[transferred_summary["is_transferred_out"]].copy()
 
-    debug_targets = ["ⓜ | Hunglow", "ⓜ | bonk"]
-    for debug_name in debug_targets:
-        debug_player_key = normalize_player_key(debug_name)
-        debug_in_active_render = bool(
-            (not active_summary.empty)
-            and ("player" in active_summary.columns)
-            and active_summary["player"].astype(str).map(normalize_player_key).eq(debug_player_key).any()
-        )
-        debug_in_benched_render = bool(
-            (not benched_summary.empty)
-            and ("player" in benched_summary.columns)
-            and benched_summary["player"].astype(str).map(normalize_player_key).eq(debug_player_key).any()
-        )
-        debug_in_streamer_render = bool(
-            (not streamer_summary.empty)
-            and ("player" in streamer_summary.columns)
-            and streamer_summary["player"].astype(str).map(normalize_player_key).eq(debug_player_key).any()
-        )
-        debug_in_transferred_render = bool(
-            (not transferred_summary.empty)
-            and ("player" in transferred_summary.columns)
-            and transferred_summary["player"].astype(str).map(normalize_player_key).eq(debug_player_key).any()
-        )
-        print(
-            "[OVERVIEW_TRANSFER_RENDER_DEBUG] "
-            f"player={debug_name} "
-            f"player_key={debug_player_key} "
-            f"in_active_render={debug_in_active_render} "
-            f"in_benched_render={debug_in_benched_render} "
-            f"in_streamer_render={debug_in_streamer_render} "
-            f"in_transferred_render={debug_in_transferred_render}"
-        )
-    all_streamer_meta_rows = _build_streamer_metadata_rows(
-        players_meta,
-        active_summary.iloc[0:0],
-        benched_summary.iloc[0:0],
-        transferred_summary.iloc[0:0],
-    )
-    streamer_meta_rows = _build_streamer_metadata_rows(players_meta, active_summary, benched_summary, transferred_summary)
-    streamer_names = streamer_meta_rows["player"].astype(str).tolist() if not streamer_meta_rows.empty and "player" in streamer_meta_rows.columns else []
-    all_streamer_names = all_streamer_meta_rows["player"].astype(str).tolist() if not all_streamer_meta_rows.empty and "player" in all_streamer_meta_rows.columns else []
+    # Defensive rendering guard: keep each player in exactly one section using split output bucket assignment.
+    def _ensure_bucket(df_bucket: pd.DataFrame, bucket_name: str) -> pd.DataFrame:
+        if df_bucket.empty or "assigned_bucket" not in df_bucket.columns:
+            return df_bucket
+        return df_bucket[df_bucket["assigned_bucket"].astype(str) == bucket_name].copy()
+
+    active_summary = _ensure_bucket(active_summary, "active")
+    transferred_summary = _ensure_bucket(transferred_summary, "transferred")
+    streamer_summary = _ensure_bucket(streamer_summary, "streamer")
+    benched_summary = _ensure_bucket(benched_summary, "benched_academy")
+
+    assigned_top_priority = set(active_summary.get("player", pd.Series(dtype=object)).astype(str).tolist())
+    assigned_top_priority |= set(transferred_summary.get("player", pd.Series(dtype=object)).astype(str).tolist())
+    assigned_top_priority |= set(streamer_summary.get("player", pd.Series(dtype=object)).astype(str).tolist())
+    if not benched_summary.empty:
+        benched_summary = benched_summary[~benched_summary["player"].astype(str).isin(assigned_top_priority)].copy()
+
+    if not roster_bucket_debug.empty:
+        with st.expander("Roster bucket debug", expanded=False):
+            st.dataframe(roster_bucket_debug, use_container_width=True)
 
     seasons = filters.get("season") or ([f"Season {auto_current_season}"] if auto_current_season else ["All seasons"])
     maps = filters.get("map") or ["All maps"]
@@ -459,7 +430,7 @@ def render(ctx):
               <div class='overview-hero-stats'>
                 <span class='chip chip-good'>Active: {active_summary['player'].nunique()}</span>
                 <span class='chip chip-poor'>Benched/Academy: {benched_summary['player'].nunique()}</span>
-                <span class='chip chip-mid'>Streamer: {len(all_streamer_names)}</span>
+                <span class='chip chip-mid'>Streamer: {streamer_summary['player'].nunique()}</span>
                 <span class='chip chip-bad'>Transferred Out: {transferred_summary['player'].nunique()}</span>
               </div>
             </div>
@@ -523,33 +494,16 @@ def render(ctx):
         _render_roster_cards(benched_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if all_streamer_names:
-        section_header("Streamer")
-        streamer_cards = pd.DataFrame(
-            {
-                "player": streamer_meta_rows.get("player", pd.Series(dtype=object)).astype(str),
-                "country": streamer_meta_rows.get("country", ""),
-                "nationality": streamer_meta_rows.get("nationality", streamer_meta_rows.get("country", "")),
-                "role": "Streamer",
-                "fame": streamer_meta_rows.get("fame", ""),
-                "photo_uri": "",
-                "team_logo_uri": "",
-                "achievements": [[] for _ in range(len(streamer_meta_rows))],
-                "achievements_hidden": [0] * len(streamer_meta_rows),
-                "roster_bucket": "streamer",
-                "desc": "Streamer profile — competitive stats not yet tracked.",
-                "new_team": streamer_meta_rows.get("new_team", ""),
-            }
-        )
-        if streamer_cards.empty:
-            st.info("No streamer-only profiles to show after excluding Active, Benched / Academy, and Transferred players.")
-        else:
-            st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
-            _render_roster_cards(streamer_cards, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
-            st.markdown("</div>", unsafe_allow_html=True)
+    section_header("Streamer")
+    if streamer_summary.empty:
+        st.info("No streamer players in this filtered context.")
+    else:
+        st.markdown("<div class='roster-section roster-section-streamer'>", unsafe_allow_html=True)
+        _render_roster_cards(streamer_summary, df, ctx.get("tactics", pd.DataFrame()), players_meta, player_match_counts, team_logo, achievements_df, card_variant="streamer")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
-        section_header("Transferred Out", "Players hard-overridden by populated New_team plus legacy long-absence transfers")
+        section_header("Transferred Out", "Remaining players with populated New_team")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
         _render_roster_cards(
             transferred_summary,
