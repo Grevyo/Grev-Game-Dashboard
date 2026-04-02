@@ -266,7 +266,11 @@ def split_roster_active_benched_streamer_transferred(
     players_meta: pd.DataFrame,
     active_threshold: float = 0.10,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    transfer_debug_key = _player_key(os.getenv("TRANSFER_DEBUG_PLAYER", "ⓜ | Bonk"))
+    transfer_debug_targets = {
+        _player_key(name)
+        for name in os.getenv("TRANSFER_DEBUG_PLAYERS", "ⓜ | Bonk,ⓜ | Hunglow").split(",")
+        if str(name).strip()
+    }
     counts = (
         player_match_counts[["player", "appearance_share"]].copy()
         if not player_match_counts.empty and {"player", "appearance_share"}.issubset(player_match_counts.columns)
@@ -291,6 +295,20 @@ def split_roster_active_benched_streamer_transferred(
     usage["resolved_season"] = _resolved_season_series(full_medisports_matches) if not usage.empty else pd.Series(dtype=float)
 
     usage_players = set(usage.get("player", pd.Series(dtype=object)).dropna().astype(str).tolist())
+    selected_usage = (
+        selected_medisports_matches[["player"]].copy()
+        if not selected_medisports_matches.empty and "player" in selected_medisports_matches.columns
+        else pd.DataFrame(columns=["player"])
+    )
+    selected_usage["player_key"] = selected_usage.get("player", pd.Series(index=selected_usage.index, dtype=object)).map(_player_key)
+    selected_rows_by_key = (
+        selected_usage.groupby("player_key", dropna=False)
+        .size()
+        .to_dict()
+        if not selected_usage.empty
+        else {}
+    )
+
     medisports_roster_names = {
         p for p in roster_names.union(meta_players).union(usage_players)
         if is_medisports_player(p)
@@ -321,9 +339,12 @@ def split_roster_active_benched_streamer_transferred(
         player_key = _player_key(player)
         in_metadata = player_key in meta_by_key
 
-        is_transferred_out = is_transferred_out_by_key.get(player_key, False)
+        metadata_transfer_candidate = is_transferred_out_by_key.get(player_key, False)
+        selected_rows = int(selected_rows_by_key.get(player_key, 0))
+        # New_team override applies only when the player is absent from the currently selected roster context.
+        is_transferred_out = metadata_transfer_candidate and selected_rows == 0
 
-        # 2/3/4) Centralized classification; transferred includes metadata override + season-history rule.
+        # 2/3/4) Centralized classification; transferred includes guarded metadata override + season-history rule.
         appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
         appearance_share = float(appearance.iloc[0]) if not appearance.empty else 0.0
         classified[player] = classify_roster_bucket(
@@ -337,12 +358,16 @@ def split_roster_active_benched_streamer_transferred(
             appearance_share=appearance_share,
             active_threshold=active_threshold,
         )
-        if player_key == transfer_debug_key:
+        if player_key in transfer_debug_targets:
             print(
                 "[ROSTER_TRANSFER_DEBUG] "
                 f"player={player} "
                 f"player_key={player_key} "
                 f"new_team={new_team_by_key.get(player_key, '')} "
+                f"metadata_transfer_candidate={metadata_transfer_candidate} "
+                f"selected_rows={selected_rows} "
+                f"last_played_season={last_season_by_key.get(player_key)} "
+                f"current_season={latest_dataset_season} "
                 f"bucket={classified[player]}"
             )
 
