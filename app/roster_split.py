@@ -2,18 +2,16 @@ import re
 
 import pandas as pd
 
-from app.data_loader import is_medisports_player, normalize_team_name
+from app.data_loader import is_medisports_player
 
-_EMPTY_NEW_TEAM_VALUES = {"", "-", "--", "n/a", "na", "none", "null", "unknown", "tbd"}
-_NON_A_TEAM_MARKERS = (
-    "academy",
-    "bench",
-    "benched",
-    "streamer",
-    "sub",
-    "trial",
-    "coach",
-)
+_EMPTY_NEW_TEAM_VALUES = {"", "-", "--", "n/a", "na", "none", "null", "unknown", "tbd", "nan"}
+
+
+def normalize_new_team_value(value: object) -> str:
+    """Return a cleaned New_team value; empty string means not transferred."""
+    raw = "" if value is None else str(value).strip()
+    return "" if raw.casefold() in _EMPTY_NEW_TEAM_VALUES else raw
+
 
 def _player_key(name: str) -> str:
     text = str(name or "").strip()
@@ -96,7 +94,7 @@ def _extract_metadata_new_team_by_player_key(players_meta: pd.DataFrame) -> dict
 
     trimmed = players_meta[[key_col, new_team_col]].copy()
     trimmed[key_col] = trimmed[key_col].astype(str).map(_player_key)
-    trimmed[new_team_col] = trimmed[new_team_col].astype(str).str.strip()
+    trimmed[new_team_col] = trimmed[new_team_col].map(normalize_new_team_value)
     trimmed = trimmed.dropna(subset=[key_col]).drop_duplicates(subset=[key_col], keep="first")
     return {
         str(row[key_col]): str(row[new_team_col]).strip()
@@ -118,18 +116,7 @@ def is_transferred_out_from_new_team(metadata_row: dict | pd.Series | None) -> b
     if new_team_value is None:
         new_team_value = row.get("New_team")
 
-    raw = str(new_team_value or "").strip()
-    if raw.casefold() in _EMPTY_NEW_TEAM_VALUES:
-        return False
-
-    normalized = normalize_team_name(raw)
-    if not normalized:
-        return False
-
-    if any(marker in normalized for marker in _NON_A_TEAM_MARKERS):
-        return False
-
-    return True
+    return bool(normalize_new_team_value(new_team_value))
 
 
 def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
@@ -320,6 +307,10 @@ def split_roster_active_benched_streamer_transferred(
     classified: dict[str, str] = {}
     meta_by_key = {_player_key(name): name for name in meta_players}
     counts_by_key = counts.assign(player_key=counts["player"].map(_player_key)) if not counts.empty else counts.copy()
+    is_transferred_out_by_key = {
+        player_key: is_transferred_out_from_new_team({"new_team": new_team})
+        for player_key, new_team in new_team_by_key.items()
+    }
     for player in all_known_players:
         # 1) Exclude non-Medisports players entirely.
         if not is_medisports_player(player):
@@ -328,8 +319,7 @@ def split_roster_active_benched_streamer_transferred(
         player_key = _player_key(player)
         in_metadata = player_key in meta_by_key
 
-        metadata_row = {"new_team": new_team_by_key.get(player_key)}
-        is_transferred_out = is_transferred_out_from_new_team(metadata_row)
+        is_transferred_out = is_transferred_out_by_key.get(player_key, False)
 
         # 2/3/4) Centralized classification; transferred includes metadata override + season-history rule.
         appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
