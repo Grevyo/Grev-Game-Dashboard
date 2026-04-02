@@ -2,7 +2,21 @@ import re
 
 import pandas as pd
 
-from app.data_loader import is_medisports_player
+from app.data_loader import is_medisports_player, normalize_team_name
+
+_EMPTY_NEW_TEAM_VALUES = {"", "-", "--", "n/a", "na", "none", "null", "unknown", "tbd"}
+_NON_A_TEAM_MARKERS = (
+    "academy",
+    "bench",
+    "benched",
+    "streamer",
+    "sub",
+    "trial",
+    "coach",
+)
+_HARDCODED_A_TEAM_DESTINATIONS = {
+    "rulethemall",
+}
 
 
 def _player_key(name: str) -> str:
@@ -62,6 +76,51 @@ def _extract_metadata_streamer_keys(players_meta: pd.DataFrame) -> set[str]:
         streamer_meta = streamer_meta[streamer_meta["name"].map(is_medisports_player)]
 
     return set(streamer_meta[key_col].map(_player_key).tolist())
+
+
+def _extract_metadata_new_team_by_player_key(players_meta: pd.DataFrame) -> dict[str, str]:
+    if players_meta.empty:
+        return {}
+
+    key_col = None
+    for candidate in ["player_clean", "player", "name"]:
+        if candidate in players_meta.columns:
+            key_col = candidate
+            break
+    if key_col is None:
+        return {}
+
+    new_team_col = None
+    for candidate in ["new_team", "New_team"]:
+        if candidate in players_meta.columns:
+            new_team_col = candidate
+            break
+    if new_team_col is None:
+        return {}
+
+    trimmed = players_meta[[key_col, new_team_col]].copy()
+    trimmed[key_col] = trimmed[key_col].astype(str).map(_player_key)
+    trimmed[new_team_col] = trimmed[new_team_col].astype(str).str.strip()
+    trimmed = trimmed.dropna(subset=[key_col]).drop_duplicates(subset=[key_col], keep="first")
+    return {
+        str(row[key_col]): str(row[new_team_col]).strip()
+        for _, row in trimmed.iterrows()
+    }
+
+
+def _is_a_team_transfer_destination(new_team_value: str | None) -> bool:
+    raw = str(new_team_value or "").strip()
+    if raw.casefold() in _EMPTY_NEW_TEAM_VALUES:
+        return False
+
+    normalized = normalize_team_name(raw)
+    if not normalized:
+        return False
+
+    if any(marker in normalized for marker in _NON_A_TEAM_MARKERS):
+        return False
+
+    return normalized in _HARDCODED_A_TEAM_DESTINATIONS
 
 
 def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
@@ -214,6 +273,7 @@ def split_roster_active_benched_streamer_transferred(
     roster_names = set(merged.get("player", pd.Series(dtype=object)).dropna().astype(str).tolist())
     meta_players = _extract_metadata_players(players_meta)
     streamer_keys = _extract_metadata_streamer_keys(players_meta)
+    new_team_by_key = _extract_metadata_new_team_by_player_key(players_meta)
 
     usage = (
         full_medisports_matches[["player", "match_id"]].copy()
@@ -249,12 +309,17 @@ def split_roster_active_benched_streamer_transferred(
         player_key = _player_key(player)
         in_metadata = player_key in meta_by_key
 
-        # 2) Streamer: explicit role in players metadata.
+        # 2) Transferred out: hard-coded New_team destination mapped to an A-team.
+        if _is_a_team_transfer_destination(new_team_by_key.get(player_key)):
+            classified[player] = "transferred"
+            continue
+
+        # 3) Streamer: explicit role in players metadata.
         if player_key in streamer_keys:
             classified[player] = "streamer"
             continue
 
-        # 3/4/5) Centralized classification; transferred requires safety guard + resolved seasons.
+        # 4/5/6) Centralized classification; transferred requires safety guard + resolved seasons.
         appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
         appearance_share = float(appearance.iloc[0]) if not appearance.empty else 0.0
         classified[player] = classify_roster_bucket(

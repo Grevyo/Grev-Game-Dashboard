@@ -248,6 +248,7 @@ def _render_roster_cards(
                         "nationality": m.get("nationality", ""),
                         "role": m.get("role", ""),
                         "fame": m.get("fame", ""),
+                        "new_team": str(m.get("new_team", m.get("New_team", "")) or "").strip(),
                     }
                 )
             merged["favourite_map"] = _resolve_favourite_map(players_meta, key)
@@ -417,7 +418,7 @@ def render(ctx):
                 <span class='chip chip-good'>Active: {active_summary['player'].nunique()}</span>
                 <span class='chip chip-poor'>Benched/Academy: {benched_summary['player'].nunique()}</span>
                 <span class='chip chip-mid'>Streamer: {len(all_streamer_names)}</span>
-                <span class='chip chip-bad'>Transferred: {transferred_summary['player'].nunique()}</span>
+                <span class='chip chip-bad'>Transferred Out: {transferred_summary['player'].nunique()}</span>
               </div>
             </div>
         </div>
@@ -506,7 +507,7 @@ def render(ctx):
             st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
-        section_header("Transferred", "Historical Medisports players absent for more than two seasons")
+        section_header("Transferred Out", "Hard-coded New_team A-team destinations and legacy long-absence transfers")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
         _render_roster_cards(
             transferred_summary,
