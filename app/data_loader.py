@@ -1,6 +1,7 @@
 import re
 import shlex
 import unicodedata
+import warnings
 from pathlib import Path
 from typing import Iterable
 
@@ -153,11 +154,12 @@ def _read_players_csv_safe(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
     parsed_rows: list[list[str]] = []
+    row_shape_issues: list[tuple[int, int, int]] = []
     expected_cols = 0
 
     try:
         with path.open("r", encoding="utf-8-sig") as handle:
-            for raw_line in handle:
+            for line_number, raw_line in enumerate(handle, start=1):
                 line = raw_line.strip()
                 if not line:
                     continue
@@ -168,16 +170,34 @@ def _read_players_csv_safe(path: Path) -> pd.DataFrame:
                     parsed_rows.append(tokens)
                     expected_cols = len(tokens)
                     continue
+                original_width = len(tokens)
                 if len(tokens) < expected_cols:
                     tokens = tokens + [""] * (expected_cols - len(tokens))
                 elif len(tokens) > expected_cols:
                     tokens = tokens[:expected_cols]
+                if original_width != expected_cols:
+                    row_shape_issues.append((line_number, original_width, expected_cols))
                 parsed_rows.append(tokens)
     except Exception:
         return pd.DataFrame()
 
     if not parsed_rows:
         return pd.DataFrame()
+
+    if row_shape_issues:
+        issue_preview = ", ".join(
+            f"line {line_no} ({found}→{expected})"
+            for line_no, found, expected in row_shape_issues[:8]
+        )
+        if len(row_shape_issues) > 8:
+            issue_preview += ", ..."
+        warnings.warn(
+            (
+                f"players.csv row width mismatch detected; padded/truncated rows to {expected_cols} columns: "
+                f"{issue_preview}"
+            ),
+            stacklevel=2,
+        )
 
     header = parsed_rows[0]
     rows = parsed_rows[1:]
