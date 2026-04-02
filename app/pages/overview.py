@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 
 from app.components import insight_card, player_card, stat_card
 from app.achievements import achievements_for_player
@@ -382,6 +383,26 @@ def render(ctx):
         players_meta=players_meta,
         active_threshold=0.10,
     )
+    debug_player_key = normalize_player_key(os.getenv("TRANSFER_DEBUG_PLAYER", "ⓜ | Hunglow"))
+    if "is_transferred_out" in benched_summary.columns:
+        benched_summary = benched_summary[~benched_summary["is_transferred_out"]].copy()
+    if debug_player_key:
+        debug_in_benched_render = bool(
+            (not benched_summary.empty)
+            and ("player" in benched_summary.columns)
+            and benched_summary["player"].astype(str).map(normalize_player_key).eq(debug_player_key).any()
+        )
+        debug_in_transferred_render = bool(
+            (not transferred_summary.empty)
+            and ("player" in transferred_summary.columns)
+            and transferred_summary["player"].astype(str).map(normalize_player_key).eq(debug_player_key).any()
+        )
+        print(
+            "[OVERVIEW_TRANSFER_RENDER_DEBUG] "
+            f"player_key={debug_player_key} "
+            f"in_benched_render={debug_in_benched_render} "
+            f"in_transferred_render={debug_in_transferred_render}"
+        )
     all_streamer_meta_rows = _build_streamer_metadata_rows(
         players_meta,
         active_summary.iloc[0:0],
@@ -507,7 +528,7 @@ def render(ctx):
             st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
-        section_header("Transferred Out", "Hard-coded New_team A-team destinations and legacy long-absence transfers")
+        section_header("Transferred Out", "Players hard-overridden by populated New_team plus legacy long-absence transfers")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
         _render_roster_cards(
             transferred_summary,

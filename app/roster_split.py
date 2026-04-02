@@ -266,7 +266,7 @@ def split_roster_active_benched_streamer_transferred(
     players_meta: pd.DataFrame,
     active_threshold: float = 0.10,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    transfer_debug_key = _player_key(os.getenv("TRANSFER_DEBUG_PLAYER", "ⓜ | Bonk"))
+    transfer_debug_key = _player_key(os.getenv("TRANSFER_DEBUG_PLAYER", "ⓜ | Hunglow"))
     counts = (
         player_match_counts[["player", "appearance_share"]].copy()
         if not player_match_counts.empty and {"player", "appearance_share"}.issubset(player_match_counts.columns)
@@ -337,15 +337,6 @@ def split_roster_active_benched_streamer_transferred(
             appearance_share=appearance_share,
             active_threshold=active_threshold,
         )
-        if player_key == transfer_debug_key:
-            print(
-                "[ROSTER_TRANSFER_DEBUG] "
-                f"player={player} "
-                f"player_key={player_key} "
-                f"new_team={new_team_by_key.get(player_key, '')} "
-                f"bucket={classified[player]}"
-            )
-
     active_players = {name for name, bucket in classified.items() if bucket == "active"}
     benched_players = {name for name, bucket in classified.items() if bucket == "benched_academy"}
     streamer_players = {name for name, bucket in classified.items() if bucket == "streamer"}
@@ -373,6 +364,10 @@ def split_roster_active_benched_streamer_transferred(
                 filler[col] = 0.0 if col in {"matches", "grevscore", "rating", "impact", "form", "kpd", "kpr", "accuracy_pct", "hs_pct", "appearance_share"} else ""
         streamer_missing = filler[filler["player"].isin(streamer_players)]
         transferred_missing = filler[filler["player"].isin(transferred_players)]
+        if "is_transferred_out" in streamer_missing.columns:
+            streamer_missing["is_transferred_out"] = False
+        if "is_transferred_out" in transferred_missing.columns:
+            transferred_missing["is_transferred_out"] = True
         if not streamer_missing.empty:
             streamer_summary = pd.concat([streamer_summary, streamer_missing[merged.columns]], ignore_index=True)
         if not transferred_missing.empty:
@@ -381,6 +376,41 @@ def split_roster_active_benched_streamer_transferred(
     for df in [active_summary, benched_summary, streamer_summary, transferred_summary]:
         if "player_key" in df.columns:
             df.drop(columns=["player_key"], inplace=True)
+
+    # Final hard safety-net against stale buckets leaking transferred players into lower-priority sections.
+    if "is_transferred_out" in active_summary.columns:
+        active_summary = active_summary[~active_summary["is_transferred_out"]].copy()
+    if "is_transferred_out" in benched_summary.columns:
+        benched_summary = benched_summary[~benched_summary["is_transferred_out"]].copy()
+    if "is_transferred_out" in streamer_summary.columns:
+        streamer_summary = streamer_summary[~streamer_summary["is_transferred_out"]].copy()
+    if "is_transferred_out" in transferred_summary.columns:
+        transferred_summary = transferred_summary[transferred_summary["is_transferred_out"]].copy()
+
+    if transfer_debug_key:
+        debug_player_name = next((name for name in all_known_players if _player_key(name) == transfer_debug_key), "")
+        debug_new_team = new_team_by_key.get(transfer_debug_key, "")
+        debug_bucket = classified.get(debug_player_name, "not_classified")
+        debug_in_benched = bool(
+            (not benched_summary.empty)
+            and ("player" in benched_summary.columns)
+            and benched_summary["player"].astype(str).map(_player_key).eq(transfer_debug_key).any()
+        )
+        debug_in_transferred = bool(
+            (not transferred_summary.empty)
+            and ("player" in transferred_summary.columns)
+            and transferred_summary["player"].astype(str).map(_player_key).eq(transfer_debug_key).any()
+        )
+        print(
+            "[ROSTER_TRANSFER_DEBUG] "
+            f"player={debug_player_name or os.getenv('TRANSFER_DEBUG_PLAYER', 'ⓜ | Hunglow')} "
+            f"player_key={transfer_debug_key} "
+            f"new_team_raw={debug_new_team!r} "
+            f"is_transferred_out={is_transferred_out_by_key.get(transfer_debug_key, False)} "
+            f"upstream_bucket={debug_bucket} "
+            f"in_benched_list={debug_in_benched} "
+            f"in_transferred_list={debug_in_transferred}"
+        )
 
     streamer_summary = streamer_summary.sort_values(["appearance_share", "grevscore"], ascending=[True, False], na_position="last")
     transferred_summary = transferred_summary.sort_values(["appearance_share", "grevscore"], ascending=[True, False], na_position="last")
