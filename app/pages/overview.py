@@ -503,7 +503,7 @@ def render(ctx):
         st.markdown("</div>", unsafe_allow_html=True)
 
     if not transferred_summary.empty:
-        section_header("Transferred Out", "Remaining players with populated New_team")
+        section_header("Transferred Out")
         st.markdown("<div class='roster-section roster-section-transferred'>", unsafe_allow_html=True)
         _render_roster_cards(
             transferred_summary,
