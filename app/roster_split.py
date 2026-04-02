@@ -108,6 +108,36 @@ def _extract_metadata_new_team_by_player_key(players_meta: pd.DataFrame) -> dict
     }
 
 
+def _extract_new_team_by_player_key(df: pd.DataFrame) -> dict[str, str]:
+    if df.empty:
+        return {}
+
+    player_col = "player" if "player" in df.columns else None
+    if player_col is None:
+        return {}
+
+    new_team_col = None
+    for candidate in ["new_team", "New_team"]:
+        if candidate in df.columns:
+            new_team_col = candidate
+            break
+    if new_team_col is None:
+        return {}
+
+    trimmed = df[[player_col, new_team_col]].copy()
+    trimmed[player_col] = trimmed[player_col].astype(str).map(_player_key)
+    trimmed[new_team_col] = trimmed[new_team_col].fillna("").astype(str).str.strip()
+    trimmed = trimmed[trimmed[player_col] != ""]
+    if trimmed.empty:
+        return {}
+
+    # Keep the first non-empty destination per normalized player key.
+    non_empty = trimmed[trimmed[new_team_col] != ""]
+    source = non_empty if not non_empty.empty else trimmed
+    source = source.drop_duplicates(subset=[player_col], keep="first")
+    return {str(row[player_col]): str(row[new_team_col]).strip() for _, row in source.iterrows()}
+
+
 def _is_a_team_transfer_destination(new_team_value: str | None) -> bool:
     raw = str(new_team_value or "").strip()
     if raw.casefold() in _EMPTY_NEW_TEAM_VALUES:
@@ -274,6 +304,7 @@ def split_roster_active_benched_streamer_transferred(
     meta_players = _extract_metadata_players(players_meta)
     streamer_keys = _extract_metadata_streamer_keys(players_meta)
     new_team_by_key = _extract_metadata_new_team_by_player_key(players_meta)
+    new_team_from_summary = _extract_new_team_by_player_key(merged)
 
     usage = (
         full_medisports_matches[["player", "match_id"]].copy()
@@ -309,8 +340,11 @@ def split_roster_active_benched_streamer_transferred(
         player_key = _player_key(player)
         in_metadata = player_key in meta_by_key
 
+        player_new_team = new_team_by_key.get(player_key) or new_team_from_summary.get(player_key)
+        is_transferred_out = _is_a_team_transfer_destination(player_new_team)
+
         # 2) Transferred out: hard-coded New_team destination mapped to an A-team.
-        if _is_a_team_transfer_destination(new_team_by_key.get(player_key)):
+        if is_transferred_out:
             classified[player] = "transferred"
             continue
 
@@ -337,10 +371,19 @@ def split_roster_active_benched_streamer_transferred(
     streamer_players = {name for name, bucket in classified.items() if bucket == "streamer"}
     transferred_players = {name for name, bucket in classified.items() if bucket == "transferred"}
 
-    active_summary = merged[merged["player"].isin(active_players)].copy()
-    benched_summary = merged[merged["player"].isin(benched_players)].copy()
-    streamer_summary = merged[merged["player"].isin(streamer_players)].copy()
-    transferred_summary = merged[merged["player"].isin(transferred_players)].copy()
+    merged = merged.copy()
+    merged["player_key"] = merged.get("player", pd.Series(index=merged.index, dtype=object)).map(_player_key)
+    transferred_keys = {_player_key(name) for name in transferred_players}
+    active_keys = {_player_key(name) for name in active_players}
+    benched_keys = {_player_key(name) for name in benched_players}
+    streamer_keys_bucket = {_player_key(name) for name in streamer_players}
+    merged["is_transferred_out"] = merged["player_key"].isin(transferred_keys)
+
+    # Priority enforcement: transferred players are excluded from lower-priority buckets.
+    active_summary = merged[merged["player_key"].isin(active_keys) & ~merged["is_transferred_out"]].copy()
+    benched_summary = merged[merged["player_key"].isin(benched_keys) & ~merged["is_transferred_out"]].copy()
+    streamer_summary = merged[merged["player_key"].isin(streamer_keys_bucket) & ~merged["is_transferred_out"]].copy()
+    transferred_summary = merged[merged["is_transferred_out"]].copy()
 
     missing_from_summary = [p for p in all_known_players if p in (streamer_players | transferred_players) and p not in set(merged.get("player", pd.Series(dtype=object)).astype(str))]
     if missing_from_summary:
@@ -354,6 +397,10 @@ def split_roster_active_benched_streamer_transferred(
             streamer_summary = pd.concat([streamer_summary, streamer_missing[merged.columns]], ignore_index=True)
         if not transferred_missing.empty:
             transferred_summary = pd.concat([transferred_summary, transferred_missing[merged.columns]], ignore_index=True)
+
+    for df in [active_summary, benched_summary, streamer_summary, transferred_summary]:
+        if "player_key" in df.columns:
+            df.drop(columns=["player_key"], inplace=True)
 
     streamer_summary = streamer_summary.sort_values(["appearance_share", "grevscore"], ascending=[True, False], na_position="last")
     transferred_summary = transferred_summary.sort_values(["appearance_share", "grevscore"], ascending=[True, False], na_position="last")
