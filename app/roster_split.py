@@ -1,3 +1,4 @@
+import os
 import re
 
 import pandas as pd
@@ -265,6 +266,7 @@ def split_roster_active_benched_streamer_transferred(
     players_meta: pd.DataFrame,
     active_threshold: float = 0.10,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    transfer_debug_key = _player_key(os.getenv("TRANSFER_DEBUG_PLAYER", "ⓜ | Bonk"))
     counts = (
         player_match_counts[["player", "appearance_share"]].copy()
         if not player_match_counts.empty and {"player", "appearance_share"}.issubset(player_match_counts.columns)
@@ -335,6 +337,14 @@ def split_roster_active_benched_streamer_transferred(
             appearance_share=appearance_share,
             active_threshold=active_threshold,
         )
+        if player_key == transfer_debug_key:
+            print(
+                "[ROSTER_TRANSFER_DEBUG] "
+                f"player={player} "
+                f"player_key={player_key} "
+                f"new_team={new_team_by_key.get(player_key, '')} "
+                f"bucket={classified[player]}"
+            )
 
     active_players = {name for name, bucket in classified.items() if bucket == "active"}
     benched_players = {name for name, bucket in classified.items() if bucket == "benched_academy"}
