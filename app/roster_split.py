@@ -216,6 +216,17 @@ def split_roster_active_benched_streamer_transferred(
             }
         )
 
+    debug_focus_names = {"ⓜ | Hunglow", "ⓜ | Bonk"}
+    focus_rows = [row for row in debug_rows if row.get("player") in debug_focus_names]
+    for row in sorted(focus_rows, key=lambda item: str(item.get("player", "")).casefold()):
+        print(
+            "[ROSTER_DEBUG] "
+            f"player={row['player']} "
+            f"raw_new_team={row['raw_new_team']!r} "
+            f"normalized_new_team={row['normalized_new_team']!r} "
+            f"assigned_bucket={row['assigned_bucket']}"
+        )
+
     merged = merged.copy()
     merged["player_key"] = merged.get("player", pd.Series(index=merged.index, dtype=object)).map(_player_key)
 
