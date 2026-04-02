@@ -139,10 +139,14 @@ def find_competition_logo(competition_name: str | None) -> str | None:
 
 
 def resolve_transferred_logo(new_team: str | None) -> str | None:
-    team_logo = find_team_logo(new_team)
-    if team_logo:
-        return team_logo
-    return find_competition_logo("cpl")
+    team_name = str(new_team or "").strip()
+    if team_name:
+        normalized_team_name = re.sub(r"\s+", " ", team_name)
+        team_filename = f"{normalized_team_name.replace(' ', '_')}.png"
+        team_logo_path = IMAGES["team_logos"] / team_filename
+        if team_logo_path.exists() and team_logo_path.is_file():
+            return str(team_logo_path)
+    return str(IMAGES["competition_logos"] / "cpl.png")
 
 
 CPL_OPEN_EVENT_PATTERN = re.compile(r"cpl\s+open", flags=re.IGNORECASE)
