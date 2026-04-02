@@ -383,14 +383,32 @@ def render(ctx):
         players_meta=players_meta,
         active_threshold=0.10,
     )
-    debug_player_key = normalize_player_key(os.getenv("TRANSFER_DEBUG_PLAYER", "ⓜ | Hunglow"))
+    if "is_transferred_out" in active_summary.columns:
+        active_summary = active_summary[~active_summary["is_transferred_out"]].copy()
     if "is_transferred_out" in benched_summary.columns:
         benched_summary = benched_summary[~benched_summary["is_transferred_out"]].copy()
-    if debug_player_key:
+    if "is_transferred_out" in streamer_summary.columns:
+        streamer_summary = streamer_summary[~streamer_summary["is_transferred_out"]].copy()
+    if "is_transferred_out" in transferred_summary.columns:
+        transferred_summary = transferred_summary[transferred_summary["is_transferred_out"]].copy()
+
+    debug_targets = ["ⓜ | Hunglow", "ⓜ | bonk"]
+    for debug_name in debug_targets:
+        debug_player_key = normalize_player_key(debug_name)
+        debug_in_active_render = bool(
+            (not active_summary.empty)
+            and ("player" in active_summary.columns)
+            and active_summary["player"].astype(str).map(normalize_player_key).eq(debug_player_key).any()
+        )
         debug_in_benched_render = bool(
             (not benched_summary.empty)
             and ("player" in benched_summary.columns)
             and benched_summary["player"].astype(str).map(normalize_player_key).eq(debug_player_key).any()
+        )
+        debug_in_streamer_render = bool(
+            (not streamer_summary.empty)
+            and ("player" in streamer_summary.columns)
+            and streamer_summary["player"].astype(str).map(normalize_player_key).eq(debug_player_key).any()
         )
         debug_in_transferred_render = bool(
             (not transferred_summary.empty)
@@ -399,8 +417,11 @@ def render(ctx):
         )
         print(
             "[OVERVIEW_TRANSFER_RENDER_DEBUG] "
+            f"player={debug_name} "
             f"player_key={debug_player_key} "
+            f"in_active_render={debug_in_active_render} "
             f"in_benched_render={debug_in_benched_render} "
+            f"in_streamer_render={debug_in_streamer_render} "
             f"in_transferred_render={debug_in_transferred_render}"
         )
     all_streamer_meta_rows = _build_streamer_metadata_rows(

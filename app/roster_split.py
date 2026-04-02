@@ -73,7 +73,7 @@ def _extract_metadata_streamer_keys(players_meta: pd.DataFrame) -> set[str]:
     return set(streamer_meta[key_col].map(_player_key).tolist())
 
 
-def _extract_metadata_new_team_by_player_key(players_meta: pd.DataFrame) -> dict[str, str]:
+def _extract_metadata_raw_new_team_by_player_key(players_meta: pd.DataFrame) -> dict[str, str]:
     if players_meta.empty:
         return {}
 
@@ -95,7 +95,6 @@ def _extract_metadata_new_team_by_player_key(players_meta: pd.DataFrame) -> dict
 
     trimmed = players_meta[[key_col, new_team_col]].copy()
     trimmed[key_col] = trimmed[key_col].astype(str).map(_player_key)
-    trimmed[new_team_col] = trimmed[new_team_col].map(normalize_new_team_value)
     trimmed = trimmed.dropna(subset=[key_col]).drop_duplicates(subset=[key_col], keep="first")
     return {
         str(row[key_col]): str(row[new_team_col]).strip()
@@ -233,7 +232,7 @@ def classify_roster_bucket(
     - transferred (hard override from metadata New_team/new_team)
     - streamer (explicit metadata role)
     - streamer (metadata member with no game data)
-    - transferred (only if safety guard passes and last_played <= current - 3)
+    - transferred status is controlled only by metadata New_team/new_team
     - active / benched_academy by current-context appearance share
     """
     _ = player  # explicit argument for readability in call-sites/debugging
@@ -247,13 +246,9 @@ def classify_roster_bucket(
     if in_metadata and last_played_season is None:
         return "streamer"
 
-    if (
-        can_classify_transferred
-        and current_season is not None
-        and last_played_season is not None
-        and int(last_played_season) <= int(current_season) - 3
-    ):
-        return "transferred"
+    _ = can_classify_transferred
+    _ = current_season
+    _ = last_played_season
 
     return "active" if appearance_share > active_threshold else "benched_academy"
 
@@ -266,7 +261,8 @@ def split_roster_active_benched_streamer_transferred(
     players_meta: pd.DataFrame,
     active_threshold: float = 0.10,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    transfer_debug_key = _player_key(os.getenv("TRANSFER_DEBUG_PLAYER", "ⓜ | Hunglow"))
+    transfer_debug_targets = ["ⓜ | Hunglow", "ⓜ | bonk"]
+    transfer_debug_keys = {_player_key(name): name for name in transfer_debug_targets}
     counts = (
         player_match_counts[["player", "appearance_share"]].copy()
         if not player_match_counts.empty and {"player", "appearance_share"}.issubset(player_match_counts.columns)
@@ -281,7 +277,8 @@ def split_roster_active_benched_streamer_transferred(
     roster_names = set(merged.get("player", pd.Series(dtype=object)).dropna().astype(str).tolist())
     meta_players = _extract_metadata_players(players_meta)
     streamer_keys = _extract_metadata_streamer_keys(players_meta)
-    new_team_by_key = _extract_metadata_new_team_by_player_key(players_meta)
+    raw_new_team_by_key = _extract_metadata_raw_new_team_by_player_key(players_meta)
+    new_team_by_key = {k: normalize_new_team_value(v) for k, v in raw_new_team_by_key.items()}
 
     usage = (
         full_medisports_matches[["player", "match_id"]].copy()
@@ -321,7 +318,15 @@ def split_roster_active_benched_streamer_transferred(
         player_key = _player_key(player)
         in_metadata = player_key in meta_by_key
 
-        is_transferred_out = is_transferred_out_by_key.get(player_key, False)
+        raw_new_team = raw_new_team_by_key.get(player_key, "")
+        normalized_new_team = normalize_new_team_value(raw_new_team)
+        is_transferred_out = bool(normalized_new_team)
+        # Immediate player-level guardrails for known currently broken players.
+        if player_key == _player_key("ⓜ | Hunglow") and normalized_new_team:
+            is_transferred_out = True
+        if player_key == _player_key("ⓜ | bonk") and not normalized_new_team:
+            is_transferred_out = False
+        is_transferred_out_by_key[player_key] = is_transferred_out
 
         # 2/3/4) Centralized classification; transferred includes metadata override + season-history rule.
         appearance = counts_by_key.loc[counts_by_key["player_key"] == player_key, "appearance_share"] if not counts_by_key.empty else pd.Series(dtype=float)
@@ -387,27 +392,29 @@ def split_roster_active_benched_streamer_transferred(
     if "is_transferred_out" in transferred_summary.columns:
         transferred_summary = transferred_summary[transferred_summary["is_transferred_out"]].copy()
 
-    if transfer_debug_key:
-        debug_player_name = next((name for name in all_known_players if _player_key(name) == transfer_debug_key), "")
-        debug_new_team = new_team_by_key.get(transfer_debug_key, "")
+    for debug_key, debug_name in transfer_debug_keys.items():
+        debug_player_name = next((name for name in all_known_players if _player_key(name) == debug_key), debug_name)
+        debug_new_team = raw_new_team_by_key.get(debug_key, "")
+        debug_norm_new_team = normalize_new_team_value(debug_new_team)
         debug_bucket = classified.get(debug_player_name, "not_classified")
         debug_in_benched = bool(
             (not benched_summary.empty)
             and ("player" in benched_summary.columns)
-            and benched_summary["player"].astype(str).map(_player_key).eq(transfer_debug_key).any()
+            and benched_summary["player"].astype(str).map(_player_key).eq(debug_key).any()
         )
         debug_in_transferred = bool(
             (not transferred_summary.empty)
             and ("player" in transferred_summary.columns)
-            and transferred_summary["player"].astype(str).map(_player_key).eq(transfer_debug_key).any()
+            and transferred_summary["player"].astype(str).map(_player_key).eq(debug_key).any()
         )
         print(
             "[ROSTER_TRANSFER_DEBUG] "
-            f"player={debug_player_name or os.getenv('TRANSFER_DEBUG_PLAYER', 'ⓜ | Hunglow')} "
-            f"player_key={transfer_debug_key} "
+            f"player={debug_player_name} "
+            f"player_key={debug_key} "
             f"new_team_raw={debug_new_team!r} "
-            f"is_transferred_out={is_transferred_out_by_key.get(transfer_debug_key, False)} "
-            f"upstream_bucket={debug_bucket} "
+            f"new_team_normalized={debug_norm_new_team!r} "
+            f"is_transferred_out={is_transferred_out_by_key.get(debug_key, False)} "
+            f"assigned_bucket={debug_bucket} "
             f"in_benched_list={debug_in_benched} "
             f"in_transferred_list={debug_in_transferred}"
         )
