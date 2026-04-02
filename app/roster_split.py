@@ -6,12 +6,21 @@ import pandas as pd
 from app.data_loader import is_medisports_player
 
 _EMPTY_NEW_TEAM_VALUES = {"", "-", "--", "n/a", "na", "none", "null", "unknown", "tbd", "nan"}
+APPROVED_TRANSFER_DESTINATIONS = {
+    "rule them all",
+}
 
 
 def normalize_new_team_value(value: object) -> str:
     """Return a cleaned New_team value; empty string means not transferred."""
     raw = "" if value is None else str(value).strip()
     return "" if raw.casefold() in _EMPTY_NEW_TEAM_VALUES else raw
+
+
+def normalize_transfer_destination(value: object) -> str:
+    """Normalize destination for transfer allow-list matching."""
+    normalized = normalize_new_team_value(value)
+    return normalized.casefold().strip() if normalized else ""
 
 
 def _player_key(name: str) -> str:
@@ -116,7 +125,10 @@ def is_transferred_out_from_new_team(metadata_row: dict | pd.Series | None) -> b
     if new_team_value is None:
         new_team_value = row.get("New_team")
 
-    return bool(normalize_new_team_value(new_team_value))
+    normalized_destination = normalize_transfer_destination(new_team_value)
+    if not normalized_destination:
+        return False
+    return normalized_destination in APPROVED_TRANSFER_DESTINATIONS
 
 
 def _resolved_season_series(df: pd.DataFrame) -> pd.Series:
@@ -320,12 +332,9 @@ def split_roster_active_benched_streamer_transferred(
 
         raw_new_team = raw_new_team_by_key.get(player_key, "")
         normalized_new_team = normalize_new_team_value(raw_new_team)
-        is_transferred_out = bool(normalized_new_team)
-        # Immediate player-level guardrails for known currently broken players.
-        if player_key == _player_key("ⓜ | Hunglow") and normalized_new_team:
-            is_transferred_out = True
-        if player_key == _player_key("ⓜ | bonk") and not normalized_new_team:
-            is_transferred_out = False
+        normalized_destination = normalize_transfer_destination(raw_new_team)
+        approved_transfer_match = normalized_destination in APPROVED_TRANSFER_DESTINATIONS if normalized_destination else False
+        is_transferred_out = approved_transfer_match
         is_transferred_out_by_key[player_key] = is_transferred_out
 
         # 2/3/4) Centralized classification; transferred includes metadata override + season-history rule.
@@ -396,6 +405,8 @@ def split_roster_active_benched_streamer_transferred(
         debug_player_name = next((name for name in all_known_players if _player_key(name) == debug_key), debug_name)
         debug_new_team = raw_new_team_by_key.get(debug_key, "")
         debug_norm_new_team = normalize_new_team_value(debug_new_team)
+        debug_normalized_destination = normalize_transfer_destination(debug_new_team)
+        debug_approved_match = debug_normalized_destination in APPROVED_TRANSFER_DESTINATIONS if debug_normalized_destination else False
         debug_bucket = classified.get(debug_player_name, "not_classified")
         debug_in_benched = bool(
             (not benched_summary.empty)
@@ -407,16 +418,20 @@ def split_roster_active_benched_streamer_transferred(
             and ("player" in transferred_summary.columns)
             and transferred_summary["player"].astype(str).map(_player_key).eq(debug_key).any()
         )
+        rendered_section = "transferred" if debug_in_transferred else ("benched" if debug_in_benched else debug_bucket)
         print(
             "[ROSTER_TRANSFER_DEBUG] "
             f"player={debug_player_name} "
             f"player_key={debug_key} "
             f"new_team_raw={debug_new_team!r} "
             f"new_team_normalized={debug_norm_new_team!r} "
+            f"destination_for_allow_list={debug_normalized_destination!r} "
+            f"approved_transfer_match={debug_approved_match} "
             f"is_transferred_out={is_transferred_out_by_key.get(debug_key, False)} "
             f"assigned_bucket={debug_bucket} "
             f"in_benched_list={debug_in_benched} "
-            f"in_transferred_list={debug_in_transferred}"
+            f"in_transferred_list={debug_in_transferred} "
+            f"final_rendered_section={rendered_section}"
         )
 
     streamer_summary = streamer_summary.sort_values(["appearance_share", "grevscore"], ascending=[True, False], na_position="last")
