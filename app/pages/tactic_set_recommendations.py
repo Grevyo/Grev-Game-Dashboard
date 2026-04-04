@@ -15,10 +15,15 @@ except ModuleNotFoundError:
 
 from app.page_layout import is_mobile_view
 from app.datetime_utils import build_match_timestamp, normalize_time_series
-from app.tactics import TIER_ORDER, attach_normalized_tier, tactic_category
+from app.tactics import (
+    TACTICAL_TIER_WEIGHTS,
+    TIER_ORDER,
+    attach_normalized_tier,
+    tactic_category,
+    weighted_tactical_win_rate,
+    weighted_tier_round_share,
+)
 
-
-TIER_WEIGHTS = {"S": 1.35, "A": 1.15, "B": 1.0, "C": 0.72}
 EXCLUDE_FOR_NOW_STATUS = "Exclude For Now"
 EXCLUDE_FOR_NOW_DISPLAY = "Try Build Replacement"
 
@@ -239,26 +244,27 @@ def _role_priority(role: str) -> int:
 
 
 def _status_logic(row: pd.Series) -> tuple[str, str]:
-    delta = float(row["delta_vs_baseline"])
+    weighted_delta = float(row["weighted_delta_vs_baseline"])
     rounds = float(row["rounds"])
     recent_delta = float(row["recent_delta"])
     confidence = float(row["confidence"])
-    s_wr = float(row.get("S", np.nan))
-    weak_tier_inflation = row["win_rate"] - row["weighted_wr"]
+    s_delta = float(row["s_tier_delta"])
+    high_tier_share = float(row["high_tier_round_share"])
+    weak_tier_inflation = float(row["c_tier_inflation"])
 
-    if rounds >= 16 and delta >= 8 and confidence >= 78 and recent_delta >= -1:
-        return "Locked In", "Strong sample, positive edge vs baseline, and stable recent output in this exact map+side context."
-    if rounds >= 11 and delta >= 4 and confidence >= 66:
-        return "Strong Pick", "Consistently ahead of baseline with enough rounds to trust as an active set piece."
-    if rounds >= 9 and delta >= 1 and confidence >= 56:
-        return "Viable", "Playable option with credible return; include when matching prep priorities and opponent reads."
-    if rounds < 8 and delta >= 2:
-        return "Test More", "Promising signal but under-tested; schedule controlled reps before core inclusion."
-    if rounds >= 8 and delta >= -1.5 and recent_delta < -5:
-        return "Situational", "Historically useful but short-term form has cooled; keep for specific scenarios only."
-    if weak_tier_inflation > 4.5 and (np.isnan(s_wr) or s_wr < row["win_rate"] - 10):
-        return "Backup", "Output is inflated by lower-tier opposition; keep as reserve until stronger-tier proof improves."
-    return EXCLUDE_FOR_NOW_STATUS, "Below baseline or unreliable evidence profile for this map+side; avoid in default call sheet."
+    if rounds >= 15 and weighted_delta >= 8 and confidence >= 78 and recent_delta >= -1 and s_delta >= 3:
+        return "Locked In", "Strong S-tier return and high-tier weighted edge make this a reliable map+side lock."
+    if rounds >= 10 and weighted_delta >= 4 and confidence >= 66 and s_delta >= 0:
+        return "Strong Pick", "Credible edge on weighted high-tier evidence supports active set inclusion."
+    if rounds >= 8 and weighted_delta >= 1 and confidence >= 56:
+        return "Viable", "Playable option with meaningful S/A/B contribution for this map+side context."
+    if rounds < 8 and weighted_delta >= 2:
+        return "Test More", "Promising weighted signal but under-tested; schedule controlled reps before core inclusion."
+    if rounds >= 8 and weighted_delta >= -1.5 and recent_delta < -5:
+        return "Situational", "Historically useful, but recent form cooled and needs scenario-specific usage."
+    if weak_tier_inflation > 5 and (s_delta < -2 or high_tier_share < 0.45):
+        return "Backup", "Mostly inflated by lower-tier results; reserve until stronger-tier proof improves."
+    return EXCLUDE_FOR_NOW_STATUS, "Weighted profile is below baseline or lacks stronger-tier trust for default call sheets."
 
 
 def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -292,16 +298,24 @@ def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     )
     tier["tier_wr"] = (tier["twins"] / (tier["twins"] + tier["tlosses"]).clip(lower=1) * 100).fillna(0)
     tier_pivot = tier.pivot_table(index=group_cols, columns="tier", values="tier_wr", aggfunc="mean").reset_index()
+    tier_wins = tier.pivot_table(index=group_cols, columns="tier", values="twins", aggfunc="sum", fill_value=0).reset_index()
+    tier_losses = tier.pivot_table(index=group_cols, columns="tier", values="tlosses", aggfunc="sum", fill_value=0).reset_index()
     for t in TIER_ORDER:
         if t not in tier_pivot.columns:
             tier_pivot[t] = np.nan
+        if t not in tier_wins.columns:
+            tier_wins[t] = 0.0
+        if t not in tier_losses.columns:
+            tier_losses[t] = 0.0
+    tier_wins = tier_wins.rename(columns={t: f"{t}_wins" for t in TIER_ORDER})
+    tier_losses = tier_losses.rename(columns={t: f"{t}_losses" for t in TIER_ORDER})
 
     tactical = tactical.merge(recent[group_cols + ["recent_wr"]], on=group_cols, how="left").merge(
         tier_pivot[group_cols + TIER_ORDER], on=group_cols, how="left"
     )
-
-    weighted_num = sum(tactical[t].fillna(tactical["win_rate"]) * w for t, w in TIER_WEIGHTS.items())
-    tactical["weighted_wr"] = weighted_num / sum(TIER_WEIGHTS.values())
+    tactical = tactical.merge(tier_wins[group_cols + [f"{t}_wins" for t in TIER_ORDER]], on=group_cols, how="left")
+    tactical = tactical.merge(tier_losses[group_cols + [f"{t}_losses" for t in TIER_ORDER]], on=group_cols, how="left")
+    tactical["weighted_wr"] = weighted_tactical_win_rate(tactical, fallback_wr_col="win_rate")
 
     baseline = (
         base.groupby(["map", "side"], dropna=False)
@@ -314,11 +328,15 @@ def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     tactical["recent_wr"] = tactical["recent_wr"].fillna(tactical["win_rate"])
     tactical["recent_delta"] = tactical["recent_wr"] - tactical["win_rate"]
     tactical["delta_vs_baseline"] = tactical["win_rate"] - tactical["baseline_wr"]
+    tactical["weighted_delta_vs_baseline"] = tactical["weighted_wr"] - tactical["baseline_wr"]
+    tactical["s_tier_delta"] = tactical["S"].fillna(tactical["win_rate"]) - tactical["baseline_wr"]
+    tactical["c_tier_inflation"] = (tactical["C"].fillna(tactical["win_rate"]) - tactical["weighted_wr"]).clip(lower=0)
+    tactical["high_tier_round_share"] = weighted_tier_round_share(tactical, tiers=("S", "A", "B"))
     tactical["sample_strength"] = np.clip(np.sqrt(tactical["rounds"].clip(lower=1)) * 20, 15, 100)
     tactical["confidence"] = (
         tactical["sample_strength"] * 0.55
-        + np.clip(tactical["delta_vs_baseline"] + 10, 0, 25) * 1.35
-        + np.clip(tactical["weighted_wr"] - 45, 0, 35) * 0.65
+        + np.clip(tactical["weighted_delta_vs_baseline"] + 12, 0, 28) * 1.45
+        + np.clip(tactical["weighted_wr"] - 45, 0, 35) * 0.7 + np.clip(tactical["s_tier_delta"] + 8, 0, 24) * 0.4
     ).clip(20, 99)
     tactical["trust_label"] = np.where(
         tactical["confidence"] >= 78,
@@ -328,8 +346,8 @@ def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     tactical["last_used_label"] = tactical["last_used"].dt.strftime("%Y-%m-%d").fillna("N/A")
     tactical["status"], tactical["status_note"] = zip(*tactical.apply(_status_logic, axis=1))
     tactical["recommendation_score"] = (
-        tactical["delta_vs_baseline"] * 3.0
-        + tactical["weighted_wr"] * 0.6
+        tactical["weighted_delta_vs_baseline"] * 3.5
+        + tactical["weighted_wr"] * 0.72
         + tactical["confidence"] * 0.45
         + tactical["rounds"].clip(upper=20) * 0.85
     )
@@ -632,6 +650,11 @@ def render(ctx):
     comp = global_filters.get("competition") or ["All Competitions"]
     season = global_filters.get("season") or ["All Seasons"]
     newest = scoped["match_ts"].max().strftime("%Y-%m-%d")
+    st.markdown(
+        f"<div class='muted' style='margin:4px 0 8px 0;'>Tier weighting model for recommendations: S {TACTICAL_TIER_WEIGHTS['S']:.1f} • A {TACTICAL_TIER_WEIGHTS['A']:.1f} • B {TACTICAL_TIER_WEIGHTS['B']:.1f} • C {TACTICAL_TIER_WEIGHTS['C']:.1f} (S >> A≈B > C).</div>",
+        unsafe_allow_html=True,
+    )
+
     st.markdown(
         f"""
         <div class='panel briefing-strip'>

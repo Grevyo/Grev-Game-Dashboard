@@ -173,3 +173,53 @@ def recommend_set(summary: pd.DataFrame, map_name: str, side: str) -> pd.DataFra
 
     out = pd.DataFrame(picks).drop_duplicates(subset=["tactic_name"]) if picks else pd.DataFrame()
     return out.sort_values("score", ascending=False)
+
+
+# Tactical recommendation weighting: S-tier should dominate, A/B should be close, C should barely count.
+TACTICAL_TIER_WEIGHTS = {"S": 5.4, "A": 2.2, "B": 2.0, "C": 0.2}
+
+
+def weighted_tactical_win_rate(
+    frame: pd.DataFrame,
+    *,
+    wins_suffix: str = "_wins",
+    losses_suffix: str = "_losses",
+    fallback_wr_col: str = "win_rate",
+) -> pd.Series:
+    """Round-weighted tier win rate for tactical recommendation systems.
+
+    Uses weighted wins / weighted rounds by tier so S-tier round outcomes have
+    substantially more decision impact than lower tiers.
+    """
+    if frame.empty:
+        return pd.Series(dtype=float, index=frame.index)
+
+    weighted_wins = pd.Series(0.0, index=frame.index, dtype=float)
+    weighted_rounds = pd.Series(0.0, index=frame.index, dtype=float)
+    for tier in TIER_ORDER:
+        weight = float(TACTICAL_TIER_WEIGHTS[tier])
+        wins = pd.to_numeric(frame.get(f"{tier}{wins_suffix}", 0), errors="coerce").fillna(0.0)
+        losses = pd.to_numeric(frame.get(f"{tier}{losses_suffix}", 0), errors="coerce").fillna(0.0)
+        rounds = (wins + losses).clip(lower=0.0)
+        weighted_wins = weighted_wins + wins * weight
+        weighted_rounds = weighted_rounds + rounds * weight
+
+    fallback = pd.to_numeric(frame.get(fallback_wr_col, 0), errors="coerce").fillna(0.0)
+    return (weighted_wins / weighted_rounds.clip(lower=1e-9) * 100.0).where(weighted_rounds > 0, fallback)
+
+
+def weighted_tier_round_share(frame: pd.DataFrame, tiers: tuple[str, ...] = ("S", "A", "B")) -> pd.Series:
+    if frame.empty:
+        return pd.Series(dtype=float, index=frame.index)
+    weighted_focus = pd.Series(0.0, index=frame.index, dtype=float)
+    weighted_all = pd.Series(0.0, index=frame.index, dtype=float)
+    for tier in TIER_ORDER:
+        wins = pd.to_numeric(frame.get(f"{tier}_wins", 0), errors="coerce").fillna(0.0)
+        losses = pd.to_numeric(frame.get(f"{tier}_losses", 0), errors="coerce").fillna(0.0)
+        rounds = (wins + losses).clip(lower=0.0)
+        weight = float(TACTICAL_TIER_WEIGHTS[tier])
+        term = rounds * weight
+        weighted_all = weighted_all + term
+        if tier in tiers:
+            weighted_focus = weighted_focus + term
+    return (weighted_focus / weighted_all.clip(lower=1e-9)).fillna(0.0)
