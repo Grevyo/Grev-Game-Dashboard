@@ -13,6 +13,7 @@ from app.metrics import stat_tone, trend_label
 from app.transforms import best_contexts, summarize_player
 from app.match_summaries import build_best_match_summary, build_last_match_summary
 from app.page_layout import section_header
+from app.datetime_utils import build_match_timestamp, normalize_time_string
 
 
 def _resolve_favourite_map(meta: pd.DataFrame, player_key: str, default: str = "N/A") -> str:
@@ -216,6 +217,106 @@ def _tier_grevscores(df_context: pd.DataFrame, player_name: str) -> dict[str, fl
         .mean()
     )
     return {str(tier).upper(): float(score) for tier, score in tier_summary.items()}
+
+
+def _build_recent_team_matches(player_matches: pd.DataFrame, tactics_df: pd.DataFrame, limit: int = 30) -> pd.DataFrame:
+    if player_matches.empty:
+        return pd.DataFrame()
+
+    base_cols = ["match_id", "date", "time", "opponent_team", "competition", "map", "tier"]
+    available_cols = [col for col in base_cols if col in player_matches.columns]
+    if not {"date", "opponent_team"}.issubset(set(available_cols)):
+        return pd.DataFrame()
+
+    team_matches = player_matches[available_cols].copy()
+    team_matches["date"] = pd.to_datetime(team_matches["date"], errors="coerce")
+    if "time" not in team_matches.columns:
+        team_matches["time"] = None
+    team_matches["time"] = team_matches["time"].map(normalize_time_string)
+    team_matches["match_ts"] = build_match_timestamp(team_matches["date"], team_matches["time"])
+    team_matches = team_matches.dropna(subset=["date"]).copy()
+
+    grouping_keys = [key for key in ["match_id", "date", "time", "opponent_team", "competition", "map", "tier", "match_ts"] if key in team_matches.columns]
+    team_matches = team_matches.drop_duplicates(subset=grouping_keys, keep="first")
+
+    if not tactics_df.empty and "date" in tactics_df.columns:
+        score_cols = [c for c in ["match_id", "date", "time", "opponent_team", "competition", "map", "wins", "losses"] if c in tactics_df.columns]
+        if {"wins", "losses"}.issubset(set(score_cols)):
+            score_df = tactics_df[score_cols].copy()
+            score_df["date"] = pd.to_datetime(score_df["date"], errors="coerce")
+            if "time" not in score_df.columns:
+                score_df["time"] = None
+            score_df["time"] = score_df["time"].map(normalize_time_string)
+            score_df["wins"] = pd.to_numeric(score_df["wins"], errors="coerce").fillna(0)
+            score_df["losses"] = pd.to_numeric(score_df["losses"], errors="coerce").fillna(0)
+            score_group_cols = [c for c in ["match_id", "date", "time", "opponent_team", "competition", "map"] if c in score_df.columns]
+            if score_group_cols:
+                score_summary = score_df.groupby(score_group_cols, dropna=False)[["wins", "losses"]].sum().reset_index()
+                score_summary["result"] = score_summary.apply(
+                    lambda row: "W" if row["wins"] > row["losses"] else "L" if row["wins"] < row["losses"] else "D",
+                    axis=1,
+                )
+                score_summary["score"] = score_summary["wins"].astype(int).astype(str) + "-" + score_summary["losses"].astype(int).astype(str)
+                merge_keys = [c for c in ["match_id", "date", "time", "opponent_team", "competition", "map"] if c in team_matches.columns and c in score_summary.columns]
+                if merge_keys:
+                    team_matches = team_matches.merge(score_summary[merge_keys + ["result", "score"]], on=merge_keys, how="left")
+
+    if "result" not in team_matches.columns:
+        team_matches["result"] = "—"
+    if "score" not in team_matches.columns:
+        team_matches["score"] = "—"
+
+    team_matches = team_matches.sort_values("match_ts", ascending=False).head(limit).copy()
+    team_matches["date_label"] = team_matches["date"].dt.strftime("%Y-%m-%d")
+    team_matches["time_label"] = team_matches["time"].fillna("—").astype(str).str.slice(0, 5)
+    team_matches["competition"] = team_matches.get("competition", pd.Series(["—"] * len(team_matches))).fillna("—")
+    team_matches["map"] = team_matches.get("map", pd.Series(["—"] * len(team_matches))).fillna("—")
+    team_matches["tier"] = team_matches.get("tier", pd.Series(["—"] * len(team_matches))).fillna("—")
+    return team_matches.reset_index(drop=True)
+
+
+def _render_recent_team_matches(matches: pd.DataFrame):
+    section_header("Last 30 Games", "Newest first — team-level recent chronology")
+    st.markdown("<div class='recent-matches-panel'>", unsafe_allow_html=True)
+    if matches.empty:
+        st.info("No recent team matches are available in the current filter scope.")
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+
+    st.markdown(
+        """
+        <div class='recent-matches-head'>
+          <span>Date</span><span>Time</span><span>Opponent</span><span>Competition</span><span>Map</span><span>Result</span><span>Score</span><span>Tier</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    for _, row in matches.iterrows():
+        result_value = str(row.get("result", "—")).strip().upper()
+        result_class = "is-neutral"
+        if result_value == "W":
+            result_class = "is-win"
+        elif result_value == "L":
+            result_class = "is-loss"
+        elif result_value == "D":
+            result_class = "is-draw"
+
+        st.markdown(
+            f"""
+            <div class='recent-match-row'>
+              <span>{row.get("date_label", "—")}</span>
+              <span>{row.get("time_label", "—")}</span>
+              <span class='opponent'>{row.get("opponent_team", "—")}</span>
+              <span>{row.get("competition", "—")}</span>
+              <span>{row.get("map", "—")}</span>
+              <span><span class='result-pill {result_class}'>{result_value or "—"}</span></span>
+              <span>{row.get("score", "—")}</span>
+              <span>{row.get("tier", "—")}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_roster_cards(
@@ -526,3 +627,6 @@ def render(ctx):
         insight_card("Risk Note", "Review low-yield side starts where entry impact is trending below baseline.", "warn")
     with w3:
         insight_card("Focus Note", "Use map veto prep to prioritize strongest map clusters from current filter scope.", "info")
+
+    recent_team_matches = _build_recent_team_matches(full_medisports_matches, ctx.get("tactics", pd.DataFrame()), limit=30)
+    _render_recent_team_matches(recent_team_matches)
