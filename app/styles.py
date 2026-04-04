@@ -233,6 +233,53 @@ def inject_styles(theme_name: str = "Dark"):
     .last-match-result-win, .match-outcome.win {{ color:var(--lime); }}
     .last-match-result-loss, .match-outcome.loss {{ color:var(--crimson); }}
 
+    .recent-matches-panel {{
+      border:1px solid var(--line);
+      border-radius: var(--radius-m);
+      background: linear-gradient(180deg, #101925 0%, #0d141d 100%);
+      overflow:hidden;
+    }}
+    .recent-matches-head, .recent-match-row {{
+      display:grid;
+      grid-template-columns: 92px 72px minmax(120px,1fr) minmax(140px,1.2fr) 84px 72px 76px 68px;
+      gap:10px;
+      align-items:center;
+      padding:8px 10px;
+    }}
+    .recent-matches-head {{
+      border-bottom:1px solid var(--line);
+      background:#0f1823;
+      font-size:.58rem;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+      color:#8fa3ba;
+      font-weight:700;
+    }}
+    .recent-match-row {{
+      border-top:1px solid rgba(39,52,67,.55);
+      font-size:.71rem;
+      color:#d3deea;
+      background:rgba(9,14,21,.35);
+    }}
+    .recent-match-row:nth-child(even) {{ background:rgba(13,20,29,.78); }}
+    .recent-match-row .opponent {{ color:#f4f8ff; font-weight:700; }}
+    .result-pill {{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:24px;
+      border:1px solid #3d5064;
+      border-radius:4px;
+      font-size:.6rem;
+      letter-spacing:.08em;
+      font-weight:700;
+      padding:2px 6px;
+    }}
+    .result-pill.is-win {{ color:var(--lime); border-color:color-mix(in srgb, var(--lime) 55%, #304152 45%); }}
+    .result-pill.is-loss {{ color:var(--crimson); border-color:color-mix(in srgb, var(--crimson) 55%, #304152 45%); }}
+    .result-pill.is-draw {{ color:var(--gold); border-color:color-mix(in srgb, var(--gold) 55%, #304152 45%); }}
+    .result-pill.is-neutral {{ color:#9fb2c7; }}
+
     .player-viewer-hero-grid {{ display:grid; grid-template-columns: minmax(0,2fr) minmax(280px,1fr); gap:10px; }}
     .overview-hero-row {{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }}
     .overview-hero-brand {{ display:flex; align-items:flex-start; gap:10px; }}
