@@ -13,6 +13,7 @@ except ModuleNotFoundError:
     PLOTLY_AVAILABLE = False
 
 from app.config import TIER_COLORS
+from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.page_layout import is_mobile_view
 from app.tactics import TIER_ORDER, attach_normalized_tier, normalize_tier_values, tactic_category
 
@@ -140,10 +141,11 @@ def _prepare_tactics(tdf: pd.DataFrame, days_window: int) -> pd.DataFrame:
     tdf["tactic_type"] = tdf["category"].replace({"Standard": "Standard", "Eco": "Eco", "Pistol": "Pistol"})
 
     tdf = attach_normalized_tier(tdf, fallback="C")
-    date_ser = tdf.get("date", pd.Series([None] * len(tdf)))
-    time_ser = tdf.get("time", pd.Series([""] * len(tdf))).astype(str)
-    tdf["match_ts"] = pd.to_datetime(date_ser.astype(str) + " " + time_ser, errors="coerce")
-    tdf["match_ts"] = tdf["match_ts"].fillna(pd.Timestamp("1970-01-01"))
+    date_ser = tdf.get("date", pd.Series([None] * len(tdf), index=tdf.index))
+    time_ser = normalize_time_series(tdf.get("time", pd.Series([None] * len(tdf), index=tdf.index)))
+    tdf["time"] = time_ser
+    tdf["match_ts"] = build_match_timestamp(date_ser, time_ser)
+    tdf["match_ts"] = tdf["match_ts"].fillna(build_match_timestamp(date_ser))
 
     newest = tdf["match_ts"].max()
     cut = newest - pd.Timedelta(days=int(days_window))

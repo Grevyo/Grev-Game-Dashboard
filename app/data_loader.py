@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from app.config import FILES, REQUIRED_FILES
+from app.datetime_utils import normalize_time_series
 from app.grouping import build_season_resolution_debug_table, normalize_competitions
 
 SYNONYMS = {
@@ -264,7 +265,9 @@ def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
     if "time" in df.columns:
-        df["time"] = df["time"].astype(str).str.strip()
+        time_values = df["time"].astype("object")
+        df["time_raw"] = time_values
+        df["time"] = normalize_time_series(time_values)
     if "map" in df.columns:
         df["map"] = df["map"].astype(str).str.title().str.strip()
     if "side" in df.columns:

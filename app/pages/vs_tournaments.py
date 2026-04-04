@@ -12,6 +12,7 @@ except ModuleNotFoundError:
     PLOTLY_AVAILABLE = False
 
 from app.competition import get_active_competition_col, is_grouped_mode
+from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.metrics import confidence_from_sample
 from app.page_layout import is_mobile_view
 
@@ -87,8 +88,10 @@ def _build_tournament_views(tdf: pd.DataFrame, competition_col: str) -> tuple[pd
     base["opponent_team"] = base.get("opponent_team", "").astype(str).str.strip().replace("", "Unknown Opponent")
 
     date_series = base.get("date", "").astype(str).str.strip()
-    time_series = base.get("time", "").astype(str).str.strip()
-    base["match_ts"] = pd.to_datetime((date_series + " " + time_series).str.strip(), errors="coerce")
+    time_series = normalize_time_series(base.get("time", pd.Series([None] * len(base), index=base.index)))
+    base["time"] = time_series
+    base["match_ts"] = build_match_timestamp(date_series, time_series)
+    base["match_ts"] = base["match_ts"].fillna(build_match_timestamp(date_series))
 
     match_level = (
         base.groupby([competition_col, "match_id"], dropna=False)
