@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.metrics import confidence_from_sample
 from app.page_layout import is_mobile_view
 
@@ -244,8 +245,9 @@ def render(ctx):
     base["opponent_team"] = base.get("opponent_team", "").astype(str).str.strip().replace("", "Unknown Opponent")
     base["map"] = base.get("map", "").astype(str).str.strip().replace("", "Unknown Map")
     base["date"] = base.get("date", "").astype(str).str.strip()
-    base["time"] = base.get("time", "").astype(str).str.strip()
-    base["match_ts"] = pd.to_datetime((base["date"] + " " + base["time"]).str.strip(), errors="coerce")
+    base["time"] = normalize_time_series(base.get("time", pd.Series([None] * len(base), index=base.index)))
+    base["match_ts"] = build_match_timestamp(base["date"], base["time"])
+    base["match_ts"] = base["match_ts"].fillna(build_match_timestamp(base["date"]))
 
     _hero(
         total_opponents=int(base["opponent_team"].nunique()),
