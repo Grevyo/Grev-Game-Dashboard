@@ -59,6 +59,61 @@ SIDE_NORMALIZATION_MAP = {
     "defensive": "Blue",
 }
 
+PLAYER_MATCHES_NUMERIC_COLUMNS = (
+    "kills",
+    "deaths",
+    "mvps",
+    "kpd",
+    "kd",
+    "kda",
+    "accuracy_pct",
+    "hs_pct",
+    "damage",
+    "rounds_played",
+    "wins",
+    "losses",
+    "total_rounds",
+    "win_rate_pct",
+    "kpr",
+    "mvp_rate",
+    "grevscore",
+    "rating",
+    "impact",
+    "form",
+    "matches",
+    "appearance_share",
+    "play_count",
+    "sample_size",
+)
+
+TACTICS_NUMERIC_COLUMNS = (
+    "wins",
+    "losses",
+    "total_rounds",
+    "win_rate_pct",
+    "rounds",
+    "rounds_played",
+    "sample_size",
+    "play_count",
+    "matches",
+    "score",
+    "rating",
+    "impact",
+    "form",
+    "confidence",
+    "recommendation_score",
+    "recent_wr",
+    "baseline_wr",
+    "delta_vs_baseline",
+    "s_tier_delta",
+    "c_tier_inflation",
+    "distinct_tactics",
+    "competitiveness",
+    "depth_score",
+    "context_signal",
+    "stomp_penalty",
+)
+
 def normalize_player_key(name: str | None) -> str:
     """Normalize player names into a stable comparison key."""
     text = str(name or "").strip()
@@ -223,11 +278,59 @@ def _rename_known_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns=rename_map)
 
 
-def _safe_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    for c in cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-    return df
+def safe_to_numeric(series: pd.Series) -> pd.Series:
+    if pd.api.types.is_numeric_dtype(series):
+        return pd.to_numeric(series, errors="coerce")
+
+    cleaned = series.astype("string").str.strip()
+    cleaned = cleaned.replace(
+        {
+            "": pd.NA,
+            "nan": pd.NA,
+            "none": pd.NA,
+            "null": pd.NA,
+            "n/a": pd.NA,
+            "na": pd.NA,
+        }
+    )
+    cleaned = cleaned.str.replace(",", "", regex=False)
+    return pd.to_numeric(cleaned, errors="coerce")
+
+
+def coerce_numeric_columns(
+    df: pd.DataFrame,
+    columns: Iterable[str],
+    *,
+    dataset_name: str,
+) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    out = df.copy()
+    debug_rows: list[str] = []
+    for column in columns:
+        if column not in out.columns:
+            continue
+
+        raw = out[column]
+        stripped = raw.astype("string").str.strip()
+        converted = safe_to_numeric(raw)
+        raw_non_null = int(raw.notna().sum())
+        converted_non_null = int(converted.notna().sum())
+        nan_after_coerce = int((converted.isna() & stripped.notna() & stripped.ne("")).sum())
+        object_source = bool(pd.api.types.is_object_dtype(raw) or pd.api.types.is_string_dtype(raw))
+
+        out[column] = converted
+        debug_rows.append(
+            f"{column}: non-null {raw_non_null}->{converted_non_null}, "
+            f"source={'text' if object_source else 'numeric'}, nan_after_coerce={nan_after_coerce}"
+        )
+
+    if debug_rows:
+        print(f"[NUMERIC_COERCE] dataset={dataset_name}")
+        for row in debug_rows:
+            print(f"[NUMERIC_COERCE] {row}")
+    return out
 
 
 def _required_file_keys() -> tuple[str, ...]:
@@ -339,20 +442,12 @@ def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) ->
 
     if "" in tactics.columns and "tier" not in tactics.columns:
         tactics = tactics.rename(columns={"": "tier"})
-    tactics = _safe_numeric(tactics, ["wins", "losses", "total_rounds", "win_rate_pct"])
+    tactics = coerce_numeric_columns(tactics, TACTICS_NUMERIC_COLUMNS, dataset_name="tactics")
     tactics = _dedupe_tactics_rows(tactics)
-    player_matches = _safe_numeric(
+    player_matches = coerce_numeric_columns(
         player_matches,
-        [
-            "kills",
-            "deaths",
-            "mvps",
-            "kpd",
-            "accuracy_pct",
-            "hs_pct",
-            "damage",
-            "rounds_played",
-        ],
+        PLAYER_MATCHES_NUMERIC_COLUMNS,
+        dataset_name="player_matches",
     )
 
     if "player" in players.columns:
