@@ -16,6 +16,7 @@ from app.config import TIER_COLORS
 from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.page_layout import is_mobile_view
 from app.tactics import (
+    TACTICAL_TIER_WEIGHTS,
     TIER_ORDER,
     attach_normalized_tier,
     normalize_tier_values,
@@ -71,10 +72,15 @@ def _status_logic(row: pd.Series) -> tuple[str, str]:
     rounds = float(row["rounds"])
     s_delta = float(row["s_tier_delta"])
     low_tier_inflation = float(row["c_tier_inflation"])
+    depth_signal = float(row.get("depth_signal", 0.0))
+    competitiveness_signal = float(row.get("competitiveness_signal", 0.0))
+    context_confidence = float(row.get("context_confidence", 0.0))
+    stomp_inflation = float(row.get("stomp_inflation", 0.0))
+    high_tier_round_share = float(row.get("high_tier_round_share", 0.0))
 
-    if rounds >= 12 and weighted_delta >= 8 and s_delta >= 4 and recent_delta >= -1:
+    if rounds >= 12 and weighted_delta >= 8 and s_delta >= 4 and recent_delta >= -1 and context_confidence >= 0.52:
         return "Strong Keep", "Strong return vs S-tier opposition and clear weighted edge over baseline in this map+side context."
-    if rounds >= 10 and weighted_delta >= 4 and s_delta >= 0:
+    if rounds >= 10 and weighted_delta >= 4 and s_delta >= 0 and context_confidence >= 0.45:
         return "Keep", "Positive weighted edge with credible S/A/B proof; keep in active set rotation."
     if rounds >= 8 and weighted_delta >= 0 and recent_delta < -6:
         return "Refine", "Still viable on weighted high-tier profile, but recent form dropped and needs refinement."
@@ -84,8 +90,12 @@ def _status_logic(row: pd.Series) -> tuple[str, str]:
         return "Drop", "Weighted profile is materially below baseline, including pressure vs stronger tiers."
     if rounds >= 8 and (weighted_delta < -4 or s_delta <= -8):
         return "Risky", "Weak S-tier/high-tier outcomes increase downside risk in this context."
+    if rounds >= 10 and weighted_delta >= 0 and (stomp_inflation >= 12 or context_confidence < 0.34):
+        return "Refine", "Raw output is positive, but evidence quality is reduced by low-depth or stomp-heavy context."
     if low_tier_inflation > 6:
         return "Situational", "Raw return is inflated by C-tier results; keep only for selective reads until stronger-tier proof improves."
+    if high_tier_round_share < 0.35 and depth_signal < 0.42 and competitiveness_signal < 0.45:
+        return "Test More", "Limited higher-tier and low-depth context make current signal less trustworthy."
     return "Situational", "Mixed evidence profile; use conditionally rather than as a default call."
 
 
@@ -99,30 +109,78 @@ def _compose_reason(row: pd.Series) -> str:
     c_inflation = float(row["c_tier_inflation"])
     days_since = int(row["days_since_used"])
     status = str(row["status"])
+    high_tier_share = float(row.get("high_tier_round_share", 0.0))
+    context_confidence = float(row.get("context_confidence", 0.0))
+    depth_signal = float(row.get("depth_signal", 0.0))
+    competitiveness_signal = float(row.get("competitiveness_signal", 0.0))
+    stomp_inflation = float(row.get("stomp_inflation", 0.0))
+    weighted_delta = float(row.get("weighted_delta_vs_baseline", 0.0))
 
     if status == "Strong Keep":
-        return "Above map-side baseline on strong sample with stable recent confirmation."
+        if s_delta >= 4 and high_tier_share >= 0.6:
+            return "High win rate against stronger tiers with stable sample and clear weighted edge."
+        return "Strong weighted return in deeper, competitive matches with stable recent form."
     if status == "Keep":
-        if s_delta >= 0 and weighted >= win_rate - 1:
-            return "S/A/B-weighted profile stays above baseline; dependable enough to keep active."
-        return "Above weighted baseline with stable enough evidence to retain in rotation."
+        if high_tier_share >= 0.55 and weighted_delta >= 3:
+            return "Positive S/A/B evidence and weighted return above map-side baseline."
+        if context_confidence >= 0.55:
+            return "Stable option in competitive, tactically deeper matches."
+        return "Good weighted return, but evidence context is moderate rather than elite."
     if status == "Refine":
+        if stomp_inflation >= 10:
+            return "Good raw numbers, but much of the sample comes from low-complexity stomp wins."
         return "Long-run return is positive, but recent results softened and need tactical refinement."
     if status == "Test More":
+        if rounds < 8:
+            return "Promising early return, but sample and higher-tier proof are still limited."
+        if context_confidence < 0.35:
+            return "Results come from shallow match contexts; needs reps in closer, deeper games."
         return "Early return is promising, but low sample still limits confidence."
     if status == "Risky":
         if s_delta <= -8:
             return "S-tier outcomes are materially below baseline, so risk is elevated despite usage."
+        if weighted_delta < -4 and high_tier_share >= 0.5:
+            return "High usage but weighted return is trailing the current map-side baseline."
         return "Weighted high-tier profile is below baseline; use only as a conditional counter-look."
     if status == "Drop":
+        if weighted_delta < -10 and recent_delta < -4:
+            return "Weak recent trend and poor higher-tier evidence make this a low-confidence option."
         return "Sustained underperformance on weighted high-tier evidence warrants de-prioritization."
     if c_inflation > 6:
         return "Mostly inflated by lower-tier results; stronger-tier evidence is still limited."
+    if s_delta >= 4 and context_confidence >= 0.5:
+        return "Stronger than raw return suggests because results came in competitive match contexts."
+    if depth_signal >= 0.62 and competitiveness_signal >= 0.55:
+        return "Solid return in deeper tactical matches, but still more situational than core."
     if recent_delta >= 4:
         return "Recent form is improving, but stronger-tier evidence is still situational."
     if days_since > 21:
         return "Not used recently and evidence is mixed; retain only for niche game-state reads."
     return "Stable mid-band option for selective situations, but not a default call."
+
+
+def _build_match_context(base: pd.DataFrame) -> pd.DataFrame:
+    context_cols = ["match_id", "map", "side"]
+    match_totals = (
+        base.groupby(context_cols, dropna=False)
+        .agg(
+            side_wins=("wins", "sum"),
+            side_losses=("losses", "sum"),
+            side_rounds=("total_rounds", "sum"),
+            distinct_tactics=("tactic_name", pd.Series.nunique),
+        )
+        .reset_index()
+    )
+    side_rounds = match_totals["side_rounds"].clip(lower=1.0)
+    round_margin = (match_totals["side_wins"] - match_totals["side_losses"]).abs()
+    match_totals["competitiveness"] = (1.0 - (round_margin / side_rounds)).clip(lower=0.0, upper=1.0)
+    match_totals["depth_score"] = ((match_totals["distinct_tactics"] - 2.0) / 5.0).clip(lower=0.0, upper=1.0)
+    match_totals["context_signal"] = (
+        match_totals["competitiveness"] * 0.55
+        + match_totals["depth_score"] * 0.45
+    ).clip(lower=0.0, upper=1.0)
+    match_totals["stomp_penalty"] = ((0.55 - match_totals["competitiveness"]).clip(lower=0.0) * 100.0).clip(upper=25.0)
+    return match_totals
 
 
 def _wr_tier_box(tier: str, value: float | None) -> str:
@@ -240,11 +298,31 @@ def _build_tactic_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
     tier_wins = tier_wins.rename(columns={t: f"{t}_wins" for t in TIER_ORDER})
     tier_losses = tier_losses.rename(columns={t: f"{t}_losses" for t in TIER_ORDER})
 
+    context = _build_match_context(base)
+    contextual_base = base.merge(
+        context[["match_id", "map", "side", "competitiveness", "depth_score", "context_signal", "stomp_penalty", "distinct_tactics"]],
+        on=["match_id", "map", "side"],
+        how="left",
+    )
+
+    context_by_tactic = (
+        contextual_base.groupby(group_cols, dropna=False)
+        .agg(
+            depth_signal=("depth_score", "mean"),
+            competitiveness_signal=("competitiveness", "mean"),
+            context_confidence=("context_signal", "mean"),
+            stomp_inflation=("stomp_penalty", "mean"),
+            avg_distinct_tactics=("distinct_tactics", "mean"),
+        )
+        .reset_index()
+    )
+
     tactical = (
         tactical.merge(recent[group_cols + ["recent_wr", "rrounds"]], on=group_cols, how="left")
         .merge(tier_pivot[group_cols + TIER_ORDER], on=group_cols, how="left")
         .merge(tier_wins[group_cols + [f"{t}_wins" for t in TIER_ORDER]], on=group_cols, how="left")
         .merge(tier_losses[group_cols + [f"{t}_losses" for t in TIER_ORDER]], on=group_cols, how="left")
+        .merge(context_by_tactic, on=group_cols, how="left")
     )
     tactical["weighted_wr"] = weighted_tactical_win_rate(tactical, fallback_wr_col="win_rate")
 
@@ -258,8 +336,27 @@ def _build_tactic_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
     tactical = tactical.merge(baseline[["map", "side", "baseline_wr", "base_rounds"]], on=["map", "side"], how="left")
     tactical["delta_vs_baseline"] = tactical["win_rate"] - tactical["baseline_wr"]
     tactical["weighted_delta_vs_baseline"] = tactical["weighted_wr"] - tactical["baseline_wr"]
+    tactical["depth_signal"] = tactical["depth_signal"].fillna(0.0).clip(lower=0.0, upper=1.0)
+    tactical["competitiveness_signal"] = tactical["competitiveness_signal"].fillna(0.0).clip(lower=0.0, upper=1.0)
+    tactical["context_confidence"] = tactical["context_confidence"].fillna(0.0).clip(lower=0.0, upper=1.0)
+    tactical["stomp_inflation"] = tactical["stomp_inflation"].fillna(0.0).clip(lower=0.0, upper=25.0)
+    tactical["avg_distinct_tactics"] = tactical["avg_distinct_tactics"].fillna(0.0)
+
+    context_bonus = tactical["context_confidence"] * 4.4
+    stomp_penalty = tactical["stomp_inflation"] * 0.42
+    tactical["weighted_delta_vs_baseline"] = tactical["weighted_delta_vs_baseline"] + context_bonus - stomp_penalty
     tactical["s_tier_delta"] = tactical["S"].fillna(tactical["win_rate"]) - tactical["baseline_wr"]
     tactical["c_tier_inflation"] = (tactical["C"].fillna(tactical["win_rate"]) - tactical["weighted_wr"]).clip(lower=0)
+    total_weighted_rounds = pd.Series(0.0, index=tactical.index, dtype=float)
+    high_weighted_rounds = pd.Series(0.0, index=tactical.index, dtype=float)
+    for tier in TIER_ORDER:
+        wins = pd.to_numeric(tactical.get(f"{tier}_wins", 0), errors="coerce").fillna(0.0)
+        losses = pd.to_numeric(tactical.get(f"{tier}_losses", 0), errors="coerce").fillna(0.0)
+        weighted_rounds = (wins + losses) * float(TACTICAL_TIER_WEIGHTS.get(tier, 1.0))
+        total_weighted_rounds = total_weighted_rounds + weighted_rounds
+        if tier in {"S", "A", "B"}:
+            high_weighted_rounds = high_weighted_rounds + weighted_rounds
+    tactical["high_tier_round_share"] = (high_weighted_rounds / total_weighted_rounds.clip(lower=1e-9)).fillna(0.0)
     tactical["recent_wr"] = tactical["recent_wr"].fillna(tactical["win_rate"])
     tactical["recent_delta"] = tactical["recent_wr"] - tactical["win_rate"]
     tactical["volatility"] = tactical["recent_delta"].abs()
