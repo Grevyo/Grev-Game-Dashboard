@@ -15,10 +15,14 @@ except ModuleNotFoundError:
 from app.config import TIER_COLORS
 from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.page_layout import is_mobile_view
-from app.tactics import TIER_ORDER, attach_normalized_tier, normalize_tier_values, tactic_category
+from app.tactics import (
+    TIER_ORDER,
+    attach_normalized_tier,
+    normalize_tier_values,
+    tactic_category,
+    weighted_tactical_win_rate,
+)
 
-
-TIER_WEIGHTS = {"S": 1.35, "A": 1.15, "B": 1.0, "C": 0.75}
 STATUS_COLORS = {
     "Strong Keep": "good",
     "Keep": "good",
@@ -62,24 +66,27 @@ def _route_bucket(name: str) -> str:
 
 
 def _status_logic(row: pd.Series) -> tuple[str, str]:
-    delta = row["delta_vs_baseline"]
-    recent_delta = row["recent_delta"]
-    rounds = row["rounds"]
-    weighted = row["weighted_wr"]
+    weighted_delta = float(row["weighted_delta_vs_baseline"])
+    recent_delta = float(row["recent_delta"])
+    rounds = float(row["rounds"])
+    s_delta = float(row["s_tier_delta"])
+    low_tier_inflation = float(row["c_tier_inflation"])
 
-    if rounds >= 14 and delta >= 9 and recent_delta >= 0 and weighted >= row["win_rate"] - 2:
-        return "Strong Keep", "Reliable edge over baseline with stable recent confirmation in this map+side context."
-    if rounds >= 10 and delta >= 5:
-        return "Keep", "Beating context baseline on meaningful sample; maintain in active prep set."
-    if rounds >= 8 and delta >= 0 and recent_delta < -6:
-        return "Refine", "Long-run edge exists but recent form is dropping; adjust utility pathing and timings."
-    if rounds < 8 and delta >= 2:
-        return "Test More", "Promising output but sample is too thin for confident locking."
-    if rounds >= 8 and delta < -8:
-        return "Drop", "Consistently below map+side baseline; remove from default pool unless specific read appears."
-    if rounds >= 8 and delta < -3:
-        return "Risky", "Under baseline with enough usage to create downside pressure in this context."
-    return "Situational", "Context-dependent outcome profile; keep as conditional call rather than default."
+    if rounds >= 12 and weighted_delta >= 8 and s_delta >= 4 and recent_delta >= -1:
+        return "Strong Keep", "Strong return vs S-tier opposition and clear weighted edge over baseline in this map+side context."
+    if rounds >= 10 and weighted_delta >= 4 and s_delta >= 0:
+        return "Keep", "Positive weighted edge with credible S/A/B proof; keep in active set rotation."
+    if rounds >= 8 and weighted_delta >= 0 and recent_delta < -6:
+        return "Refine", "Still viable on weighted high-tier profile, but recent form dropped and needs refinement."
+    if rounds < 8 and weighted_delta >= 2:
+        return "Test More", "Early weighted signal is promising, but sample is still too thin to lock."
+    if rounds >= 8 and weighted_delta < -9:
+        return "Drop", "Weighted profile is materially below baseline, including pressure vs stronger tiers."
+    if rounds >= 8 and (weighted_delta < -4 or s_delta <= -8):
+        return "Risky", "Weak S-tier/high-tier outcomes increase downside risk in this context."
+    if low_tier_inflation > 6:
+        return "Situational", "Raw return is inflated by C-tier results; keep only for selective reads until stronger-tier proof improves."
+    return "Situational", "Mixed evidence profile; use conditionally rather than as a default call."
 
 
 def _compose_reason(row: pd.Series) -> str:
@@ -88,27 +95,31 @@ def _compose_reason(row: pd.Series) -> str:
     recent_delta = float(row["recent_delta"])
     weighted = float(row["weighted_wr"])
     win_rate = float(row["win_rate"])
+    s_delta = float(row["s_tier_delta"])
+    c_inflation = float(row["c_tier_inflation"])
     days_since = int(row["days_since_used"])
     status = str(row["status"])
 
     if status == "Strong Keep":
         return "Above map-side baseline on strong sample with stable recent confirmation."
     if status == "Keep":
-        if weighted >= win_rate:
-            return "Reliable edge and tier-weighted quality support keeping it in the core set."
-        return "Above baseline with proven sample; remains a dependable primary option."
+        if s_delta >= 0 and weighted >= win_rate - 1:
+            return "S/A/B-weighted profile stays above baseline; dependable enough to keep active."
+        return "Above weighted baseline with stable enough evidence to retain in rotation."
     if status == "Refine":
         return "Long-run return is positive, but recent results softened and need tactical refinement."
     if status == "Test More":
         return "Early return is promising, but low sample still limits confidence."
     if status == "Risky":
-        if rounds >= 12:
-            return "Usage is meaningful, yet performance sits below baseline and increases downside risk."
-        return "Below-baseline trend with unstable outcomes; use only as conditional counter-look."
+        if s_delta <= -8:
+            return "S-tier outcomes are materially below baseline, so risk is elevated despite usage."
+        return "Weighted high-tier profile is below baseline; use only as a conditional counter-look."
     if status == "Drop":
-        return "Sustained underperformance versus baseline with enough evidence to de-prioritize."
+        return "Sustained underperformance on weighted high-tier evidence warrants de-prioritization."
+    if c_inflation > 6:
+        return "Mostly inflated by lower-tier results; stronger-tier evidence is still limited."
     if recent_delta >= 4:
-        return "Recent form is improving, but role remains situational versus core calls."
+        return "Recent form is improving, but stronger-tier evidence is still situational."
     if days_since > 21:
         return "Not used recently and evidence is mixed; retain only for niche game-state reads."
     return "Stable mid-band option for selective situations, but not a default call."
@@ -217,17 +228,25 @@ def _build_tactic_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
     tier_view["tier_wr"] = (tier_view["twins"] / (tier_view["twins"] + tier_view["tlosses"]).clip(lower=1) * 100).fillna(0)
 
     tier_pivot = tier_view.pivot_table(index=group_cols, columns="tier", values="tier_wr", aggfunc="mean").reset_index()
+    tier_wins = tier_view.pivot_table(index=group_cols, columns="tier", values="twins", aggfunc="sum", fill_value=0).reset_index()
+    tier_losses = tier_view.pivot_table(index=group_cols, columns="tier", values="tlosses", aggfunc="sum", fill_value=0).reset_index()
     for t in TIER_ORDER:
         if t not in tier_pivot.columns:
             tier_pivot[t] = np.nan
+        if t not in tier_wins.columns:
+            tier_wins[t] = 0.0
+        if t not in tier_losses.columns:
+            tier_losses[t] = 0.0
+    tier_wins = tier_wins.rename(columns={t: f"{t}_wins" for t in TIER_ORDER})
+    tier_losses = tier_losses.rename(columns={t: f"{t}_losses" for t in TIER_ORDER})
 
-    tactical = tactical.merge(recent[group_cols + ["recent_wr", "rrounds"]], on=group_cols, how="left").merge(
-        tier_pivot[group_cols + TIER_ORDER], on=group_cols, how="left"
+    tactical = (
+        tactical.merge(recent[group_cols + ["recent_wr", "rrounds"]], on=group_cols, how="left")
+        .merge(tier_pivot[group_cols + TIER_ORDER], on=group_cols, how="left")
+        .merge(tier_wins[group_cols + [f"{t}_wins" for t in TIER_ORDER]], on=group_cols, how="left")
+        .merge(tier_losses[group_cols + [f"{t}_losses" for t in TIER_ORDER]], on=group_cols, how="left")
     )
-
-    weighted_num = sum(tactical[t].fillna(tactical["win_rate"]) * w for t, w in TIER_WEIGHTS.items())
-    weighted_den = sum(TIER_WEIGHTS.values())
-    tactical["weighted_wr"] = weighted_num / weighted_den
+    tactical["weighted_wr"] = weighted_tactical_win_rate(tactical, fallback_wr_col="win_rate")
 
     baseline = (
         base.groupby(["map", "side"], dropna=False)
@@ -238,6 +257,9 @@ def _build_tactic_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
 
     tactical = tactical.merge(baseline[["map", "side", "baseline_wr", "base_rounds"]], on=["map", "side"], how="left")
     tactical["delta_vs_baseline"] = tactical["win_rate"] - tactical["baseline_wr"]
+    tactical["weighted_delta_vs_baseline"] = tactical["weighted_wr"] - tactical["baseline_wr"]
+    tactical["s_tier_delta"] = tactical["S"].fillna(tactical["win_rate"]) - tactical["baseline_wr"]
+    tactical["c_tier_inflation"] = (tactical["C"].fillna(tactical["win_rate"]) - tactical["weighted_wr"]).clip(lower=0)
     tactical["recent_wr"] = tactical["recent_wr"].fillna(tactical["win_rate"])
     tactical["recent_delta"] = tactical["recent_wr"] - tactical["win_rate"]
     tactical["volatility"] = tactical["recent_delta"].abs()
@@ -491,8 +513,8 @@ def _render_tactics_breakdown(ctx, *, recent_mode: bool = False):
 
     st.markdown("<div class='section-title' style='margin-top:8px;'>Tactic Status Board</div>", unsafe_allow_html=True)
     tactical["board_score"] = (
-        tactical["delta_vs_baseline"] * 2.4
-        + tactical["weighted_wr"] * 0.26
+        tactical["weighted_delta_vs_baseline"] * 2.9
+        + tactical["weighted_wr"] * 0.34
         + np.log1p(tactical["rounds"]) * 5.8
         - tactical["volatility"] * 0.85
         - np.where(tactical["days_since_used"] > 18, 2.6, 0)
@@ -586,7 +608,7 @@ def _render_tactics_breakdown(ctx, *, recent_mode: bool = False):
     rec_pool = tactical[
         tactical["status"].isin(["Strong Keep", "Keep", "Refine", "Situational", "Test More"]) & ~tactical["is_excluded"]
     ].copy()
-    rec_pool["pick_score"] = rec_pool["weighted_wr"] * 0.52 + rec_pool["delta_vs_baseline"] * 2.1 + np.log1p(rec_pool["rounds"]) * 6
+    rec_pool["pick_score"] = rec_pool["weighted_wr"] * 0.62 + rec_pool["weighted_delta_vs_baseline"] * 2.6 + np.log1p(rec_pool["rounds"]) * 6
     slots = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B", "Mid", "Ivy"]
     picks = []
     for slot in slots:
