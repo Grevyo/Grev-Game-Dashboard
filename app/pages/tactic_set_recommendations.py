@@ -65,13 +65,14 @@ SPLIT_STYLE_PATTERNS = [
     r"(?<![A-Z0-9])B\s*[/_-]\s*A(?![A-Z0-9])",
 ]
 MAP_OPTIONAL_BUCKETS = {
-    "train": ["Ivy", "Apps", "Connector"],
+    "train": ["Ivy", "Pop", "Apps", "Connector"],
     "castle": ["Mid", "B Halls", "B Doors", "A Main"],
     "mill": ["Mid", "A Halls", "A Long", "B Long", "2nd Mid"],
 }
 MAP_OPTIONAL_PATTERNS = {
     "train": {
-        "Ivy": [r"\bIVY\b"],
+        "Ivy": [r"(?<![A-Z0-9])IVY(?![A-Z0-9])"],
+        "Pop": [r"(?<![A-Z0-9])POP(?![A-Z0-9])"],
         "Apps": [r"\bAPPS?\b"],
         "Connector": [r"\bCONNECTOR\b", r"\bCONN\b", r"\bCON\b"],
     },
@@ -89,6 +90,27 @@ MAP_OPTIONAL_PATTERNS = {
         "B Long": [r"\bB[\s\-_]*LONG\b"],
     },
 }
+MAP_OPTIONAL_COMPACT_ALIASES = {
+    "train": {
+        "Ivy": ["IVY"],
+        "Pop": ["POP"],
+        "Apps": ["APP", "APPS"],
+        "Connector": ["CONNECTOR", "CONN"],
+    },
+    "castle": {
+        "Mid": ["MID"],
+        "B Halls": ["BHALL", "BHALLS"],
+        "B Doors": ["BDOOR", "BDOORS"],
+        "A Main": ["AMAIN"],
+    },
+    "mill": {
+        "2nd Mid": ["2NDMID", "BMID"],
+        "Mid": ["MID"],
+        "A Halls": ["AHALL", "AHALLS", "ATUN", "ATUNS", "ATUNNEL", "ATUNNELS"],
+        "A Long": ["ALONG"],
+        "B Long": ["BLONG"],
+    },
+}
 
 
 def _fmt_pct(value: float) -> str:
@@ -104,24 +126,28 @@ def _fmt_tier_pct(value: float) -> str:
 
 
 def _route_role(name: str) -> str:
-    n = str(name).upper()
-    if "PISTOL" in n or "(P)" in n or n.startswith("P"):
+    normalized = _normalize_tactic_name(name)
+    if _has_keyword(normalized, "PISTOL") or "(P)" in normalized or re.match(r"^\s*(?:\([A-Z]+\)\s*)*P", normalized):
         return "Pistol"
-    if "ECO" in n or "(E)" in n or n.startswith("E"):
-        if "A" in n:
+    if _has_keyword(normalized, "ECO") or "(E)" in normalized or re.match(r"^\s*(?:\([A-Z]+\)\s*)*E", normalized):
+        has_a = _has_lane_hint(normalized, "A")
+        has_b = _has_lane_hint(normalized, "B")
+        if has_a and not has_b:
             return "Eco A"
-        if "B" in n:
+        if has_b and not has_a:
             return "Eco B"
         return "Eco"
-    if "IVY" in n:
+    if _contains_map_alias(name, "IVY"):
         return "Ivy Lane"
-    if "MID" in n:
+    if _contains_map_alias(name, "MID"):
         return "Mid Lane"
-    if "A" in n and "B" in n:
+    has_a = _has_lane_hint(normalized, "A")
+    has_b = _has_lane_hint(normalized, "B")
+    if has_a and has_b:
         return "Split/Hybrid"
-    if "A" in n:
+    if has_a:
         return "Standard A"
-    if "B" in n:
+    if has_b:
         return "Standard B"
     return "Standard"
 
@@ -130,13 +156,39 @@ def _canonical_map_name(map_name: str) -> str:
     return str(map_name).strip().lower()
 
 
-def _has_lane_token(name: str, lane: str) -> bool:
-    return bool(re.search(rf"\b{lane}\b", str(name).upper()))
+def _normalize_tactic_name(name: str) -> str:
+    return str(name).upper().strip()
+
+
+def _tactic_parse_views(name: str) -> tuple[str, str]:
+    normalized = _normalize_tactic_name(name)
+    compact = re.sub(r"[^A-Z0-9]+", "", normalized)
+    return normalized, compact
+
+
+def _has_keyword(name: str, keyword: str) -> bool:
+    normalized, compact = _tactic_parse_views(name)
+    if re.search(rf"(?<![A-Z0-9]){re.escape(keyword)}(?![A-Z0-9])", normalized):
+        return True
+    return keyword in compact
 
 
 def _has_lane_hint(name: str, lane: str) -> bool:
-    norm = str(name).upper()
-    return bool(re.search(rf"(?<![A-Z0-9]){lane}(?:\d+)?(?![A-Z])", norm))
+    normalized, compact = _tactic_parse_views(name)
+    lane = lane.upper()
+    if re.search(rf"(?<![A-Z0-9]){lane}(?![A-Z0-9])", normalized):
+        return True
+    if re.search(rf"(?<![A-Z0-9]){lane}(?=[/_>\-])", normalized):
+        return True
+    if re.search(rf"^\s*(?:\([A-Z]+\)\s*)*{lane}(?=[A-Z0-9/_>\-])", normalized):
+        return True
+    return bool(re.search(rf"^{lane}(?=[A-Z0-9])", compact))
+
+
+def _contains_map_alias(name: str, alias: str) -> bool:
+    normalized, compact = _tactic_parse_views(name)
+    alias = alias.upper()
+    return bool(re.search(rf"(?<![A-Z0-9]){re.escape(alias)}(?![A-Z0-9])", normalized) or alias in compact)
 
 
 def _role_to_core_bucket(role: str) -> str | None:
@@ -150,10 +202,10 @@ def _role_to_core_bucket(role: str) -> str | None:
 
 
 def _infer_core_bucket(name: str) -> str:
-    n = str(name).upper()
-    if "PISTOL" in n or "(P)" in n or re.match(r"^\s*P[\s\-_]", n):
+    n = _normalize_tactic_name(name)
+    if _has_keyword(n, "PISTOL") or "(P)" in n or re.match(r"^\s*(?:\([A-Z]+\)\s*)*P", n):
         return "Pistol"
-    if "ECO" in n or "(E)" in n or re.match(r"^\s*E[\s\-_]", n):
+    if _has_keyword(n, "ECO") or "(E)" in n or re.match(r"^\s*(?:\([A-Z]+\)\s*)*E", n):
         if _has_lane_hint(n, "A"):
             return "Eco A"
         if _has_lane_hint(n, "B"):
@@ -169,23 +221,34 @@ def _infer_core_bucket(name: str) -> str:
 def _infer_optional_buckets(name: str, map_name: str) -> list[str]:
     map_key = _canonical_map_name(map_name)
     config = MAP_OPTIONAL_PATTERNS.get(map_key, {})
-    norm_name = str(name).upper()
+    compact_aliases = MAP_OPTIONAL_COMPACT_ALIASES.get(map_key, {})
+    norm_name, compact_name = _tactic_parse_views(name)
     matched: list[str] = []
     for bucket, patterns in config.items():
-        if any(re.search(pattern, norm_name) for pattern in patterns):
+        alias_hits = any(alias in compact_name for alias in compact_aliases.get(bucket, []))
+        if alias_hits or any(re.search(pattern, norm_name) for pattern in patterns):
             matched.append(bucket)
     return matched
 
 
 def _is_split_site_tactic(name: str) -> bool:
-    norm_name = str(name).upper()
+    norm_name, compact_name = _tactic_parse_views(name)
     if any(re.search(pattern, norm_name) for pattern in SPLIT_STYLE_PATTERNS):
         return True
 
-    # Also catch compact/segmented shorthand in tactic tokens (e.g., "[AB]", "A_B", "BA-").
-    normalized = re.sub(r"[^A-Z0-9]+", " ", norm_name)
-    tokens = [token for token in normalized.split() if token]
-    return any(token in {"AB", "BA"} for token in tokens)
+    if re.search(r"(?<![A-Z0-9])(AB|BA)(?=[A-Z0-9/_>\-]|$)", norm_name):
+        return True
+
+    for marker in ("AB", "BA"):
+        idx = compact_name.find(marker)
+        if idx == -1:
+            continue
+        if idx == 0:
+            return True
+        prev = compact_name[idx - 1]
+        if prev.isdigit():
+            return True
+    return False
 
 
 def _ensure_tactic_classification_fields(
