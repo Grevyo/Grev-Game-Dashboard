@@ -19,7 +19,9 @@ from app.tactics import (
     TIER_ORDER,
     attach_normalized_tier,
     normalize_tier_values,
+    observed_tiers_from_row,
     tactic_category,
+    tier_evidence_label,
     weighted_tactical_win_rate,
     weighted_tier_round_share,
 )
@@ -104,11 +106,16 @@ def _status_logic(row: pd.Series) -> tuple[str, str, str]:
     s_delta = float(row["s_tier_delta"])
     tier_focus = float(row["high_tier_round_share"])
     c_inflation = float(row["c_tier_inflation"])
+    observed_tiers = observed_tiers_from_row(row)
+    evidence_label = tier_evidence_label(observed_tiers)
+    has_sa_sample = any(tier in {"S", "A"} for tier in observed_tiers)
 
     if rounds <= 3:
         return "Too Early To Judge", "No", "Sample is tiny; one result swing can invert this read."
     if rounds <= 5 and weighted_delta >= 8 and s_delta >= 2 and wr >= 58:
-        return "Keep Trialing", "Yes", "Early signal is strong vs S/A/B-weighted opposition; schedule controlled reps."
+        if not has_sa_sample and observed_tiers:
+            return "Keep Trialing", "Yes", f"Early signal is strong on {evidence_label}, but no S/A sample yet."
+        return "Keep Trialing", "Yes", f"Early signal is strong on weighted {evidence_label}; schedule controlled reps."
     if rounds <= 5 and weighted_delta <= -10:
         return "Early Warning", "No", "Early weighted return is materially below baseline; revise before more exposure."
     if weighted_delta >= 9 and wr >= 60 and s_delta >= 3:
@@ -116,11 +123,15 @@ def _status_logic(row: pd.Series) -> tuple[str, str, str]:
     if weighted_delta >= 4 and wr >= 52:
         return "Test More", "Yes", "Above weighted baseline so far; add reps to separate signal from noise."
     if weighted_delta <= -15 and rounds >= 8:
+        if not has_sa_sample and observed_tiers:
+            return "Candidate Drop", "No", f"Weak start has persisted on weighted {evidence_label}; de-prioritize."
         return "Candidate Drop", "No", "Weak start has persisted on weighted high-tier evidence; de-prioritize."
     if weighted_delta <= -8 or s_delta <= -10:
         return "Weak Start", "No", "Under baseline versus stronger tiers in early testing; refine setup before scaling."
     if tier_focus >= 0.55 and weighted_delta >= 0:
-        return "Keep Trialing", "Yes", "Holding at/above baseline despite substantial S/A/B weighted exposure."
+        if not has_sa_sample and observed_tiers:
+            return "Keep Trialing", "Yes", f"Holding at/above baseline with substantial {evidence_label} exposure."
+        return "Keep Trialing", "Yes", f"Holding at/above baseline despite substantial {evidence_label} weighted exposure."
     if c_inflation > 8:
         return "Too Early To Judge", "Yes", "Most upside is C-tier inflated; need stronger-tier reps before confidence rises."
     return "Too Early To Judge", "Yes", "Mixed low-sample profile; continue selective trials for clarity."

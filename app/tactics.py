@@ -223,3 +223,25 @@ def weighted_tier_round_share(frame: pd.DataFrame, tiers: tuple[str, ...] = ("S"
         if tier in tiers:
             weighted_focus = weighted_focus + term
     return (weighted_focus / weighted_all.clip(lower=1e-9)).fillna(0.0)
+
+
+def observed_tiers_from_row(
+    row: pd.Series,
+    *,
+    wins_suffix: str = "_wins",
+    losses_suffix: str = "_losses",
+) -> list[str]:
+    observed: list[str] = []
+    for tier in TIER_ORDER:
+        wins = pd.to_numeric(row.get(f"{tier}{wins_suffix}", 0), errors="coerce")
+        losses = pd.to_numeric(row.get(f"{tier}{losses_suffix}", 0), errors="coerce")
+        rounds = float(pd.Series([wins]).fillna(0).iloc[0]) + float(pd.Series([losses]).fillna(0).iloc[0])
+        if rounds > 0:
+            observed.append(tier)
+    return observed
+
+
+def tier_evidence_label(observed_tiers: list[str]) -> str:
+    if not observed_tiers:
+        return "limited tier evidence"
+    return f"{'/'.join(observed_tiers)}-tier evidence"
