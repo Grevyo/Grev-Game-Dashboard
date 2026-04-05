@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from app.config import FILES, REQUIRED_FILES
-from app.datetime_utils import normalize_time_series
+from app.datetime_utils import coerce_date_columns, normalize_time_series
 from app.grouping import build_season_resolution_debug_table, normalize_competitions
 
 SYNONYMS = {
@@ -361,12 +361,20 @@ def _build_file_signature() -> tuple[tuple[str, str, int, int], ...]:
 
 
 
-def _derive_core(df: pd.DataFrame) -> pd.DataFrame:
+def _derive_core(df: pd.DataFrame, *, dataset_name: str) -> pd.DataFrame:
     if df.empty:
         return df
     df = _rename_known_columns(df)
-    if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    date_columns = [
+        column
+        for column in df.columns
+        if column == "last_used"
+        or column.endswith("_date")
+        or column == "date"
+        or column.startswith("date_")
+    ]
+    if date_columns:
+        df = coerce_date_columns(df, date_columns, dataset_name=dataset_name)
     if "time" in df.columns:
         time_values = df["time"].astype("object")
         df["time_raw"] = time_values
@@ -435,10 +443,10 @@ def _dedupe_tactics_rows(df: pd.DataFrame) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) -> dict[str, pd.DataFrame]:
-    player_matches = _derive_core(_read_flexible_csv(FILES["player_matches"]))
-    tactics = _derive_core(_read_flexible_csv(FILES["tactics"]))
-    achievements = _derive_core(_read_flexible_csv(FILES["achievements"]))
-    players = _derive_core(_read_players_csv_safe(FILES["players"]))
+    player_matches = _derive_core(_read_flexible_csv(FILES["player_matches"]), dataset_name="player_matches")
+    tactics = _derive_core(_read_flexible_csv(FILES["tactics"]), dataset_name="tactics")
+    achievements = _derive_core(_read_flexible_csv(FILES["achievements"]), dataset_name="achievements")
+    players = _derive_core(_read_players_csv_safe(FILES["players"]), dataset_name="players")
 
     if "" in tactics.columns and "tier" not in tactics.columns:
         tactics = tactics.rename(columns={"": "tier"})
