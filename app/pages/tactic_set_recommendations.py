@@ -19,7 +19,9 @@ from app.tactics import (
     TACTICAL_TIER_WEIGHTS,
     TIER_ORDER,
     attach_normalized_tier,
+    observed_tiers_from_row,
     tactic_category,
+    tier_evidence_label,
     weighted_tactical_win_rate,
     weighted_tier_round_share,
 )
@@ -251,13 +253,20 @@ def _status_logic(row: pd.Series) -> tuple[str, str]:
     s_delta = float(row["s_tier_delta"])
     high_tier_share = float(row["high_tier_round_share"])
     weak_tier_inflation = float(row["c_tier_inflation"])
+    observed_tiers = observed_tiers_from_row(row)
+    evidence_label = tier_evidence_label(observed_tiers)
+    has_sa_sample = any(tier in {"S", "A"} for tier in observed_tiers)
 
     if rounds >= 15 and weighted_delta >= 8 and confidence >= 78 and recent_delta >= -1 and s_delta >= 3:
         return "Locked In", "Strong S-tier return and high-tier weighted edge make this a reliable map+side lock."
     if rounds >= 10 and weighted_delta >= 4 and confidence >= 66 and s_delta >= 0:
-        return "Strong Pick", "Credible edge on weighted high-tier evidence supports active set inclusion."
+        if not has_sa_sample and observed_tiers:
+            return "Strong Pick", f"Credible edge on weighted {evidence_label}, but no S/A sample yet."
+        return "Strong Pick", f"Credible edge on weighted {evidence_label} supports active set inclusion."
     if rounds >= 8 and weighted_delta >= 1 and confidence >= 56:
-        return "Viable", "Playable option with meaningful S/A/B contribution for this map+side context."
+        if not has_sa_sample and observed_tiers:
+            return "Viable", f"Playable option supported by {evidence_label}, though higher-tier sample is limited."
+        return "Viable", f"Playable option with meaningful {evidence_label} for this map+side context."
     if rounds < 8 and weighted_delta >= 2:
         return "Test More", "Promising weighted signal but under-tested; schedule controlled reps before core inclusion."
     if rounds >= 8 and weighted_delta >= -1.5 and recent_delta < -5:

@@ -20,7 +20,9 @@ from app.tactics import (
     TIER_ORDER,
     attach_normalized_tier,
     normalize_tier_values,
+    observed_tiers_from_row,
     tactic_category,
+    tier_evidence_label,
     weighted_tactical_win_rate,
 )
 
@@ -77,11 +79,16 @@ def _status_logic(row: pd.Series) -> tuple[str, str]:
     context_confidence = float(row.get("context_confidence", 0.0))
     stomp_inflation = float(row.get("stomp_inflation", 0.0))
     high_tier_round_share = float(row.get("high_tier_round_share", 0.0))
+    observed_tiers = observed_tiers_from_row(row)
+    evidence_label = tier_evidence_label(observed_tiers)
+    has_sa_sample = any(tier in {"S", "A"} for tier in observed_tiers)
 
     if rounds >= 12 and weighted_delta >= 8 and s_delta >= 4 and recent_delta >= -1 and context_confidence >= 0.52:
         return "Strong Keep", "Strong return vs S-tier opposition and clear weighted edge over baseline in this map+side context."
     if rounds >= 10 and weighted_delta >= 4 and s_delta >= 0 and context_confidence >= 0.45:
-        return "Keep", "Positive weighted edge with credible S/A/B proof; keep in active set rotation."
+        if not has_sa_sample and observed_tiers:
+            return "Keep", f"Positive weighted edge with credible {evidence_label}; no S/A sample yet."
+        return "Keep", f"Positive weighted edge with credible {evidence_label}; keep in active set rotation."
     if rounds >= 8 and weighted_delta >= 0 and recent_delta < -6:
         return "Refine", "Still viable on weighted high-tier profile, but recent form dropped and needs refinement."
     if rounds < 8 and weighted_delta >= 2:
@@ -115,6 +122,10 @@ def _compose_reason(row: pd.Series) -> str:
     competitiveness_signal = float(row.get("competitiveness_signal", 0.0))
     stomp_inflation = float(row.get("stomp_inflation", 0.0))
     weighted_delta = float(row.get("weighted_delta_vs_baseline", 0.0))
+    observed_tiers = observed_tiers_from_row(row)
+    evidence_label = tier_evidence_label(observed_tiers)
+    has_sa_sample = any(tier in {"S", "A"} for tier in observed_tiers)
+    b_only = observed_tiers == ["B"]
 
     if status == "Strong Keep":
         if s_delta >= 4 and high_tier_share >= 0.6:
@@ -122,9 +133,15 @@ def _compose_reason(row: pd.Series) -> str:
         return "Strong weighted return in deeper, competitive matches with stable recent form."
     if status == "Keep":
         if high_tier_share >= 0.55 and weighted_delta >= 3:
-            return "Positive S/A/B evidence and weighted return above map-side baseline."
+            if b_only:
+                return "Positive B-tier evidence and weighted return above map-side baseline."
+            if not has_sa_sample and observed_tiers:
+                return f"Positive {evidence_label} and weighted return above map-side baseline; no S/A sample yet."
+            return f"Positive {evidence_label} and weighted return above map-side baseline."
         if context_confidence >= 0.55:
             return "Stable option in competitive, tactically deeper matches."
+        if not has_sa_sample and observed_tiers:
+            return f"Good weighted return, but evidence is limited to {evidence_label}."
         return "Good weighted return, but evidence context is moderate rather than elite."
     if status == "Refine":
         if stomp_inflation >= 10:
@@ -132,6 +149,8 @@ def _compose_reason(row: pd.Series) -> str:
         return "Long-run return is positive, but recent results softened and need tactical refinement."
     if status == "Test More":
         if rounds < 8:
+            if b_only:
+                return "Promising B-tier return, but no S/A sample yet."
             return "Promising early return, but sample and higher-tier proof are still limited."
         if context_confidence < 0.35:
             return "Results come from shallow match contexts; needs reps in closer, deeper games."
