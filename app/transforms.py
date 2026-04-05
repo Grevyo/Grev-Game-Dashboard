@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from app.datetime_utils import safe_to_datetime
 
 
 GREVSCORE_CAP = 2.2
@@ -221,7 +222,10 @@ def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
 def latest_window(df: pd.DataFrame, days: int | None = None, matches: int | None = None) -> pd.DataFrame:
     if df.empty:
         return df
-    out = df.sort_values("date")
+    out = df.copy()
+    if "date" in out.columns:
+        out["date"] = safe_to_datetime(out["date"])
+    out = out.sort_values("date")
     if days and "date" in out.columns:
         cutoff = out["date"].max() - pd.Timedelta(days=days)
         out = out[out["date"] >= cutoff]

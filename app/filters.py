@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from app.competition import get_active_competition_col, is_grouped_mode
+from app.datetime_utils import safe_to_datetime
 
 
 def _sorted_values(df: pd.DataFrame, col: str) -> list:
@@ -208,10 +209,12 @@ def apply_filters(df, filters):
         out = out[out["side"].isin(filters["side"])]
 
     if filters.get("last_days") and "date" in out.columns:
+        out["date"] = safe_to_datetime(out["date"])
         cutoff = out["date"].max() - pd.Timedelta(days=filters["last_days"])
         out = out[out["date"] >= cutoff]
 
     if filters.get("last_matches") and "date" in out.columns:
+        out["date"] = safe_to_datetime(out["date"])
         group_col = "player" if "player" in out.columns else None
         if group_col:
             out = out.sort_values("date").groupby(group_col, group_keys=False).tail(filters["last_matches"])
