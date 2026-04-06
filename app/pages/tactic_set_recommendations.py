@@ -17,6 +17,7 @@ from app.page_layout import is_mobile_view
 from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.tactics import (
     TACTIC_STATUS_ORDER,
+    TACTICAL_TIER_WEIGHTS,
     TIER_ORDER,
     attach_normalized_tier,
     build_tactic_description,
