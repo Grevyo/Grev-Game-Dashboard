@@ -18,12 +18,11 @@ from app.page_layout import is_mobile_view
 from app.tactics import (
     TIER_ORDER,
     attach_normalized_tier,
+    evaluate_tactics,
     normalize_tier_values,
     observed_tiers_from_row,
     tactic_category,
     tier_evidence_label,
-    weighted_tactical_win_rate,
-    weighted_tier_round_share,
 )
 TEST_STATUS_ORDER = [
     "Promising",
@@ -101,9 +100,11 @@ def _inject_page_css() -> None:
 
 def _status_logic(row: pd.Series) -> tuple[str, str, str]:
     rounds = float(row["rounds"])
-    wr = float(row["recent_wr"])
-    weighted_delta = float(row["weighted_wr"] - row["baseline_wr"])
-    s_delta = float(row["s_tier_delta"])
+    wr = float(row.get("recent_wr", row.get("win_rate", 0)))
+    weighted_delta = float(row.get("weighted_delta_vs_baseline", 0))
+    quality = float(row.get("quality_score", 0))
+    confidence = float(row.get("confidence_score", 0))
+    context = float(row.get("context_score", 0))
     tier_focus = float(row["high_tier_round_share"])
     c_inflation = float(row["c_tier_inflation"])
     observed_tiers = observed_tiers_from_row(row)
@@ -112,27 +113,27 @@ def _status_logic(row: pd.Series) -> tuple[str, str, str]:
 
     if rounds <= 3:
         return "Too Early To Judge", "No", "Sample is tiny; one result swing can invert this read."
-    if rounds <= 5 and weighted_delta >= 8 and s_delta >= 2 and wr >= 58:
+    if rounds <= 5 and quality >= 64 and weighted_delta >= 5 and wr >= 56:
         if not has_sa_sample and observed_tiers:
             return "Keep Trialing", "Yes", f"Early signal is strong on {evidence_label}, but no S/A sample yet."
         return "Keep Trialing", "Yes", f"Early signal is strong on weighted {evidence_label}; schedule controlled reps."
     if rounds <= 5 and weighted_delta <= -10:
         return "Early Warning", "No", "Early weighted return is materially below baseline; revise before more exposure."
-    if weighted_delta >= 9 and wr >= 60 and s_delta >= 3:
-        return "Promising", "Yes", "Strong early return against higher-tier opposition, led by S-tier signal."
-    if weighted_delta >= 4 and wr >= 52:
+    if quality >= 72 and confidence >= 48 and context >= 42 and weighted_delta >= 4:
+        return "Promising", "Yes", "Strong early quality with credible context and above-baseline weighted return."
+    if quality >= 56 and wr >= 52:
         return "Test More", "Yes", "Above weighted baseline so far; add reps to separate signal from noise."
-    if weighted_delta <= -15 and rounds >= 8:
+    if quality <= 30 and weighted_delta <= -8 and rounds >= 8:
         if not has_sa_sample and observed_tiers:
             return "Candidate Drop", "No", f"Weak start has persisted on weighted {evidence_label}; de-prioritize."
         return "Candidate Drop", "No", "Weak start has persisted on weighted high-tier evidence; de-prioritize."
-    if weighted_delta <= -8 or s_delta <= -10:
+    if weighted_delta <= -6 or context < 28:
         return "Weak Start", "No", "Under baseline versus stronger tiers in early testing; refine setup before scaling."
     if tier_focus >= 0.55 and weighted_delta >= 0:
         if not has_sa_sample and observed_tiers:
             return "Keep Trialing", "Yes", f"Holding at/above baseline with substantial {evidence_label} exposure."
         return "Keep Trialing", "Yes", f"Holding at/above baseline despite substantial {evidence_label} weighted exposure."
-    if c_inflation > 8:
+    if c_inflation > 8 or confidence < 35:
         return "Too Early To Judge", "Yes", "Most upside is C-tier inflated; need stronger-tier reps before confidence rises."
     return "Too Early To Judge", "Yes", "Mixed low-sample profile; continue selective trials for clarity."
 
@@ -235,67 +236,14 @@ def render(ctx):
         return
 
     group_cols = ["map", "side", "tactic_name", "category", "tactic_type"]
-    tactical = (
-        scoped.groupby(group_cols, dropna=False)
-        .agg(
-            wins=("wins", "sum"),
-            losses=("losses", "sum"),
-            rounds=("total_rounds", "sum"),
-            last_used=("match_ts", "max"),
-            first_used=("match_ts", "min"),
-        )
-        .reset_index()
-    )
+    tactical, _baseline = evaluate_tactics(scoped, group_cols=group_cols, recent_days=days_window)
 
     tactical = tactical[(tactical["rounds"] > 0) & (tactical["rounds"] <= int(max_rounds))].copy()
     if tactical.empty:
         st.warning("No low-sample tactics in the recent window meet the Max Rounds threshold.")
         return
 
-    tactical["recent_wr"] = (tactical["wins"] / (tactical["wins"] + tactical["losses"]).clip(lower=1) * 100).fillna(0)
-    tactical["last_used_label"] = tactical["last_used"].dt.strftime("%Y-%m-%d").fillna("N/A")
-
-    baseline = (
-        scoped.groupby(["map", "side"], dropna=False)
-        .agg(base_wins=("wins", "sum"), base_losses=("losses", "sum"))
-        .reset_index()
-    )
-    baseline["baseline_wr"] = (baseline["base_wins"] / (baseline["base_wins"] + baseline["base_losses"]).clip(lower=1) * 100).fillna(0)
-    tactical = tactical.merge(baseline[["map", "side", "baseline_wr"]], on=["map", "side"], how="left")
-    tactical["delta_vs_baseline"] = tactical["recent_wr"] - tactical["baseline_wr"]
-
-    tier_view = (
-        scoped.groupby(group_cols + ["tier"], dropna=False)
-        .agg(twins=("wins", "sum"), tlosses=("losses", "sum"), trounds=("total_rounds", "sum"))
-        .reset_index()
-    )
-    tier_view["tier_wr"] = (tier_view["twins"] / (tier_view["twins"] + tier_view["tlosses"]).clip(lower=1) * 100).fillna(0)
-    tier_pivot = tier_view.pivot_table(index=group_cols, columns="tier", values="tier_wr", aggfunc="mean").reset_index()
-    for tier in TIER_ORDER:
-        if tier not in tier_pivot.columns:
-            tier_pivot[tier] = np.nan
-    tactical = tactical.merge(tier_pivot[group_cols + TIER_ORDER], on=group_cols, how="left")
-
-    tier_wins = tier_view.pivot_table(index=group_cols, columns="tier", values="twins", aggfunc="sum", fill_value=0).reset_index()
-    tier_losses = tier_view.pivot_table(index=group_cols, columns="tier", values="tlosses", aggfunc="sum", fill_value=0).reset_index()
-    for tier in TIER_ORDER:
-        if tier not in tier_wins.columns:
-            tier_wins[tier] = 0.0
-        if tier not in tier_losses.columns:
-            tier_losses[tier] = 0.0
-    tier_wins = tier_wins.rename(columns={tier: f"{tier}_wins" for tier in TIER_ORDER})
-    tier_losses = tier_losses.rename(columns={tier: f"{tier}_losses" for tier in TIER_ORDER})
-    tactical = tactical.merge(tier_wins[group_cols + [f"{tier}_wins" for tier in TIER_ORDER]], on=group_cols, how="left")
-    tactical = tactical.merge(tier_losses[group_cols + [f"{tier}_losses" for tier in TIER_ORDER]], on=group_cols, how="left")
-    tactical["weighted_wr"] = weighted_tactical_win_rate(tactical, fallback_wr_col="recent_wr")
-    tier_rounds = tier_view.pivot_table(index=group_cols, columns="tier", values="trounds", aggfunc="sum", fill_value=0).reset_index()
-    for tier in TIER_ORDER:
-        if tier not in tier_rounds.columns:
-            tier_rounds[tier] = 0
-    tactical = tactical.merge(tier_rounds[group_cols + TIER_ORDER], on=group_cols, how="left", suffixes=("", "_rounds"))
-    tactical["high_tier_round_share"] = weighted_tier_round_share(tactical, tiers=("S", "A", "B"))
-    tactical["s_tier_delta"] = tactical["S"].fillna(tactical["recent_wr"]) - tactical["baseline_wr"]
-    tactical["c_tier_inflation"] = (tactical["C"].fillna(tactical["recent_wr"]) - tactical["weighted_wr"]).clip(lower=0)
+    tactical["recent_wr"] = tactical["recent_wr"].fillna(tactical["win_rate"])
 
     status_frame = tactical.apply(_status_logic, axis=1, result_type="expand")
     tactical[["status", "keep_testing", "reason"]] = status_frame
