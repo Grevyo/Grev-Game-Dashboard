@@ -16,8 +16,11 @@ from app.config import TIER_COLORS
 from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.page_layout import is_mobile_view
 from app.tactics import (
+    TACTIC_STATUS_ORDER,
     TIER_ORDER,
     attach_normalized_tier,
+    build_tactic_description,
+    classify_tactic_status,
     evaluate_tactics,
     normalize_tier_values,
     observed_tiers_from_row,
@@ -34,7 +37,7 @@ STATUS_COLORS = {
     "Drop": "bad",
 }
 TIER_COLOR_CLASS = {"S": "grev-tier-s", "A": "grev-tier-a", "B": "grev-tier-b", "C": "grev-tier-c"}
-STATUS_PRIORITY = ["Strong Keep", "Keep", "Refine", "Test More", "Risky", "Drop"]
+STATUS_PRIORITY = TACTIC_STATUS_ORDER
 
 
 def _fmt_pct(value: float) -> str:
@@ -67,104 +70,11 @@ def _route_bucket(name: str) -> str:
 
 
 def _status_logic(row: pd.Series) -> tuple[str, str]:
-    quality = float(row.get("quality_score", 0.0))
-    confidence = float(row.get("confidence_score", 0.0))
-    context = float(row.get("context_score", 0.0))
-    set_value = float(row.get("set_inclusion_score", 0.0))
-    weighted_delta = float(row.get("weighted_delta_vs_baseline", 0.0))
-    recent_delta = float(row.get("recent_delta", 0.0))
-    volatility = float(row.get("volatility", 0.0))
-    observed_tiers = observed_tiers_from_row(row)
-    evidence_label = tier_evidence_label(observed_tiers)
-    has_sa_sample = any(tier in {"S", "A"} for tier in observed_tiers)
-
-    if quality >= 78 and confidence >= 66 and context >= 58 and set_value >= 70 and weighted_delta >= 5:
-        return "Strong Keep", "Elite quality with trustworthy context and repeatable evidence supports core retention."
-    if quality >= 62 and confidence >= 52 and context >= 45 and set_value >= 56 and weighted_delta >= 1:
-        if not has_sa_sample and observed_tiers:
-            return "Keep", f"Solid weighted output and {evidence_label}, but higher-tier sample is still limited."
-        return "Keep", f"Solid weighted output with reliable {evidence_label} and useful set value."
-    if quality >= 48 and (recent_delta <= -4 or volatility >= 8 or context < 42):
-        return "Refine", "Underlying quality is playable, but trend/context weakness suggests tactical refinement."
-    if quality >= 52 and confidence < 46:
-        return "Test More", "Promising quality signal, but sample trust is still too thin for full commitment."
-    if quality < 44 and confidence < 48 and weighted_delta <= -3:
-        return "Drop", "Below-baseline quality with low-trust evidence gives weak inclusion value."
-    if volatility >= 10 or context < 36 or weighted_delta < -1:
-        return "Risky", "Swingy or low-context profile raises downside risk despite isolated positives."
-    return "Refine", "Mixed profile: some value exists, but clearer proof is needed before committing."
+    return classify_tactic_status(row)
 
 
 def _compose_reason(row: pd.Series) -> str:
-    delta = float(row["delta_vs_baseline"])
-    rounds = int(row["rounds"])
-    recent_delta = float(row["recent_delta"])
-    weighted = float(row["weighted_wr"])
-    win_rate = float(row["win_rate"])
-    s_delta = float(row["s_tier_delta"])
-    c_inflation = float(row["c_tier_inflation"])
-    days_since = int(row["days_since_used"])
-    status = str(row["status"])
-    high_tier_share = float(row.get("high_tier_round_share", 0.0))
-    context_confidence = float(row.get("context_confidence", 0.0))
-    depth_signal = float(row.get("depth_signal", 0.0))
-    competitiveness_signal = float(row.get("competitiveness_signal", 0.0))
-    stomp_inflation = float(row.get("stomp_inflation", 0.0))
-    weighted_delta = float(row.get("weighted_delta_vs_baseline", 0.0))
-    observed_tiers = observed_tiers_from_row(row)
-    evidence_label = tier_evidence_label(observed_tiers)
-    has_sa_sample = any(tier in {"S", "A"} for tier in observed_tiers)
-    b_only = observed_tiers == ["B"]
-
-    if status == "Strong Keep":
-        if s_delta >= 4 and high_tier_share >= 0.6:
-            return "High win rate against stronger tiers with stable sample and clear weighted edge."
-        return "Strong weighted return in deeper, competitive matches with stable recent form."
-    if status == "Keep":
-        if high_tier_share >= 0.55 and weighted_delta >= 3:
-            if b_only:
-                return "Positive B-tier evidence and weighted return above map-side baseline."
-            if not has_sa_sample and observed_tiers:
-                return f"Positive {evidence_label} and weighted return above map-side baseline; no S/A sample yet."
-            return f"Positive {evidence_label} and weighted return above map-side baseline."
-        if context_confidence >= 0.55:
-            return "Stable option in competitive, tactically deeper matches."
-        if not has_sa_sample and observed_tiers:
-            return f"Good weighted return, but evidence is limited to {evidence_label}."
-        return "Good weighted return, but evidence context is moderate rather than elite."
-    if status == "Refine":
-        if stomp_inflation >= 10:
-            return "Good raw numbers, but much of the sample comes from low-complexity stomp wins."
-        return "Long-run return is positive, but recent results softened and need tactical refinement."
-    if status == "Test More":
-        if rounds < 8:
-            if b_only:
-                return "Promising B-tier return, but no S/A sample yet."
-            return "Promising early return, but sample and higher-tier proof are still limited."
-        if context_confidence < 0.35:
-            return "Results come from shallow match contexts; needs reps in closer, deeper games."
-        return "Early return is promising, but low sample still limits confidence."
-    if status == "Risky":
-        if s_delta <= -8:
-            return "S-tier outcomes are materially below baseline, so risk is elevated despite usage."
-        if weighted_delta < -4 and high_tier_share >= 0.5:
-            return "High usage but weighted return is trailing the current map-side baseline."
-        return "Weighted high-tier profile is below baseline; use only as a conditional counter-look."
-    if status == "Drop":
-        if weighted_delta < -10 and recent_delta < -4:
-            return "Weak recent trend and poor higher-tier evidence make this a low-confidence option."
-        return "Sustained underperformance on weighted high-tier evidence warrants de-prioritization."
-    if c_inflation > 6:
-        return "Mostly inflated by lower-tier results; stronger-tier evidence is still limited."
-    if s_delta >= 4 and context_confidence >= 0.5:
-        return "Stronger than raw return suggests because results came in competitive match contexts."
-    if depth_signal >= 0.62 and competitiveness_signal >= 0.55:
-        return "Solid return in deeper tactical matches, but still more situational than core."
-    if recent_delta >= 4:
-        return "Recent form is improving, but stronger-tier evidence is still situational."
-    if days_since > 21:
-        return "Not used recently and evidence is mixed; retain only for niche game-state reads."
-    return "Stable mid-band option for selective situations, but not a default call."
+    return build_tactic_description(row)
 
 
 def _wr_tier_box(tier: str, value: float | None) -> str:
