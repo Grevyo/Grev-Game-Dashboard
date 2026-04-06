@@ -16,43 +16,34 @@ except ModuleNotFoundError:
 from app.page_layout import is_mobile_view
 from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.tactics import (
+    TACTIC_STATUS_ORDER,
     TIER_ORDER,
     attach_normalized_tier,
+    build_tactic_description,
+    classify_tactic_status,
     evaluate_tactics,
     observed_tiers_from_row,
     tactic_category,
     tier_evidence_label,
 )
-
-EXCLUDE_FOR_NOW_STATUS = "Exclude For Now"
-EXCLUDE_FOR_NOW_DISPLAY = "Try Build Replacement"
+EXCLUDE_FOR_NOW_STATUS = "Drop"
 
 
 def _display_status(status: str | None) -> str:
-    value = str(status or "")
-    return EXCLUDE_FOR_NOW_DISPLAY if value == EXCLUDE_FOR_NOW_STATUS else value
+    return str(status or "")
 
 
-STATUS_ORDER = [
-    "Locked In",
-    "Strong Pick",
-    "Viable",
-    "Situational",
-    "Test More",
-    "Backup",
-    EXCLUDE_FOR_NOW_STATUS,
-]
+STATUS_ORDER = TACTIC_STATUS_ORDER
 STATUS_TONE = {
-    "Locked In": "good",
-    "Strong Pick": "good",
-    "Viable": "mid",
-    "Situational": "mid",
+    "Strong Keep": "good",
+    "Keep": "good",
+    "Refine": "mid",
     "Test More": "poor",
-    "Backup": "poor",
-    EXCLUDE_FOR_NOW_STATUS: "bad",
+    "Risky": "poor",
+    "Drop": "bad",
 }
-STRONG_COVERAGE_STATUSES = {"Locked In", "Strong Pick"}
-WEAK_COVERAGE_STATUSES = {"Situational", "Risky", "Drop", "Backup", EXCLUDE_FOR_NOW_STATUS}
+STRONG_COVERAGE_STATUSES = {"Strong Keep", "Keep"}
+WEAK_COVERAGE_STATUSES = {"Risky", "Drop"}
 TIER_COLORS = {"S": "#d4b15d", "A": "#9b6ef3", "B": "#4d8dff", "C": "#59b67a"}
 REQUIRED_CORE_BUCKETS = ["Pistol", "Eco A", "Eco B", "Standard A", "Standard B"]
 SPLIT_STYLE_LABEL = "AB / BA Split"
@@ -307,35 +298,9 @@ def _role_priority(role: str) -> int:
 
 
 def _status_logic(row: pd.Series) -> tuple[str, str]:
-    weighted_delta = float(row["weighted_delta_vs_baseline"])
-    rounds = float(row["rounds"])
-    recent_delta = float(row["recent_delta"])
-    confidence = float(row.get("confidence_score", row.get("confidence", 0)))
-    quality = float(row.get("quality_score", 0))
-    set_value = float(row.get("set_inclusion_score", 0))
-    high_tier_share = float(row["high_tier_round_share"])
-    weak_tier_inflation = float(row["c_tier_inflation"])
-    observed_tiers = observed_tiers_from_row(row)
-    evidence_label = tier_evidence_label(observed_tiers)
-    has_sa_sample = any(tier in {"S", "A"} for tier in observed_tiers)
-
-    if rounds >= 15 and quality >= 75 and confidence >= 70 and set_value >= 72 and weighted_delta >= 5 and recent_delta >= -2:
-        return "Locked In", "High quality, strong trust, and high set-inclusion value justify lock status."
-    if rounds >= 10 and quality >= 62 and confidence >= 58 and set_value >= 60 and weighted_delta >= 1:
-        if not has_sa_sample and observed_tiers:
-            return "Strong Pick", f"Credible edge on weighted {evidence_label}, but no S/A sample yet."
-        return "Strong Pick", f"Credible edge on weighted {evidence_label} supports active set inclusion."
-    if rounds >= 8 and quality >= 54 and confidence >= 50 and set_value >= 50:
-        if not has_sa_sample and observed_tiers:
-            return "Viable", f"Playable option supported by {evidence_label}, though higher-tier sample is limited."
-        return "Viable", f"Playable option with meaningful {evidence_label} for this map+side context."
-    if rounds < 8 and quality >= 48:
-        return "Test More", "Promising weighted signal but under-tested; schedule controlled reps before core inclusion."
-    if rounds >= 8 and weighted_delta >= -1.5 and recent_delta < -5:
-        return "Situational", "Historically useful, but recent form cooled and needs scenario-specific usage."
-    if weak_tier_inflation > 5 and (weighted_delta < 0 or high_tier_share < 0.45):
-        return "Backup", "Mostly inflated by lower-tier results; reserve until stronger-tier proof improves."
-    return EXCLUDE_FOR_NOW_STATUS, "Weighted profile is below baseline or lacks stronger-tier trust for default call sheets."
+    status, _note = classify_tactic_status(row)
+    reason = build_tactic_description(pd.Series({**row.to_dict(), "status": status}))
+    return status, reason
 
 
 def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -580,7 +545,7 @@ def render(ctx):
 
     active_pool = tactical[~tactical["tactic_name"].isin(excluded_tactics)].copy()
     manually_excluded = tactical[tactical["tactic_name"].isin(excluded_tactics)].copy()
-    model_excluded_mask = active_pool["status"].isin(["Backup", EXCLUDE_FOR_NOW_STATUS])
+    model_excluded_mask = active_pool["status"].isin(["Risky", EXCLUDE_FOR_NOW_STATUS])
     model_excluded_names = set(active_pool.loc[model_excluded_mask, "tactic_name"].astype(str).tolist())
     effective_model_excluded = model_excluded_names - model_overrides
     recommendation_pool = active_pool[~active_pool["tactic_name"].isin(effective_model_excluded)].copy()
@@ -826,7 +791,7 @@ def render(ctx):
 
     included = recommendation_pool[recommendation_pool["tactic_name"].isin(rec_set["tactic_name"])].copy()
     borderline = recommendation_pool[
-        recommendation_pool["status"].isin(["Viable", "Situational", "Test More"])
+        recommendation_pool["status"].isin(["Keep", "Refine", "Test More"])
         & ~recommendation_pool["tactic_name"].isin(rec_set["tactic_name"])
     ].head(8)
     excluded_by_model = active_pool[active_pool["tactic_name"].isin(effective_model_excluded)].head(8)
@@ -893,13 +858,12 @@ def render(ctx):
                 hover_name="tactic_name",
                 hover_data={"delta_vs_baseline": ":.1f", "recent_wr": ":.1f", "S": ":.1f", "A": ":.1f", "B": ":.1f", "C": ":.1f"},
                 color_discrete_map={
-                    "Locked In": "#9FE870",
-                    "Strong Pick": "#70d384",
-                    "Viable": "#d3a85c",
-                    "Situational": "#c79555",
+                    "Strong Keep": "#9FE870",
+                    "Keep": "#70d384",
+                    "Refine": "#d3a85c",
                     "Test More": "#ff9f43",
-                    "Backup": "#ff7a4d",
-                    EXCLUDE_FOR_NOW_STATUS: "#ff4d5e",
+                    "Risky": "#ff7a4d",
+                    "Drop": "#ff4d5e",
                 },
             )
             scatter.update_layout(template="plotly_dark", margin=dict(l=8, r=8, t=10, b=8), height=360 if not mobile_view else 320)

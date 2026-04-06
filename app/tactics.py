@@ -176,6 +176,7 @@ def recommend_set(summary: pd.DataFrame, map_name: str, side: str) -> pd.DataFra
 
 
 TACTICAL_TIER_WEIGHTS = {"S": 5.4, "A": 2.2, "B": 2.0, "C": 0.2}
+TACTIC_STATUS_ORDER = ["Strong Keep", "Keep", "Refine", "Test More", "Risky", "Drop"]
 
 
 def weighted_tactical_win_rate(
@@ -325,44 +326,78 @@ def evaluate_tactics(base: pd.DataFrame, group_cols: list[str], *, recent_days: 
     tactical["c_tier_inflation"] = (tactical["C"].fillna(tactical["weighted_wr"]) - tactical["weighted_wr"]).clip(lower=0)
     tactical["volatility"] = tactical["recent_delta"].abs()
 
-    rounds_norm = np.clip(np.sqrt(tactical["rounds"].fillna(0).clip(lower=0)) / np.sqrt(35), 0, 1)
-    match_norm = np.clip(np.sqrt(tactical["match_count"].fillna(0).clip(lower=0)) / np.sqrt(8), 0, 1)
+    rounds_norm = np.clip(np.sqrt(tactical["rounds"].fillna(0).clip(lower=0)) / np.sqrt(40), 0, 1)
+    match_norm = np.clip(np.sqrt(tactical["match_count"].fillna(0).clip(lower=0)) / np.sqrt(10), 0, 1)
     recency_days = (base["match_ts"].max() - tactical["last_used"]).dt.days.fillna(999)
-    recency_norm = np.clip(1.0 - (recency_days / 35.0), 0, 1)
+    recency_norm = np.clip(1.0 - (recency_days / 45.0), 0, 1)
     repeatability = np.clip((tactical["match_count"].fillna(0) / tactical["rounds"].clip(lower=1)) * 8.0, 0, 1)
     stability = np.clip(1.0 - tactical["volatility"].abs() / 18.0, 0, 1)
+    long_run_norm = np.clip((tactical["weighted_delta_vs_baseline"] + 10.0) / 24.0, 0, 1)
+    trend_norm = np.clip((tactical["recent_delta"] + 8.0) / 18.0, 0, 1)
+    s_tier_norm = np.clip((tactical["s_tier_delta"] + 8.0) / 18.0, 0, 1)
 
     tactical["context_score"] = (
         tactical["context_confidence"].fillna(0.0).clip(0, 1) * 100
-        + tactical["depth_signal"].fillna(0.0).clip(0, 1) * 20
-        - tactical["stomp_inflation"].fillna(0.0).clip(0, 25) * 1.2
+        + tactical["depth_signal"].fillna(0.0).clip(0, 1) * 24
+        + tactical["competitiveness_signal"].fillna(0.0).clip(0, 1) * 16
+        - tactical["stomp_inflation"].fillna(0.0).clip(0, 25) * 1.8
     ).clip(0, 100)
     tactical["quality_score"] = (
-        np.clip(tactical["weighted_delta_vs_baseline"] + 16, 0, 36) * 1.8
-        + np.clip(tactical["s_tier_delta"] + 12, 0, 30) * 1.5
-        + np.clip(tactical["recent_delta"] + 8, 0, 20) * 1.15
-        + tactical["high_tier_round_share"].fillna(0) * 22
-        - tactical["c_tier_inflation"].fillna(0).clip(0, 18) * 1.25
+        long_run_norm * 42
+        + s_tier_norm * 24
+        + trend_norm * 14
+        + tactical["high_tier_round_share"].fillna(0).clip(0, 1) * 12
+        + tactical["context_score"].fillna(0.0).clip(0, 100) * 0.12
+        - tactical["c_tier_inflation"].fillna(0).clip(0, 16) * 1.7
     ).clip(0, 100)
     tactical["confidence_score"] = (
-        rounds_norm * 38
+        rounds_norm * 36
         + match_norm * 20
-        + recency_norm * 12
-        + repeatability * 14
-        + stability * 16
-        + tactical["context_score"] * 0.12
+        + recency_norm * 10
+        + repeatability * 12
+        + stability * 12
+        + tactical["context_score"].fillna(0.0).clip(0, 100) * 0.1
     ).clip(0, 100)
 
+    role_supply = pd.Series(1.0, index=tactical.index, dtype=float)
+    if "role" in tactical.columns:
+        role_counts = (
+            tactical.groupby(["map", "side", "role"], dropna=False)["tactic_name"]
+            .nunique()
+            .rename("role_count")
+            .reset_index()
+        )
+        tactical = tactical.merge(role_counts, on=["map", "side", "role"], how="left")
+        role_supply = tactical["role_count"].fillna(1.0).clip(lower=1.0)
+    elif "core_bucket" in tactical.columns:
+        bucket_counts = (
+            tactical.groupby(["map", "side", "core_bucket"], dropna=False)["tactic_name"]
+            .nunique()
+            .rename("role_count")
+            .reset_index()
+        )
+        tactical = tactical.merge(bucket_counts, on=["map", "side", "core_bucket"], how="left")
+        role_supply = tactical["role_count"].fillna(1.0).clip(lower=1.0)
+    else:
+        tactical["role_count"] = 1.0
+
+    redundancy_penalty = np.clip((role_supply - 1.0) / 4.0, 0, 1)
+    uniqueness = (1.0 - redundancy_penalty).clip(0, 1)
+    core_bonus = pd.Series(0.0, index=tactical.index, dtype=float)
+    if "core_bucket" in tactical.columns:
+        core_bonus = tactical["core_bucket"].fillna("").isin(["Pistol", "Eco A", "Eco B", "Standard A", "Standard B"]).astype(float) * 0.22
     tactical["coverage_value"] = (
-        tactical["high_tier_round_share"].fillna(0) * 35
-        + np.clip(tactical["rounds"].fillna(0), 0, 16) * 1.8
-        + np.clip(tactical["context_score"] - 50, 0, 50) * 0.38
+        tactical["high_tier_round_share"].fillna(0).clip(0, 1) * 24
+        + tactical["context_score"].fillna(0.0).clip(0, 100) * 0.24
+        + uniqueness * 24
+        + core_bonus * 100
+        + np.clip(tactical["rounds"].fillna(0), 0, 20) * 1.0
     ).clip(0, 100)
     tactical["set_inclusion_score"] = (
-        tactical["quality_score"] * 0.36
-        + tactical["confidence_score"] * 0.24
-        + tactical["context_score"] * 0.18
-        + tactical["coverage_value"] * 0.22
+        tactical["quality_score"] * 0.31
+        + tactical["confidence_score"] * 0.2
+        + tactical["context_score"] * 0.16
+        + tactical["coverage_value"] * 0.33
     ).clip(0, 100)
 
     tactical["days_since_used"] = recency_days
@@ -390,3 +425,87 @@ def tier_evidence_label(observed_tiers: list[str]) -> str:
     if not observed_tiers:
         return "limited tier evidence"
     return f"{'/'.join(observed_tiers)}-tier evidence"
+
+
+def classify_tactic_status(row: pd.Series) -> tuple[str, str]:
+    quality = float(row.get("quality_score", 0.0))
+    confidence = float(row.get("confidence_score", 0.0))
+    context = float(row.get("context_score", 0.0))
+    set_value = float(row.get("set_inclusion_score", 0.0))
+    weighted_delta = float(row.get("weighted_delta_vs_baseline", 0.0))
+    volatility = float(row.get("volatility", 0.0))
+    stomp_inflation = float(row.get("stomp_inflation", 0.0))
+    observed_tiers = observed_tiers_from_row(row)
+    evidence_label = tier_evidence_label(observed_tiers)
+    has_sa_sample = any(t in {"S", "A"} for t in observed_tiers)
+
+    if quality >= 76 and confidence >= 62 and context >= 52 and set_value >= 66 and weighted_delta >= 4:
+        return "Strong Keep", "Elite weighted profile with trustworthy evidence and high set value."
+    if quality >= 60 and confidence >= 48 and context >= 40 and set_value >= 54 and weighted_delta >= 0.5:
+        if observed_tiers and not has_sa_sample:
+            return "Keep", f"Solid weighted output on {evidence_label}, but higher-tier sample is still limited."
+        return "Keep", f"Solid weighted output with reliable {evidence_label} and useful set value."
+    if quality >= 52 and confidence < 45:
+        return "Test More", "Promising quality signal, but evidence trust is still thin."
+    if weighted_delta <= -6 and confidence >= 34:
+        return "Drop", "Consistent below-baseline return provides a weak case for inclusion."
+    if volatility >= 9 or context < 34 or stomp_inflation >= 11:
+        return "Risky", "Context/volatility profile is unstable despite isolated upside."
+    if quality < 42 and confidence < 42:
+        return "Drop", "Low quality with low-confidence sample gives no reliable upside."
+    return "Refine", "Playable foundation exists, but trend or context gaps need tactical refinement."
+
+
+def build_tactic_description(row: pd.Series) -> str:
+    status = str(row.get("status", ""))
+    rounds = int(float(row.get("rounds", 0)))
+    weighted_delta = float(row.get("weighted_delta_vs_baseline", 0.0))
+    recent_delta = float(row.get("recent_delta", 0.0))
+    high_tier_share = float(row.get("high_tier_round_share", 0.0))
+    context_confidence = float(row.get("context_confidence", 0.0))
+    depth_signal = float(row.get("depth_signal", 0.0))
+    stomp_inflation = float(row.get("stomp_inflation", 0.0))
+    observed_tiers = observed_tiers_from_row(row)
+    evidence_label = tier_evidence_label(observed_tiers)
+    has_sa_sample = any(t in {"S", "A"} for t in observed_tiers)
+    b_only = observed_tiers == ["B"]
+
+    if status == "Strong Keep":
+        if observed_tiers and not has_sa_sample:
+            if b_only:
+                return "Very strong B-tier return with stable support and clear baseline edge."
+            return f"Very strong {evidence_label} with stable support and clear baseline edge."
+        if high_tier_share >= 0.6 and weighted_delta >= 4:
+            return "High win rate versus strong tiers with stable support and clear baseline edge."
+        return "Strong weighted return in competitive, deeper-match contexts with stable trend."
+    if status == "Keep":
+        if b_only:
+            return "Positive B-tier evidence with weighted return above map-side baseline."
+        if observed_tiers and not has_sa_sample:
+            return f"Positive {evidence_label}, above baseline so far, but no S/A sample yet."
+        return f"Reliable {evidence_label} and positive weighted return over local baseline."
+    if status == "Refine":
+        if recent_delta <= -4:
+            return "Long-run value is workable, but recent trend softened and needs tuning."
+        if stomp_inflation >= 10:
+            return "Good raw return, but evidence is inflated by low-depth stomp matches."
+        return "Some value is present, but context and execution consistency need refinement."
+    if status == "Test More":
+        if rounds <= 6:
+            return "Promising early return, but sample size is still too thin for trust."
+        if observed_tiers and not has_sa_sample:
+            return f"Encouraging {evidence_label}, but higher-tier reps are still missing."
+        return "Above baseline in spots, but evidence depth is not yet strong enough."
+    if status == "Risky":
+        if stomp_inflation >= 10:
+            return "Much of the upside comes from easier, shallow matches, so risk is elevated."
+        if context_confidence < 0.35:
+            return "Results are context-sensitive with weak deeper-match support."
+        return "Swingy output and unstable context profile make this a situational risk."
+    if status == "Drop":
+        if weighted_delta <= -8 and recent_delta <= -3:
+            return "Weak recent trend with below-baseline weighted return suggests dropping."
+        return "Higher-tier weighted evidence remains below baseline with little upside."
+    if depth_signal >= 0.6:
+        return "Decent in deeper tactical games, but not yet reliable enough to anchor the set."
+    return "Mixed profile with limited stronger-tier certainty; use selectively."

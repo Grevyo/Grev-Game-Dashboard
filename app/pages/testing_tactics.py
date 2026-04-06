@@ -16,31 +16,25 @@ from app.config import TIER_COLORS
 from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.page_layout import is_mobile_view
 from app.tactics import (
+    TACTIC_STATUS_ORDER,
     TIER_ORDER,
     attach_normalized_tier,
+    build_tactic_description,
+    classify_tactic_status,
     evaluate_tactics,
     normalize_tier_values,
     observed_tiers_from_row,
     tactic_category,
     tier_evidence_label,
 )
-TEST_STATUS_ORDER = [
-    "Promising",
-    "Keep Trialing",
-    "Test More",
-    "Too Early To Judge",
-    "Early Warning",
-    "Weak Start",
-    "Candidate Drop",
-]
+TEST_STATUS_ORDER = TACTIC_STATUS_ORDER
 TEST_STATUS_CLASS = {
-    "Promising": "good",
-    "Keep Trialing": "good",
+    "Strong Keep": "good",
+    "Keep": "good",
+    "Refine": "mid",
     "Test More": "mid",
-    "Too Early To Judge": "mid",
-    "Early Warning": "poor",
-    "Weak Start": "poor",
-    "Candidate Drop": "bad",
+    "Risky": "poor",
+    "Drop": "bad",
 }
 
 
@@ -99,43 +93,9 @@ def _inject_page_css() -> None:
 
 
 def _status_logic(row: pd.Series) -> tuple[str, str, str]:
-    rounds = float(row["rounds"])
-    wr = float(row.get("recent_wr", row.get("win_rate", 0)))
-    weighted_delta = float(row.get("weighted_delta_vs_baseline", 0))
-    quality = float(row.get("quality_score", 0))
-    confidence = float(row.get("confidence_score", 0))
-    context = float(row.get("context_score", 0))
-    tier_focus = float(row["high_tier_round_share"])
-    c_inflation = float(row["c_tier_inflation"])
-    observed_tiers = observed_tiers_from_row(row)
-    evidence_label = tier_evidence_label(observed_tiers)
-    has_sa_sample = any(tier in {"S", "A"} for tier in observed_tiers)
-
-    if rounds <= 3:
-        return "Too Early To Judge", "No", "Sample is tiny; one result swing can invert this read."
-    if rounds <= 5 and quality >= 64 and weighted_delta >= 5 and wr >= 56:
-        if not has_sa_sample and observed_tiers:
-            return "Keep Trialing", "Yes", f"Early signal is strong on {evidence_label}, but no S/A sample yet."
-        return "Keep Trialing", "Yes", f"Early signal is strong on weighted {evidence_label}; schedule controlled reps."
-    if rounds <= 5 and weighted_delta <= -10:
-        return "Early Warning", "No", "Early weighted return is materially below baseline; revise before more exposure."
-    if quality >= 72 and confidence >= 48 and context >= 42 and weighted_delta >= 4:
-        return "Promising", "Yes", "Strong early quality with credible context and above-baseline weighted return."
-    if quality >= 56 and wr >= 52:
-        return "Test More", "Yes", "Above weighted baseline so far; add reps to separate signal from noise."
-    if quality <= 30 and weighted_delta <= -8 and rounds >= 8:
-        if not has_sa_sample and observed_tiers:
-            return "Candidate Drop", "No", f"Weak start has persisted on weighted {evidence_label}; de-prioritize."
-        return "Candidate Drop", "No", "Weak start has persisted on weighted high-tier evidence; de-prioritize."
-    if weighted_delta <= -6 or context < 28:
-        return "Weak Start", "No", "Under baseline versus stronger tiers in early testing; refine setup before scaling."
-    if tier_focus >= 0.55 and weighted_delta >= 0:
-        if not has_sa_sample and observed_tiers:
-            return "Keep Trialing", "Yes", f"Holding at/above baseline with substantial {evidence_label} exposure."
-        return "Keep Trialing", "Yes", f"Holding at/above baseline despite substantial {evidence_label} weighted exposure."
-    if c_inflation > 8 or confidence < 35:
-        return "Too Early To Judge", "Yes", "Most upside is C-tier inflated; need stronger-tier reps before confidence rises."
-    return "Too Early To Judge", "Yes", "Mixed low-sample profile; continue selective trials for clarity."
+    status, _ = classify_tactic_status(row)
+    keep_testing = "Yes" if status in {"Strong Keep", "Keep", "Refine", "Test More"} else "No"
+    return status, keep_testing, build_tactic_description(pd.Series({**row.to_dict(), "status": status}))
 
 
 def _tier_box(tier: str, value: float | None) -> str:
@@ -266,9 +226,9 @@ def render(ctx):
 
     m1, m2, m3, m4, m5 = st.columns(5, gap="small")
     m1.markdown(f"<div class='panel panel-tight accent-good'><div class='metric-title'>Testing Tactics</div><div class='metric-value'>{len(tactical)}</div><div class='muted'>low-sample + recent</div></div>", unsafe_allow_html=True)
-    m2.markdown(f"<div class='panel panel-tight accent-mid'><div class='metric-title'>Promising / Keep</div><div class='metric-value'>{int(tactical['status'].isin(['Promising','Keep Trialing']).sum())}</div><div class='muted'>continue development</div></div>", unsafe_allow_html=True)
-    m3.markdown(f"<div class='panel panel-tight accent-poor'><div class='metric-title'>Too Early</div><div class='metric-value'>{int((tactical['status'] == 'Too Early To Judge').sum())}</div><div class='muted'>sample still thin</div></div>", unsafe_allow_html=True)
-    m4.markdown(f"<div class='panel panel-tight accent-bad'><div class='metric-title'>Weak / Drop</div><div class='metric-value'>{int(tactical['status'].isin(['Weak Start','Candidate Drop']).sum())}</div><div class='muted'>refine or remove</div></div>", unsafe_allow_html=True)
+    m2.markdown(f"<div class='panel panel-tight accent-mid'><div class='metric-title'>Keep Zone</div><div class='metric-value'>{int(tactical['status'].isin(['Strong Keep','Keep']).sum())}</div><div class='muted'>stable or near-stable options</div></div>", unsafe_allow_html=True)
+    m3.markdown(f"<div class='panel panel-tight accent-poor'><div class='metric-title'>Refine / Test</div><div class='metric-value'>{int(tactical['status'].isin(['Refine','Test More']).sum())}</div><div class='muted'>needs tuning or more reps</div></div>", unsafe_allow_html=True)
+    m4.markdown(f"<div class='panel panel-tight accent-bad'><div class='metric-title'>Risk / Drop</div><div class='metric-value'>{int(tactical['status'].isin(['Risky','Drop']).sum())}</div><div class='muted'>high downside profiles</div></div>", unsafe_allow_html=True)
     m5.markdown(f"<div class='panel panel-tight accent-mid'><div class='metric-title'>Window Rounds</div><div class='metric-value'>{int(tactical['rounds'].sum())}</div><div class='muted'>tracked recent rounds</div></div>", unsafe_allow_html=True)
 
     if PLOTLY_AVAILABLE:
