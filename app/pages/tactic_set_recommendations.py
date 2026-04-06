@@ -16,14 +16,12 @@ except ModuleNotFoundError:
 from app.page_layout import is_mobile_view
 from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.tactics import (
-    TACTICAL_TIER_WEIGHTS,
     TIER_ORDER,
     attach_normalized_tier,
+    evaluate_tactics,
     observed_tiers_from_row,
     tactic_category,
     tier_evidence_label,
-    weighted_tactical_win_rate,
-    weighted_tier_round_share,
 )
 
 EXCLUDE_FOR_NOW_STATUS = "Exclude For Now"
@@ -312,116 +310,50 @@ def _status_logic(row: pd.Series) -> tuple[str, str]:
     weighted_delta = float(row["weighted_delta_vs_baseline"])
     rounds = float(row["rounds"])
     recent_delta = float(row["recent_delta"])
-    confidence = float(row["confidence"])
-    s_delta = float(row["s_tier_delta"])
+    confidence = float(row.get("confidence_score", row.get("confidence", 0)))
+    quality = float(row.get("quality_score", 0))
+    set_value = float(row.get("set_inclusion_score", 0))
     high_tier_share = float(row["high_tier_round_share"])
     weak_tier_inflation = float(row["c_tier_inflation"])
     observed_tiers = observed_tiers_from_row(row)
     evidence_label = tier_evidence_label(observed_tiers)
     has_sa_sample = any(tier in {"S", "A"} for tier in observed_tiers)
 
-    if rounds >= 15 and weighted_delta >= 8 and confidence >= 78 and recent_delta >= -1 and s_delta >= 3:
-        return "Locked In", "Strong S-tier return and high-tier weighted edge make this a reliable map+side lock."
-    if rounds >= 10 and weighted_delta >= 4 and confidence >= 66 and s_delta >= 0:
+    if rounds >= 15 and quality >= 75 and confidence >= 70 and set_value >= 72 and weighted_delta >= 5 and recent_delta >= -2:
+        return "Locked In", "High quality, strong trust, and high set-inclusion value justify lock status."
+    if rounds >= 10 and quality >= 62 and confidence >= 58 and set_value >= 60 and weighted_delta >= 1:
         if not has_sa_sample and observed_tiers:
             return "Strong Pick", f"Credible edge on weighted {evidence_label}, but no S/A sample yet."
         return "Strong Pick", f"Credible edge on weighted {evidence_label} supports active set inclusion."
-    if rounds >= 8 and weighted_delta >= 1 and confidence >= 56:
+    if rounds >= 8 and quality >= 54 and confidence >= 50 and set_value >= 50:
         if not has_sa_sample and observed_tiers:
             return "Viable", f"Playable option supported by {evidence_label}, though higher-tier sample is limited."
         return "Viable", f"Playable option with meaningful {evidence_label} for this map+side context."
-    if rounds < 8 and weighted_delta >= 2:
+    if rounds < 8 and quality >= 48:
         return "Test More", "Promising weighted signal but under-tested; schedule controlled reps before core inclusion."
     if rounds >= 8 and weighted_delta >= -1.5 and recent_delta < -5:
         return "Situational", "Historically useful, but recent form cooled and needs scenario-specific usage."
-    if weak_tier_inflation > 5 and (s_delta < -2 or high_tier_share < 0.45):
+    if weak_tier_inflation > 5 and (weighted_delta < 0 or high_tier_share < 0.45):
         return "Backup", "Mostly inflated by lower-tier results; reserve until stronger-tier proof improves."
     return EXCLUDE_FOR_NOW_STATUS, "Weighted profile is below baseline or lacks stronger-tier trust for default call sheets."
 
 
 def _build_views(base: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     group_cols = ["map", "side", "tactic_name", "category", "tactic_type", "role", "core_bucket"]
-
-    tactical = (
-        base.groupby(group_cols, dropna=False)
-        .agg(
-            wins=("wins", "sum"),
-            losses=("losses", "sum"),
-            rounds=("total_rounds", "sum"),
-            last_used=("match_ts", "max"),
-        )
-        .reset_index()
-    )
-    tactical["win_rate"] = (tactical["wins"] / (tactical["wins"] + tactical["losses"]).clip(lower=1) * 100).fillna(0)
-
-    recent_cut = base["match_ts"].max() - pd.Timedelta(days=21)
-    recent = (
-        base[base["match_ts"] >= recent_cut]
-        .groupby(group_cols, dropna=False)
-        .agg(rwins=("wins", "sum"), rlosses=("losses", "sum"))
-        .reset_index()
-    )
-    recent["recent_wr"] = (recent["rwins"] / (recent["rwins"] + recent["rlosses"]).clip(lower=1) * 100).fillna(0)
-
-    tier = (
-        base.groupby(group_cols + ["tier"], dropna=False)
-        .agg(twins=("wins", "sum"), tlosses=("losses", "sum"))
-        .reset_index()
-    )
-    tier["tier_wr"] = (tier["twins"] / (tier["twins"] + tier["tlosses"]).clip(lower=1) * 100).fillna(0)
-    tier_pivot = tier.pivot_table(index=group_cols, columns="tier", values="tier_wr", aggfunc="mean").reset_index()
-    tier_wins = tier.pivot_table(index=group_cols, columns="tier", values="twins", aggfunc="sum", fill_value=0).reset_index()
-    tier_losses = tier.pivot_table(index=group_cols, columns="tier", values="tlosses", aggfunc="sum", fill_value=0).reset_index()
-    for t in TIER_ORDER:
-        if t not in tier_pivot.columns:
-            tier_pivot[t] = np.nan
-        if t not in tier_wins.columns:
-            tier_wins[t] = 0.0
-        if t not in tier_losses.columns:
-            tier_losses[t] = 0.0
-    tier_wins = tier_wins.rename(columns={t: f"{t}_wins" for t in TIER_ORDER})
-    tier_losses = tier_losses.rename(columns={t: f"{t}_losses" for t in TIER_ORDER})
-
-    tactical = tactical.merge(recent[group_cols + ["recent_wr"]], on=group_cols, how="left").merge(
-        tier_pivot[group_cols + TIER_ORDER], on=group_cols, how="left"
-    )
-    tactical = tactical.merge(tier_wins[group_cols + [f"{t}_wins" for t in TIER_ORDER]], on=group_cols, how="left")
-    tactical = tactical.merge(tier_losses[group_cols + [f"{t}_losses" for t in TIER_ORDER]], on=group_cols, how="left")
-    tactical["weighted_wr"] = weighted_tactical_win_rate(tactical, fallback_wr_col="win_rate")
-
-    baseline = (
-        base.groupby(["map", "side"], dropna=False)
-        .agg(base_wins=("wins", "sum"), base_losses=("losses", "sum"), base_rounds=("total_rounds", "sum"))
-        .reset_index()
-    )
-    baseline["baseline_wr"] = (baseline["base_wins"] / (baseline["base_wins"] + baseline["base_losses"]).clip(lower=1) * 100).fillna(0)
-
-    tactical = tactical.merge(baseline[["map", "side", "baseline_wr", "base_rounds"]], on=["map", "side"], how="left")
-    tactical["recent_wr"] = tactical["recent_wr"].fillna(tactical["win_rate"])
-    tactical["recent_delta"] = tactical["recent_wr"] - tactical["win_rate"]
-    tactical["delta_vs_baseline"] = tactical["win_rate"] - tactical["baseline_wr"]
-    tactical["weighted_delta_vs_baseline"] = tactical["weighted_wr"] - tactical["baseline_wr"]
-    tactical["s_tier_delta"] = tactical["S"].fillna(tactical["win_rate"]) - tactical["baseline_wr"]
-    tactical["c_tier_inflation"] = (tactical["C"].fillna(tactical["win_rate"]) - tactical["weighted_wr"]).clip(lower=0)
-    tactical["high_tier_round_share"] = weighted_tier_round_share(tactical, tiers=("S", "A", "B"))
-    tactical["sample_strength"] = np.clip(np.sqrt(tactical["rounds"].clip(lower=1)) * 20, 15, 100)
-    tactical["confidence"] = (
-        tactical["sample_strength"] * 0.55
-        + np.clip(tactical["weighted_delta_vs_baseline"] + 12, 0, 28) * 1.45
-        + np.clip(tactical["weighted_wr"] - 45, 0, 35) * 0.7 + np.clip(tactical["s_tier_delta"] + 8, 0, 24) * 0.4
-    ).clip(20, 99)
+    tactical, baseline = evaluate_tactics(base, group_cols=group_cols, recent_days=21)
+    tactical["confidence"] = tactical["confidence_score"]
     tactical["trust_label"] = np.where(
         tactical["confidence"] >= 78,
         "Trusted",
         np.where(tactical["confidence"] >= 62, "Playable", "Fragile"),
     )
-    tactical["last_used_label"] = tactical["last_used"].dt.strftime("%Y-%m-%d").fillna("N/A")
     tactical["status"], tactical["status_note"] = zip(*tactical.apply(_status_logic, axis=1))
     tactical["recommendation_score"] = (
-        tactical["weighted_delta_vs_baseline"] * 3.5
-        + tactical["weighted_wr"] * 0.72
-        + tactical["confidence"] * 0.45
-        + tactical["rounds"].clip(upper=20) * 0.85
+        tactical["set_inclusion_score"] * 1.8
+        + tactical["quality_score"] * 1.1
+        + tactical["confidence_score"] * 0.75
+        + tactical["coverage_value"] * 0.8
+        + tactical["weighted_delta_vs_baseline"] * 2.2
     )
     return tactical, baseline
 

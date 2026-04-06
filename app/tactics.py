@@ -1,5 +1,6 @@
 import re
 
+import numpy as np
 import pandas as pd
 
 from app.descriptions import tactic_reason
@@ -60,7 +61,6 @@ def best_tier_column(df: pd.DataFrame) -> str | None:
         for col in matching:
             col_data = df[col]
             if isinstance(col_data, pd.DataFrame):
-                # Duplicate column names can produce a DataFrame; use the most populated slice.
                 for _, dup_series in col_data.items():
                     norm = normalize_tier_values(dup_series)
                     score = (int(norm.notna().sum()), int(dup_series.astype(str).str.strip().ne("").sum()))
@@ -175,7 +175,6 @@ def recommend_set(summary: pd.DataFrame, map_name: str, side: str) -> pd.DataFra
     return out.sort_values("score", ascending=False)
 
 
-# Tactical recommendation weighting: S-tier should dominate, A/B should be close, C should barely count.
 TACTICAL_TIER_WEIGHTS = {"S": 5.4, "A": 2.2, "B": 2.0, "C": 0.2}
 
 
@@ -186,11 +185,6 @@ def weighted_tactical_win_rate(
     losses_suffix: str = "_losses",
     fallback_wr_col: str = "win_rate",
 ) -> pd.Series:
-    """Round-weighted tier win rate for tactical recommendation systems.
-
-    Uses weighted wins / weighted rounds by tier so S-tier round outcomes have
-    substantially more decision impact than lower tiers.
-    """
     if frame.empty:
         return pd.Series(dtype=float, index=frame.index)
 
@@ -223,6 +217,157 @@ def weighted_tier_round_share(frame: pd.DataFrame, tiers: tuple[str, ...] = ("S"
         if tier in tiers:
             weighted_focus = weighted_focus + term
     return (weighted_focus / weighted_all.clip(lower=1e-9)).fillna(0.0)
+
+
+def build_match_context(frame: pd.DataFrame) -> pd.DataFrame:
+    context_cols = ["match_id", "map", "side"]
+    grouped = (
+        frame.groupby(context_cols, dropna=False)
+        .agg(
+            side_wins=("wins", "sum"),
+            side_losses=("losses", "sum"),
+            side_rounds=("total_rounds", "sum"),
+            distinct_tactics=("tactic_name", pd.Series.nunique),
+        )
+        .reset_index()
+    )
+    side_rounds = grouped["side_rounds"].clip(lower=1.0)
+    round_margin = (grouped["side_wins"] - grouped["side_losses"]).abs()
+    grouped["competitiveness"] = (1.0 - (round_margin / side_rounds)).clip(lower=0.0, upper=1.0)
+    grouped["depth_score"] = ((grouped["distinct_tactics"] - 2.0) / 5.0).clip(lower=0.0, upper=1.0)
+    grouped["context_signal"] = (grouped["competitiveness"] * 0.6 + grouped["depth_score"] * 0.4).clip(0.0, 1.0)
+    grouped["stomp_penalty"] = ((0.55 - grouped["competitiveness"]).clip(lower=0.0) * 100.0).clip(upper=25.0)
+    return grouped
+
+
+def evaluate_tactics(base: pd.DataFrame, group_cols: list[str], *, recent_days: int = 14) -> tuple[pd.DataFrame, pd.DataFrame]:
+    tactical = (
+        base.groupby(group_cols, dropna=False)
+        .agg(
+            wins=("wins", "sum"),
+            losses=("losses", "sum"),
+            rounds=("total_rounds", "sum"),
+            last_used=("match_ts", "max"),
+            first_used=("match_ts", "min"),
+            match_count=("match_id", pd.Series.nunique),
+        )
+        .reset_index()
+    )
+    tactical["win_rate"] = (tactical["wins"] / (tactical["wins"] + tactical["losses"]).clip(lower=1) * 100).fillna(0)
+
+    recent_cut = base["match_ts"].max() - pd.Timedelta(days=recent_days)
+    recent = (
+        base[base["match_ts"] >= recent_cut]
+        .groupby(group_cols, dropna=False)
+        .agg(rwins=("wins", "sum"), rlosses=("losses", "sum"), rrounds=("total_rounds", "sum"), recent_matches=("match_id", pd.Series.nunique))
+        .reset_index()
+    )
+    recent["recent_wr"] = (recent["rwins"] / (recent["rwins"] + recent["rlosses"]).clip(lower=1) * 100).fillna(0)
+
+    tier_view = (
+        base.groupby(group_cols + ["tier"], dropna=False)
+        .agg(twins=("wins", "sum"), tlosses=("losses", "sum"), trounds=("total_rounds", "sum"))
+        .reset_index()
+    )
+    tier_view["tier_wr"] = (tier_view["twins"] / (tier_view["twins"] + tier_view["tlosses"]).clip(lower=1) * 100).fillna(0)
+    tier_pivot = tier_view.pivot_table(index=group_cols, columns="tier", values="tier_wr", aggfunc="mean").reset_index()
+    tier_wins = tier_view.pivot_table(index=group_cols, columns="tier", values="twins", aggfunc="sum", fill_value=0).reset_index()
+    tier_losses = tier_view.pivot_table(index=group_cols, columns="tier", values="tlosses", aggfunc="sum", fill_value=0).reset_index()
+    for t in TIER_ORDER:
+        if t not in tier_pivot.columns:
+            tier_pivot[t] = np.nan
+        if t not in tier_wins.columns:
+            tier_wins[t] = 0.0
+        if t not in tier_losses.columns:
+            tier_losses[t] = 0.0
+    tier_wins = tier_wins.rename(columns={t: f"{t}_wins" for t in TIER_ORDER})
+    tier_losses = tier_losses.rename(columns={t: f"{t}_losses" for t in TIER_ORDER})
+
+    context = build_match_context(base)
+    contextual_base = base.merge(
+        context[["match_id", "map", "side", "competitiveness", "depth_score", "context_signal", "stomp_penalty", "distinct_tactics"]],
+        on=["match_id", "map", "side"],
+        how="left",
+    )
+    context_by_tactic = (
+        contextual_base.groupby(group_cols, dropna=False)
+        .agg(
+            depth_signal=("depth_score", "mean"),
+            competitiveness_signal=("competitiveness", "mean"),
+            context_confidence=("context_signal", "mean"),
+            stomp_inflation=("stomp_penalty", "mean"),
+            avg_distinct_tactics=("distinct_tactics", "mean"),
+        )
+        .reset_index()
+    )
+
+    tactical = tactical.merge(recent, on=group_cols, how="left")
+    tactical = tactical.merge(tier_pivot[group_cols + TIER_ORDER], on=group_cols, how="left")
+    tactical = tactical.merge(tier_wins[group_cols + [f"{t}_wins" for t in TIER_ORDER]], on=group_cols, how="left")
+    tactical = tactical.merge(tier_losses[group_cols + [f"{t}_losses" for t in TIER_ORDER]], on=group_cols, how="left")
+    tactical = tactical.merge(context_by_tactic, on=group_cols, how="left")
+
+    baseline = (
+        base.groupby(["map", "side"], dropna=False)
+        .agg(base_wins=("wins", "sum"), base_losses=("losses", "sum"), base_rounds=("total_rounds", "sum"))
+        .reset_index()
+    )
+    baseline["baseline_wr"] = (baseline["base_wins"] / (baseline["base_wins"] + baseline["base_losses"]).clip(lower=1) * 100).fillna(0)
+
+    tactical = tactical.merge(baseline[["map", "side", "baseline_wr", "base_rounds"]], on=["map", "side"], how="left")
+    tactical["recent_wr"] = tactical["recent_wr"].fillna(tactical["win_rate"])
+    tactical["recent_delta"] = tactical["recent_wr"] - tactical["win_rate"]
+    tactical["weighted_wr"] = weighted_tactical_win_rate(tactical, fallback_wr_col="win_rate")
+    tactical["weighted_delta_vs_baseline"] = tactical["weighted_wr"] - tactical["baseline_wr"]
+    tactical["delta_vs_baseline"] = tactical["win_rate"] - tactical["baseline_wr"]
+    tactical["s_tier_delta"] = tactical["S"].fillna(tactical["weighted_wr"]) - tactical["baseline_wr"]
+    tactical["high_tier_round_share"] = weighted_tier_round_share(tactical, tiers=("S", "A", "B"))
+    tactical["c_tier_inflation"] = (tactical["C"].fillna(tactical["weighted_wr"]) - tactical["weighted_wr"]).clip(lower=0)
+    tactical["volatility"] = tactical["recent_delta"].abs()
+
+    rounds_norm = np.clip(np.sqrt(tactical["rounds"].fillna(0).clip(lower=0)) / np.sqrt(35), 0, 1)
+    match_norm = np.clip(np.sqrt(tactical["match_count"].fillna(0).clip(lower=0)) / np.sqrt(8), 0, 1)
+    recency_days = (base["match_ts"].max() - tactical["last_used"]).dt.days.fillna(999)
+    recency_norm = np.clip(1.0 - (recency_days / 35.0), 0, 1)
+    repeatability = np.clip((tactical["match_count"].fillna(0) / tactical["rounds"].clip(lower=1)) * 8.0, 0, 1)
+    stability = np.clip(1.0 - tactical["volatility"].abs() / 18.0, 0, 1)
+
+    tactical["context_score"] = (
+        tactical["context_confidence"].fillna(0.0).clip(0, 1) * 100
+        + tactical["depth_signal"].fillna(0.0).clip(0, 1) * 20
+        - tactical["stomp_inflation"].fillna(0.0).clip(0, 25) * 1.2
+    ).clip(0, 100)
+    tactical["quality_score"] = (
+        np.clip(tactical["weighted_delta_vs_baseline"] + 16, 0, 36) * 1.8
+        + np.clip(tactical["s_tier_delta"] + 12, 0, 30) * 1.5
+        + np.clip(tactical["recent_delta"] + 8, 0, 20) * 1.15
+        + tactical["high_tier_round_share"].fillna(0) * 22
+        - tactical["c_tier_inflation"].fillna(0).clip(0, 18) * 1.25
+    ).clip(0, 100)
+    tactical["confidence_score"] = (
+        rounds_norm * 38
+        + match_norm * 20
+        + recency_norm * 12
+        + repeatability * 14
+        + stability * 16
+        + tactical["context_score"] * 0.12
+    ).clip(0, 100)
+
+    tactical["coverage_value"] = (
+        tactical["high_tier_round_share"].fillna(0) * 35
+        + np.clip(tactical["rounds"].fillna(0), 0, 16) * 1.8
+        + np.clip(tactical["context_score"] - 50, 0, 50) * 0.38
+    ).clip(0, 100)
+    tactical["set_inclusion_score"] = (
+        tactical["quality_score"] * 0.36
+        + tactical["confidence_score"] * 0.24
+        + tactical["context_score"] * 0.18
+        + tactical["coverage_value"] * 0.22
+    ).clip(0, 100)
+
+    tactical["days_since_used"] = recency_days
+    tactical["last_used_label"] = tactical["last_used"].dt.strftime("%Y-%m-%d").fillna("N/A")
+    return tactical, baseline
 
 
 def observed_tiers_from_row(
