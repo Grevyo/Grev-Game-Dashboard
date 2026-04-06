@@ -3,6 +3,8 @@ import pandas as pd
 import streamlit as st
 import re
 
+import app.tactics as shared_tactics
+
 try:
     import plotly.express as px
     import plotly.graph_objects as go
@@ -17,15 +19,11 @@ from app.page_layout import is_mobile_view
 from app.datetime_utils import build_match_timestamp, normalize_time_series
 from app.tactics import (
     TACTIC_STATUS_ORDER,
-    TACTICAL_TIER_WEIGHTS,
-    TIER_ORDER,
     attach_normalized_tier,
     build_tactic_description,
     classify_tactic_status,
     evaluate_tactics,
-    observed_tiers_from_row,
     tactic_category,
-    tier_evidence_label,
 )
 EXCLUDE_FOR_NOW_STATUS = "Drop"
 
@@ -482,6 +480,20 @@ def _inject_page_css() -> None:
     )
 
 
+def _shared_tier_weight_text() -> str:
+    weights = getattr(shared_tactics, "TACTICAL_TIER_WEIGHTS", None)
+    if not isinstance(weights, dict):
+        return "Shared tactical model tier weighting is active for recommendations."
+    return (
+        "Tier weighting model for recommendations: "
+        f"S {float(weights.get('S', 0.0)):.1f} • "
+        f"A {float(weights.get('A', 0.0)):.1f} • "
+        f"B {float(weights.get('B', 0.0)):.1f} • "
+        f"C {float(weights.get('C', 0.0)):.1f} "
+        "(S >> A≈B > C)."
+    )
+
+
 def render(ctx):
     tdf = ctx["tactics"].copy()
     mobile_view = is_mobile_view()
@@ -621,7 +633,7 @@ def render(ctx):
     season = global_filters.get("season") or ["All Seasons"]
     newest = scoped["match_ts"].max().strftime("%Y-%m-%d")
     st.markdown(
-        f"<div class='muted' style='margin:4px 0 8px 0;'>Tier weighting model for recommendations: S {TACTICAL_TIER_WEIGHTS['S']:.1f} • A {TACTICAL_TIER_WEIGHTS['A']:.1f} • B {TACTICAL_TIER_WEIGHTS['B']:.1f} • C {TACTICAL_TIER_WEIGHTS['C']:.1f} (S >> A≈B > C).</div>",
+        f"<div class='muted' style='margin:4px 0 8px 0;'>{_shared_tier_weight_text()}</div>",
         unsafe_allow_html=True,
     )
 
@@ -696,7 +708,6 @@ def render(ctx):
     st.markdown("</div>", unsafe_allow_html=True)
 
     map_optional_buckets = MAP_OPTIONAL_BUCKETS.get(_canonical_map_name(map_name), [])
-    core_counts = rec_set.groupby("core_bucket")["tactic_name"].count().to_dict()
 
     optional_count_map: dict[str, int] = {}
     for optional in map_optional_buckets:
