@@ -224,22 +224,22 @@ def inject_styles(theme_name: str = "Dark"):
       margin-bottom:.3rem;
     }}
     div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stHorizontalBlock"] {{
-      gap:.38rem;
+      gap:.32rem;
     }}
     div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stButton"] > button {{
-      min-height: 2.15rem;
-      padding: .34rem .62rem;
+      min-height: 2.05rem;
+      padding: .3rem .52rem;
       border-radius: 10px;
       border:1px solid #34485d;
       background: linear-gradient(180deg, #132131 0%, #0f1a28 100%);
       color:#dce7f3;
-      font-size:.64rem;
+      font-size:.62rem;
       font-weight:700;
-      letter-spacing:.055em;
+      letter-spacing:.045em;
       text-transform:none;
       line-height:1.15;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 6px 14px rgba(0,0,0,.22);
-      transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+      transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease, box-shadow .18s ease;
     }}
     div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stButton"] > button:hover {{
       border-color:#6f8dab;
@@ -247,10 +247,20 @@ def inject_styles(theme_name: str = "Dark"):
       transform: translateY(-1px);
     }}
     div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stBaseButton-primary"] > button {{
-      border-color: color-mix(in srgb, var(--accent) 58%, #4e6073 42%);
-      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 20%, #152130 80%) 0%, #101a27 100%);
-      color:#f7fff6;
-      box-shadow: inset 0 0 0 1px rgba(159,232,112,.16), 0 8px 18px rgba(0,0,0,.26);
+      border-color: color-mix(in srgb, var(--accent) 76%, #5d7388 24%);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--accent) 34%, #172535 66%) 0%,
+        color-mix(in srgb, var(--accent) 18%, #101b29 82%) 100%
+      );
+      color:#fbfffb;
+      text-shadow: 0 1px 0 rgba(0,0,0,.25);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--accent) 48%, rgba(255,255,255,.14) 52%),
+        0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent 76%),
+        0 8px 20px rgba(0,0,0,.3),
+        0 0 14px color-mix(in srgb, var(--accent) 26%, transparent 74%);
+      transform: translateY(-1px);
     }}
     div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stBaseButton-secondary"] > button {{
       opacity:.96;
