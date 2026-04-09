@@ -29,7 +29,7 @@ PAGE_REGISTRY = [
     ("Recent Tactics Breakdown", recent_tactics_breakdown.render),
     ("Tactics Overview", tactics_overview.render),
     ("Testing Tactics", testing_tactics.render),
-    ("Tactical Set Recommendations", tactic_set_recommendations.render),
+    ("Tactical Set Recommendation", tactic_set_recommendations.render),
 ]
 
 PAGES = dict(PAGE_REGISTRY)
@@ -42,31 +42,25 @@ def _render_page_navigation() -> str:
         current = options[0]
         st.session_state["page_nav"] = current
 
-    if hasattr(st, "pills"):
-        return st.pills(
-            "Page",
-            options,
-            selection_mode="single",
-            default=current,
-            label_visibility="collapsed",
-            key="page_nav",
-        )
-    if hasattr(st, "segmented_control"):
-        return st.segmented_control(
-            "Page",
-            options,
-            default=current,
-            selection_mode="single",
-            label_visibility="collapsed",
-            key="page_nav",
-        )
-    return st.radio(
-        "Page",
-        options,
-        horizontal=True,
-        label_visibility="collapsed",
-        key="page_nav",
-    )
+    st.markdown("#### Page Navigation")
+    selected = current
+    columns_per_row = 3
+
+    for start in range(0, len(options), columns_per_row):
+        cols = st.columns(columns_per_row, gap="small")
+        row_options = options[start : start + columns_per_row]
+        for col_idx, option in enumerate(row_options):
+            with cols[col_idx]:
+                if st.button(
+                    option,
+                    key=f"page_nav_btn_{start + col_idx}",
+                    type="primary" if option == selected else "secondary",
+                    use_container_width=True,
+                ):
+                    selected = option
+
+    st.session_state["page_nav"] = selected
+    return selected
 
 
 def run_app():
