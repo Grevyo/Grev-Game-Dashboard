@@ -149,7 +149,7 @@ def inject_styles(theme_name: str = "Dark"):
     div[data-testid="stPills"] > div,
     div[data-testid="stRadio"][role="radiogroup"] > div {{
       display:flex;
-      flex-wrap:nowrap;
+      flex-wrap:wrap;
       gap:6px;
     }}
     div[data-testid="stPills"] label[data-baseweb="checkbox"] > div:first-child,
