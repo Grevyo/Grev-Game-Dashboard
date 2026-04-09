@@ -33,6 +33,13 @@ PAGE_REGISTRY = [
 ]
 
 PAGES = dict(PAGE_REGISTRY)
+TACTICAL_PAGE_NAMES = [
+    "Tactics Breakdown",
+    "Recent Tactics Breakdown",
+    "Tactics Overview",
+    "Testing Tactics",
+    "Tactical Set Recommendations",
+]
 
 
 def _render_page_navigation() -> str:
@@ -77,6 +84,17 @@ def run_app():
         if st.button("Reload Data", use_container_width=True, help="Clear cached data and reload files from data/."):
             st.cache_data.clear()
             st.rerun()
+
+        st.markdown("### Tactical Navigation")
+        for page_name in TACTICAL_PAGE_NAMES:
+            is_current = st.session_state.get("page_nav") == page_name
+            label = f"• {page_name}" if is_current else page_name
+            if st.button(label, key=f"nav_btn_{page_name}", use_container_width=True):
+                if st.session_state.get("page_nav") != page_name:
+                    st.session_state["page_nav"] = page_name
+                    st.rerun()
+
+        st.markdown("---")
         current = st.session_state.get("page_nav", options[0])
         if current not in options:
             current = options[0]
