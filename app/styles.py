@@ -203,6 +203,23 @@ def inject_styles(theme_name: str = "Dark"):
       color:#7990a8;
       letter-spacing:.03em;
     }}
+    .page-nav-group-title {{
+      margin:.22rem 0 .08rem 0;
+      font-size:.67rem;
+      text-transform:uppercase;
+      letter-spacing:.13em;
+      color:#adc0d4;
+      font-weight:760;
+    }}
+    .page-nav-group-subtitle {{
+      margin:0 0 .42rem 0;
+      font-size:.63rem;
+      color:#74889f;
+      letter-spacing:.025em;
+    }}
+    .page-nav-group-gap {{
+      height:.42rem;
+    }}
     div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) {{
       margin-bottom:.3rem;
     }}

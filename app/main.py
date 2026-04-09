@@ -33,10 +33,44 @@ PAGE_REGISTRY = [
 ]
 
 PAGES = dict(PAGE_REGISTRY)
+TEAM_PAGE_PREFERENCE = [
+    "Overview",
+    "Player Stats Viewer",
+    "Medisports vs Teams",
+    "Medisports vs Team",
+    "Medisports vs Tournaments",
+]
+
+
+def _grouped_navigation_options() -> tuple[list[str], list[str]]:
+    options = list(PAGES.keys())
+    team_group = [page_name for page_name in TEAM_PAGE_PREFERENCE if page_name in options]
+    tactics_group = [page_name for page_name in options if page_name not in team_group]
+    return team_group, tactics_group
+
+
+def _render_nav_group(title: str, subtitle: str, options: list[str], selected: str, key_prefix: str, columns_per_row: int = 4) -> str:
+    st.markdown(f"<div class='page-nav-group-title'>{title}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='page-nav-group-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
+
+    for start in range(0, len(options), columns_per_row):
+        cols = st.columns(columns_per_row, gap="small")
+        row_options = options[start : start + columns_per_row]
+        for col_idx, option in enumerate(row_options):
+            with cols[col_idx]:
+                if st.button(
+                    option,
+                    key=f"{key_prefix}_{start + col_idx}",
+                    type="primary" if option == selected else "secondary",
+                    use_container_width=True,
+                ):
+                    selected = option
+    return selected
 
 
 def _render_page_navigation() -> str:
-    options = list(PAGES.keys())
+    team_group, tactics_group = _grouped_navigation_options()
+    options = [*team_group, *tactics_group]
     current = st.session_state.get("page_nav", options[0])
     if current not in options:
         current = options[0]
@@ -44,7 +78,6 @@ def _render_page_navigation() -> str:
 
     nav_shell = st.container()
     selected = current
-    columns_per_row = 4
 
     with nav_shell:
         st.markdown("<div class='page-nav-anchor'></div>", unsafe_allow_html=True)
@@ -52,24 +85,27 @@ def _render_page_navigation() -> str:
             (
                 "<div class='page-nav-shell'>"
                 "<div class='page-nav-title'>Page Navigation</div>"
-                "<div class='page-nav-subtitle'>Choose a dashboard surface.</div>"
+                "<div class='page-nav-subtitle'>Choose a dashboard surface by Team or Tactics.</div>"
                 "</div>"
             ),
             unsafe_allow_html=True,
         )
+        selected = _render_nav_group(
+            title="Team",
+            subtitle="Core roster, overview, and matchup pages.",
+            options=team_group,
+            selected=selected,
+            key_prefix="page_nav_team_btn",
+        )
+        st.markdown("<div class='page-nav-group-gap'></div>", unsafe_allow_html=True)
+        selected = _render_nav_group(
+            title="Tactics",
+            subtitle="Tactical analysis, testing, and recommendation pages.",
+            options=tactics_group,
+            selected=selected,
+            key_prefix="page_nav_tactics_btn",
+        )
 
-        for start in range(0, len(options), columns_per_row):
-            cols = st.columns(columns_per_row, gap="small")
-            row_options = options[start : start + columns_per_row]
-            for col_idx, option in enumerate(row_options):
-                with cols[col_idx]:
-                    if st.button(
-                        option,
-                        key=f"page_nav_btn_{start + col_idx}",
-                        type="primary" if option == selected else "secondary",
-                        use_container_width=True,
-                    ):
-                        selected = option
 
     st.session_state["page_nav"] = selected
     return selected
