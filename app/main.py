@@ -19,18 +19,20 @@ from app.styles import inject_styles
 from app.transforms import with_player_metrics
 
 
-PAGES = {
-    "Overview": overview.render,
-    "Player Stats Viewer": player_viewer.render,
-    "Medisports vs Teams": vs_teams.render,
-    "Medisports vs Team": vs_team.render,
-    "Medisports vs Tournaments": vs_tournaments.render,
-    "Tactics Breakdown": tactics_breakdown.render,
-    "Recent Tactics Breakdown": recent_tactics_breakdown.render,
-    "Testing Tactics": testing_tactics.render,
-    "Tactics Overview": tactics_overview.render,
-    "Tactical Set Recommendations": tactic_set_recommendations.render,
-}
+PAGE_REGISTRY = [
+    ("Overview", overview.render),
+    ("Player Stats Viewer", player_viewer.render),
+    ("Medisports vs Teams", vs_teams.render),
+    ("Medisports vs Team", vs_team.render),
+    ("Medisports vs Tournaments", vs_tournaments.render),
+    ("Tactics Breakdown", tactics_breakdown.render),
+    ("Recent Tactics Breakdown", recent_tactics_breakdown.render),
+    ("Tactics Overview", tactics_overview.render),
+    ("Testing Tactics", testing_tactics.render),
+    ("Tactical Set Recommendations", tactic_set_recommendations.render),
+]
+
+PAGES = dict(PAGE_REGISTRY)
 
 
 def _render_page_navigation() -> str:
@@ -70,9 +72,17 @@ def _render_page_navigation() -> str:
 def run_app():
     st.set_page_config(page_title="Medisports Analytics", page_icon="🎮", layout="wide")
 
+    options = list(PAGES.keys())
     with st.sidebar:
         if st.button("Reload Data", use_container_width=True, help="Clear cached data and reload files from data/."):
             st.cache_data.clear()
+            st.rerun()
+        current = st.session_state.get("page_nav", options[0])
+        if current not in options:
+            current = options[0]
+        selected = st.selectbox("Navigate", options, index=options.index(current), help="Select a page to open.")
+        if selected != current:
+            st.session_state["page_nav"] = selected
             st.rerun()
 
     try:
