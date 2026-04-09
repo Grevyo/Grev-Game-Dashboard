@@ -42,22 +42,34 @@ def _render_page_navigation() -> str:
         current = options[0]
         st.session_state["page_nav"] = current
 
-    st.markdown("#### Page Navigation")
+    nav_shell = st.container()
     selected = current
-    columns_per_row = 3
+    columns_per_row = 4
 
-    for start in range(0, len(options), columns_per_row):
-        cols = st.columns(columns_per_row, gap="small")
-        row_options = options[start : start + columns_per_row]
-        for col_idx, option in enumerate(row_options):
-            with cols[col_idx]:
-                if st.button(
-                    option,
-                    key=f"page_nav_btn_{start + col_idx}",
-                    type="primary" if option == selected else "secondary",
-                    use_container_width=True,
-                ):
-                    selected = option
+    with nav_shell:
+        st.markdown("<div class='page-nav-anchor'></div>", unsafe_allow_html=True)
+        st.markdown(
+            (
+                "<div class='page-nav-shell'>"
+                "<div class='page-nav-title'>Page Navigation</div>"
+                "<div class='page-nav-subtitle'>Choose a dashboard surface.</div>"
+                "</div>"
+            ),
+            unsafe_allow_html=True,
+        )
+
+        for start in range(0, len(options), columns_per_row):
+            cols = st.columns(columns_per_row, gap="small")
+            row_options = options[start : start + columns_per_row]
+            for col_idx, option in enumerate(row_options):
+                with cols[col_idx]:
+                    if st.button(
+                        option,
+                        key=f"page_nav_btn_{start + col_idx}",
+                        type="primary" if option == selected else "secondary",
+                        use_container_width=True,
+                    ):
+                        selected = option
 
     st.session_state["page_nav"] = selected
     return selected

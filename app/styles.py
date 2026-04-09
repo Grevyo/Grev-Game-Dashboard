@@ -181,6 +181,64 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     .stButton>button:hover {{ border-color:#8ab56b; }}
 
+    .page-nav-shell {{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      margin: 0 0 .45rem 0;
+      gap:10px;
+      flex-wrap:wrap;
+    }}
+    .page-nav-title {{
+      margin:0;
+      font-size:.72rem;
+      text-transform:uppercase;
+      letter-spacing:.14em;
+      color:#8ea3ba;
+      font-weight:760;
+    }}
+    .page-nav-subtitle {{
+      margin-top:2px;
+      font-size:.69rem;
+      color:#7990a8;
+      letter-spacing:.03em;
+    }}
+    div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) {{
+      margin-bottom:.3rem;
+    }}
+    div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stHorizontalBlock"] {{
+      gap:.38rem;
+    }}
+    div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stButton"] > button {{
+      min-height: 2.15rem;
+      padding: .34rem .62rem;
+      border-radius: 10px;
+      border:1px solid #34485d;
+      background: linear-gradient(180deg, #132131 0%, #0f1a28 100%);
+      color:#dce7f3;
+      font-size:.64rem;
+      font-weight:700;
+      letter-spacing:.055em;
+      text-transform:none;
+      line-height:1.15;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 6px 14px rgba(0,0,0,.22);
+      transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+    }}
+    div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stButton"] > button:hover {{
+      border-color:#6f8dab;
+      color:#f4f9ff;
+      transform: translateY(-1px);
+    }}
+    div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stBaseButton-primary"] > button {{
+      border-color: color-mix(in srgb, var(--accent) 58%, #4e6073 42%);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 20%, #152130 80%) 0%, #101a27 100%);
+      color:#f7fff6;
+      box-shadow: inset 0 0 0 1px rgba(159,232,112,.16), 0 8px 18px rgba(0,0,0,.26);
+    }}
+    div[data-testid="stVerticalBlock"]:has(.page-nav-anchor) div[data-testid="stBaseButton-secondary"] > button {{
+      opacity:.96;
+    }}
+
     div[data-testid="stSelectbox"] > div, div[data-testid="stMultiSelect"] > div,
     div[data-testid="stNumberInput"] > div, div[data-testid="stTextInput"] > div,
     div[data-testid="stSlider"] {{
