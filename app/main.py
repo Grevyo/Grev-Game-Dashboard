@@ -9,6 +9,7 @@ from app.pages import (
     recent_tactics_breakdown,
     tactic_set_recommendations,
     tactics_breakdown,
+    tactics_overview,
     testing_tactics,
     vs_team,
     vs_teams,
@@ -27,6 +28,7 @@ PAGES = {
     "Tactics Breakdown": tactics_breakdown.render,
     "Recent Tactics Breakdown": recent_tactics_breakdown.render,
     "Testing Tactics": testing_tactics.render,
+    "Tactics Overview": tactics_overview.render,
     "Tactical Set Recommendations": tactic_set_recommendations.render,
 }
 
