@@ -49,7 +49,7 @@ def _grouped_navigation_options() -> tuple[list[str], list[str]]:
     return team_group, tactics_group
 
 
-def _render_nav_group(title: str, subtitle: str, options: list[str], selected: str, key_prefix: str, columns_per_row: int = 4) -> str:
+def _render_nav_group(title: str, subtitle: str, options: list[str], selected: str, key_prefix: str, columns_per_row: int = 5) -> str:
     st.markdown(f"<div class='page-nav-group-title'>{title}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='page-nav-group-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
 
