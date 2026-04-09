@@ -1,5 +1,4 @@
 import streamlit as st
-import json
 
 from app.data_loader import detect_our_team, load_data, validate_columns
 from app.filters import apply_filters, build_global_filters, filter_panel_toggle, global_filters_from_state
@@ -34,11 +33,6 @@ PAGE_REGISTRY = [
 ]
 
 PAGES = dict(PAGE_REGISTRY)
-
-
-def _tactical_page_names(options: list[str]) -> list[str]:
-    """Derive tactical nav pages from the live page options list."""
-    return [name for name in options if "tactic" in name.lower()]
 
 
 def _render_page_navigation() -> str:
@@ -77,42 +71,6 @@ def _render_page_navigation() -> str:
 
 def run_app():
     st.set_page_config(page_title="Medisports Analytics", page_icon="🎮", layout="wide")
-
-    options = list(PAGES.keys())
-    tactical_pages = _tactical_page_names(options)
-    with st.sidebar:
-        if st.button("Reload Data", use_container_width=True, help="Clear cached data and reload files from data/."):
-            st.cache_data.clear()
-            st.rerun()
-
-        st.markdown("### Tactical Navigation")
-        for page_name in tactical_pages:
-            is_current = st.session_state.get("page_nav") == page_name
-            label = f"• {page_name}" if is_current else page_name
-            if st.button(label, key=f"nav_btn_{page_name}", use_container_width=True):
-                if st.session_state.get("page_nav") != page_name:
-                    st.session_state["page_nav"] = page_name
-                    st.rerun()
-
-        if st.checkbox("Show nav debug", value=False, key="show_nav_debug"):
-            nav_debug = {
-                "options": options,
-                "tactical_pages": tactical_pages,
-                "contains_tactics_overview": "Tactics Overview" in options,
-                "tactical_contains_tactics_overview": "Tactics Overview" in tactical_pages,
-                "current_page_nav": st.session_state.get("page_nav"),
-            }
-            st.caption("Navigation debug (live widget inputs)")
-            st.code(json.dumps(nav_debug, indent=2), language="json")
-
-        st.markdown("---")
-        current = st.session_state.get("page_nav", options[0])
-        if current not in options:
-            current = options[0]
-        selected = st.selectbox("Navigate", options, index=options.index(current), help="Select a page to open.")
-        if selected != current:
-            st.session_state["page_nav"] = selected
-            st.rerun()
 
     try:
         data = load_data()
