@@ -1,15 +1,19 @@
 import html
 import re
+import unicodedata
 
 import pandas as pd
 import streamlit as st
 
+from app.config import IMAGES
 from app.data_loader import get_medisports_player_names, normalize_player_key
 from app.image_helpers import (
     find_achievement_image,
+    find_competition_logo,
     image_data_uri_thumbnail,
     resolve_achievement_image,
     resolve_player_photo,
+    SUPPORTED_EXTENSIONS,
 )
 from app.page_layout import section_header
 
@@ -77,22 +81,49 @@ def _safe_html(value: object) -> str:
 
 
 def _normalize_for_match(value: object) -> str:
-    return re.sub(r"\s+", " ", str(value or "")).strip().casefold()
+    text = unicodedata.normalize("NFKD", str(value or "")).casefold()
+    text = text.replace("ⓜ", "m")
+    text = re.sub(r"[|/\\•·]+", " ", text)
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
-def _competition_from_row(row: pd.Series, known_competitions: list[str]) -> str:
+def _normalize_player_plain(value: object) -> str:
+    text = _display_value(value)
+    if not text:
+        return ""
+    parts = [part.strip() for part in re.split(r"\|", text) if part.strip()]
+    if parts:
+        text = parts[-1]
+    text = re.sub(r"^[^a-zA-Z0-9]+", "", text)
+    return normalize_player_key(text)
+
+
+def _text_for_entity_detection(row: pd.Series) -> str:
+    fields = [
+        _display_value(row.get("title")),
+        _display_value(row.get("details")),
+        _display_value(row.get("notes")),
+        _display_value(row.get("opponent_or_org")),
+        _display_value(row.get("from_entity")),
+        _display_value(row.get("to_entity")),
+        _display_value(row.get("competition")),
+    ]
+    return f" {_normalize_for_match(' '.join(fields))} "
+
+
+def _competition_from_row(row: pd.Series, known_competitions: list[str], competition_logo_index: dict[str, str]) -> str:
     structured = _display_value(row.get("competition"))
     if structured:
         return structured
 
-    row_text = _normalize_for_match(
-        " ".join(
-            _display_value(row.get(field))
-            for field in ["title", "details", "notes", "opponent_or_org"]
-        )
-    )
+    row_text = _text_for_entity_detection(row)
     for competition in known_competitions:
-        if competition and _normalize_for_match(competition) in row_text:
+        normalized = _normalize_for_match(competition)
+        if normalized and f" {normalized} " in row_text:
+            return competition
+    for competition in competition_logo_index:
+        if competition and f" {competition} " in row_text:
             return competition
     return ""
 
@@ -118,9 +149,17 @@ def _build_player_photo_index(data: dict) -> dict[str, str]:
             candidates.extend(players_df[col].dropna().astype(str).tolist())
     candidates.extend(get_medisports_player_names(matches_df, player_col="player"))
 
+    photos_folder = IMAGES.get("player_photos")
+    if photos_folder and photos_folder.exists():
+        candidates.extend(
+            path.stem
+            for path in photos_folder.iterdir()
+            if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
+        )
+
     index: dict[str, str] = {}
     for player in candidates:
-        key = normalize_player_key(player)
+        key = _normalize_player_plain(player)
         if not key or key in index:
             continue
         photo = resolve_player_photo(player)
@@ -134,29 +173,46 @@ def _resolve_player_visual(row: pd.Series, player_photo_index: dict[str, str]) -
     if not player_photo_index:
         return None, None
 
-    fields = [
-        _display_value(row.get("title")),
-        _display_value(row.get("details")),
-        _display_value(row.get("notes")),
-        _display_value(row.get("opponent_or_org")),
-        _display_value(row.get("from_entity")),
-        _display_value(row.get("to_entity")),
-    ]
-    haystack = _normalize_for_match(" ".join(fields))
+    haystack = _text_for_entity_detection(row)
 
     for key, path in player_photo_index.items():
         if not key:
             continue
-        pattern = re.compile(rf"(?<!\w){re.escape(key)}(?!\w)", flags=re.IGNORECASE)
-        if pattern.search(haystack):
+        normalized_key = _normalize_for_match(key)
+        if normalized_key and f" {normalized_key} " in haystack:
             return key, path
     return None, None
 
 
-def _resolve_tournament_visual(row: pd.Series, known_competitions: list[str]) -> tuple[str | None, str | None]:
-    competition = _competition_from_row(row, known_competitions)
+def _build_competition_logo_index(known_competitions: list[str]) -> dict[str, str]:
+    index: dict[str, str] = {}
+    for competition in known_competitions:
+        normalized = _normalize_for_match(competition)
+        if not normalized:
+            continue
+        logo_path = find_competition_logo(competition)
+        if logo_path:
+            index[normalized] = logo_path
+
+    logos_folder = IMAGES.get("competition_logos")
+    if logos_folder and logos_folder.exists():
+        for path in logos_folder.iterdir():
+            if not path.is_file() or path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+                continue
+            normalized = _normalize_for_match(path.stem)
+            if normalized and normalized not in index:
+                index[normalized] = str(path)
+    return index
+
+
+def _resolve_tournament_visual(
+    row: pd.Series,
+    known_competitions: list[str],
+    competition_logo_index: dict[str, str],
+) -> tuple[str | None, str | None, str | None]:
+    competition = _competition_from_row(row, known_competitions, competition_logo_index)
     if not competition:
-        return None, None
+        return None, None, None
 
     placement = _infer_gold_placement(row)
     resolved = resolve_achievement_image(
@@ -164,39 +220,51 @@ def _resolve_tournament_visual(row: pd.Series, known_competitions: list[str]) ->
         achievement_name=competition,
         placement=placement,
     )
+    trophy_path = None
     final_path = resolved.get("final_path")
     if final_path:
-        return competition, str(final_path)
-
-    if str(placement).strip().startswith("1"):
+        trophy_path = str(final_path)
+    elif str(placement).strip().startswith("1"):
         gold_path = find_achievement_image(
             link_or_name=f"{competition} gold",
             achievement_name=competition,
             placement="1st",
         )
         if gold_path:
-            return competition, gold_path
-    return competition, None
+            trophy_path = gold_path
+
+    competition_logo = competition_logo_index.get(_normalize_for_match(competition))
+    return competition, competition_logo, trophy_path
 
 
-def _visual_priority(row: pd.Series, player_image_uri: str | None, trophy_image_uri: str | None) -> list[tuple[str, str]]:
+def _visual_priority(
+    row: pd.Series,
+    player_image_uri: str | None,
+    competition_image_uri: str | None,
+    trophy_image_uri: str | None,
+) -> list[tuple[str, str]]:
     event_type = _normalize_for_match(row.get("event_type"))
     category = _normalize_for_match(row.get("category"))
     player_centric = any(token in event_type for token in ["transfer", "sign", "roster"]) or category == "roster"
     tournament_centric = category == "competition" or "qualification" in event_type or "result" in event_type
 
     visuals: list[tuple[str, str]] = []
-    if player_image_uri and trophy_image_uri:
-        if player_centric and not tournament_centric:
-            visuals = [("Player", player_image_uri), ("Achievement", trophy_image_uri)]
-        elif tournament_centric and not player_centric:
-            visuals = [("Achievement", trophy_image_uri), ("Player", player_image_uri)]
-        else:
-            visuals = [("Player", player_image_uri), ("Achievement", trophy_image_uri)]
-    elif player_image_uri:
-        visuals = [("Player", player_image_uri)]
+    if player_image_uri:
+        visuals.append(("Player", player_image_uri))
+    if tournament_centric and trophy_image_uri:
+        visuals.append(("Achievement", trophy_image_uri))
+    elif competition_image_uri:
+        visuals.append(("Competition", competition_image_uri))
     elif trophy_image_uri:
-        visuals = [("Achievement", trophy_image_uri)]
+        visuals.append(("Achievement", trophy_image_uri))
+
+    if player_centric and len(visuals) > 1:
+        visuals = sorted(visuals, key=lambda item: 0 if item[0] == "Player" else 1)
+    elif tournament_centric and len(visuals) > 1:
+        visuals = sorted(visuals, key=lambda item: 0 if item[0] in {"Achievement", "Competition"} else 1)
+
+    if not visuals and player_image_uri:
+        visuals = [("Player", player_image_uri)]
     return visuals[:2]
 
 
@@ -247,6 +315,7 @@ def render(data: dict):
         else []
     )
     player_photo_index = _build_player_photo_index(data)
+    competition_logo_index = _build_competition_logo_index(known_competitions)
 
     st.markdown(
         """
@@ -287,10 +356,17 @@ def render(data: dict):
         notes = _display_value(row.get("notes"))
         highlights = _timeline_highlights(row)
         _, player_path = _resolve_player_visual(row, player_photo_index)
-        _, trophy_path = _resolve_tournament_visual(row, known_competitions)
+        _, competition_logo_path, trophy_path = _resolve_tournament_visual(
+            row,
+            known_competitions,
+            competition_logo_index,
+        )
         player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
+        competition_uri = (
+            image_data_uri_thumbnail(competition_logo_path, max_width=140, max_height=140) if competition_logo_path else None
+        )
         trophy_uri = image_data_uri_thumbnail(trophy_path, max_width=140, max_height=140) if trophy_path else None
-        visuals = _visual_priority(row, player_uri, trophy_uri)
+        visuals = _visual_priority(row, player_uri, competition_uri, trophy_uri)
 
         meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
         details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""

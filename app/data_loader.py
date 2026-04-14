@@ -139,7 +139,15 @@ TIMELINE_NUMERIC_COLUMNS = ("fee_cpl", "ranking_from", "ranking_to", "season")
 def normalize_player_key(name: str | None) -> str:
     """Normalize player names into a stable comparison key."""
     text = str(name or "").strip()
-    text = re.sub(r"^ⓜ\s*\|\s*", "", text, flags=re.IGNORECASE)
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFKD", text)
+    text = re.sub(r"\s*\|\s*", " | ", text)
+    parts = [part.strip() for part in text.split("|") if part.strip()]
+    if parts:
+        text = parts[-1]
+    text = re.sub(r"^(?:ⓜ|m)\b", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"^[^a-zA-Z0-9]+", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text.casefold()
 
