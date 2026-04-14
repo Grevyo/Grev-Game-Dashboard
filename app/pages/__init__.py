@@ -1,7 +1,8 @@
-from . import overview, player_viewer, recent_tactics_breakdown, tactic_set_recommendations, tactics_breakdown, tactics_overview, testing_tactics, vs_team, vs_teams, vs_tournaments
+from . import medisports_timeline, overview, player_viewer, recent_tactics_breakdown, tactic_set_recommendations, tactics_breakdown, tactics_overview, testing_tactics, vs_team, vs_teams, vs_tournaments
 
 __all__ = [
     "overview",
+    "medisports_timeline",
     "player_viewer",
     "vs_team",
     "vs_teams",

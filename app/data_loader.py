@@ -115,6 +115,27 @@ TACTICS_NUMERIC_COLUMNS = (
     "stomp_penalty",
 )
 
+TIMELINE_COLUMNS = [
+    "season",
+    "date",
+    "event_type",
+    "category",
+    "title",
+    "details",
+    "opponent_or_org",
+    "competition",
+    "placement",
+    "record",
+    "from_entity",
+    "to_entity",
+    "fee_cpl",
+    "ranking_from",
+    "ranking_to",
+    "notes",
+]
+
+TIMELINE_NUMERIC_COLUMNS = ("fee_cpl", "ranking_from", "ranking_to", "season")
+
 def normalize_player_key(name: str | None) -> str:
     """Normalize player names into a stable comparison key."""
     text = str(name or "").strip()
@@ -338,6 +359,15 @@ def _required_file_keys() -> tuple[str, ...]:
     return REQUIRED_FILES
 
 
+def _cache_file_keys() -> tuple[str, ...]:
+    keys = list(_required_file_keys())
+    optional_keys = ("medisports_timeline",)
+    for key in optional_keys:
+        if key in FILES:
+            keys.append(key)
+    return tuple(keys)
+
+
 def _validate_required_files() -> None:
     missing_files: list[Path] = []
     for file_key in _required_file_keys():
@@ -354,8 +384,11 @@ def _validate_required_files() -> None:
 
 def _build_file_signature() -> tuple[tuple[str, str, int, int], ...]:
     signatures: list[tuple[str, str, int, int]] = []
-    for file_key in _required_file_keys():
+    for file_key in _cache_file_keys():
         file_path = FILES[file_key]
+        if not file_path.exists():
+            signatures.append((file_key, str(file_path), 0, 0))
+            continue
         stat = file_path.stat()
         signatures.append((file_key, str(file_path), stat.st_mtime_ns, stat.st_size))
     return tuple(signatures)
@@ -442,12 +475,49 @@ def _dedupe_tactics_rows(df: pd.DataFrame) -> pd.DataFrame:
     return cleaned.drop_duplicates(subset=existing_keys, keep="first").reset_index(drop=True)
 
 
+def _read_timeline_csv(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame(columns=TIMELINE_COLUMNS)
+
+    try:
+        df = pd.read_csv(path, dtype="string", keep_default_na=False)
+    except Exception:
+        return pd.DataFrame(columns=TIMELINE_COLUMNS)
+
+    df = _normalize_columns(df)
+    for col in TIMELINE_COLUMNS:
+        if col not in df.columns:
+            df[col] = pd.NA
+    return df[TIMELINE_COLUMNS].copy()
+
+
+def _normalize_timeline(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        empty = pd.DataFrame(columns=[*TIMELINE_COLUMNS, "date_sort"])
+        empty["date_sort"] = pd.Series(dtype="datetime64[ns]")
+        return empty
+
+    out = df.copy()
+    for column in TIMELINE_COLUMNS:
+        if column not in out.columns:
+            out[column] = pd.NA
+        out[column] = out[column].astype("string").str.strip()
+        out[column] = out[column].replace("", pd.NA)
+
+    out["date"] = pd.to_datetime(out["date"], errors="coerce")
+    out = coerce_numeric_columns(out, TIMELINE_NUMERIC_COLUMNS, dataset_name="medisports_timeline")
+    out["date_sort"] = out["date"]
+    out = out.sort_values(["date_sort", "season", "title"], ascending=[True, True, True], na_position="last").reset_index(drop=True)
+    return out
+
+
 @st.cache_data(show_spinner=False)
 def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) -> dict[str, pd.DataFrame]:
     player_matches = _derive_core(_read_flexible_csv(FILES["player_matches"]), dataset_name="player_matches")
     tactics = _derive_core(_read_flexible_csv(FILES["tactics"]), dataset_name="tactics")
     achievements = _derive_core(_read_flexible_csv(FILES["achievements"]), dataset_name="achievements")
     players = _derive_core(_read_players_csv_safe(FILES["players"]), dataset_name="players")
+    medisports_timeline = _normalize_timeline(_read_timeline_csv(FILES["medisports_timeline"]))
 
     if "" in tactics.columns and "tier" not in tactics.columns:
         tactics = tactics.rename(columns={"": "tier"})
@@ -515,6 +585,7 @@ def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) ->
         "tactics": tactics,
         "achievements": achievements,
         "players": players,
+        "medisports_timeline": medisports_timeline,
     }
 
 
