@@ -11,6 +11,7 @@ HARDCODED_SEASON_WINDOWS: tuple[tuple[pd.Timestamp, pd.Timestamp, int], ...] = (
     (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-02-02"), 8),
     (pd.Timestamp("2026-02-03"), pd.Timestamp("2026-03-03"), 9),
     (pd.Timestamp("2026-03-04"), pd.Timestamp("2026-04-12"), 10),
+    (pd.Timestamp("2026-04-13"), pd.Timestamp("2026-12-31"), 11),
 )
 
 
