@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from app.datetime_utils import build_match_timestamp, normalize_time_series
+from app.map_utils import normalize_map_series
 
 
 def _inject_page_css() -> None:
@@ -39,7 +40,7 @@ def _inject_page_css() -> None:
 
 def _prepare_tactics(tdf: pd.DataFrame) -> pd.DataFrame:
     scoped = tdf.copy()
-    scoped["map"] = scoped.get("map", "Unknown").astype(str).str.strip().replace("", "Unknown")
+    scoped["map"] = normalize_map_series(scoped.get("map", pd.Series(index=scoped.index, dtype=object)), unknown_label="Unknown")
     scoped["side"] = scoped.get("side", "Unknown").astype(str).str.strip().replace("", "Unknown")
     scoped["tactic_name"] = scoped.get("tactic_name", "Unknown Tactic").astype(str).str.strip().replace("", "Unknown Tactic")
     scoped["competition"] = scoped.get("competition", "Unknown").astype(str).str.strip().replace("", "Unknown")

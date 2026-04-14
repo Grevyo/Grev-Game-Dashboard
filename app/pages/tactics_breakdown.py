@@ -14,6 +14,7 @@ except ModuleNotFoundError:
 
 from app.config import TIER_COLORS
 from app.datetime_utils import build_match_timestamp, normalize_time_series
+from app.map_utils import normalize_map_series
 from app.page_layout import is_mobile_view
 from app.tactics import (
     TACTIC_STATUS_ORDER,
@@ -203,7 +204,7 @@ def _render_tactics_breakdown(ctx, *, recent_mode: bool = False):
 
     _inject_page_css()
 
-    tdf["map"] = tdf.get("map", "Unknown").astype(str).str.strip().replace("", "Unknown")
+    tdf["map"] = normalize_map_series(tdf.get("map", pd.Series(index=tdf.index, dtype=object)), unknown_label="Unknown")
     tdf["side"] = tdf.get("side", "Unknown").astype(str).str.strip().replace("", "Unknown")
     tdf["tactic_name"] = tdf.get("tactic_name", "Unknown Tactic").astype(str).str.strip().replace("", "Unknown Tactic")
     tdf["category"] = tdf["tactic_name"].map(tactic_category)

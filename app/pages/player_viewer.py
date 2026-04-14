@@ -15,6 +15,7 @@ from app.achievements import achievements_for_player
 from app.data_loader import get_medisports_player_names, get_medisports_roster_df
 from app.filters import filter_panel_toggle
 from app.image_helpers import image_data_uri, find_team_logo, resolve_player_photo
+from app.map_utils import normalize_map_series
 from app.match_summaries import build_best_n_matches, build_last_n_matches, resolve_match_result
 from app.presentation_helpers import nationality_label
 from app.page_layout import is_mobile_view, section_header
@@ -106,7 +107,7 @@ def _render_map_performance_table(p: pd.DataFrame, tactics_scope: pd.DataFrame):
         return
 
     maps = p.copy()
-    maps["map"] = maps["map"].astype(str).str.strip()
+    maps["map"] = normalize_map_series(maps["map"])
     maps = maps[maps["map"] != ""]
     if maps.empty:
         st.markdown("<div class='panel panel-tight'><span class='muted'>No map data available in this scope.</span></div>", unsafe_allow_html=True)
@@ -127,7 +128,7 @@ def _render_map_performance_table(p: pd.DataFrame, tactics_scope: pd.DataFrame):
         map_df = map_df.sort_values("date") if "date" in map_df.columns else map_df
         map_tactics = tactics_scope
         if not tactics_scope.empty and "map" in tactics_scope.columns:
-            map_tactics = tactics_scope[tactics_scope["map"].astype(str).str.strip() == str(map_name)]
+            map_tactics = tactics_scope[normalize_map_series(tactics_scope["map"]) == str(map_name)]
 
         wins, losses = _true_record(map_df, map_tactics)
         matches = int(map_df["match_id"].nunique()) if "match_id" in map_df.columns else int(len(map_df))
@@ -279,7 +280,7 @@ def render(ctx):
     best_map_value = "N/A"
     if not tactics_scope.empty and {"map", "side", "wins"}.issubset(tactics_scope.columns):
         best_map_subset = tactics_scope.copy()
-        best_map_subset["map"] = best_map_subset["map"].astype(str).str.strip()
+        best_map_subset["map"] = normalize_map_series(best_map_subset["map"])
         best_map_subset["side"] = best_map_subset["side"].astype(str).str.strip()
         best_map_subset["wins"] = pd.to_numeric(best_map_subset["wins"], errors="coerce").fillna(0)
         best_map_subset = best_map_subset[(best_map_subset["map"] != "") & (best_map_subset["side"].isin(["Red", "Blue"]))]

@@ -11,6 +11,7 @@ import streamlit as st
 from app.config import FILES, REQUIRED_FILES
 from app.datetime_utils import coerce_date_columns, normalize_time_series
 from app.grouping import build_season_resolution_debug_table, normalize_competitions
+from app.map_utils import normalize_map_series
 
 SYNONYMS = {
     "date": ["date", "match_date"],
@@ -380,7 +381,7 @@ def _derive_core(df: pd.DataFrame, *, dataset_name: str) -> pd.DataFrame:
         df["time_raw"] = time_values
         df["time"] = normalize_time_series(time_values)
     if "map" in df.columns:
-        df["map"] = df["map"].astype(str).str.title().str.strip()
+        df["map"] = normalize_map_series(df["map"])
     if "side" in df.columns:
         df["side"] = df["side"].map(normalize_side_label)
     if "competition" in df.columns:

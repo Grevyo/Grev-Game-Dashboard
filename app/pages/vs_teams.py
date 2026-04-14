@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.datetime_utils import build_match_timestamp, normalize_time_series
+from app.map_utils import normalize_map_series
 from app.metrics import confidence_from_sample
 from app.page_layout import is_mobile_view
 
@@ -243,7 +244,7 @@ def render(ctx):
 
     base = tdf.copy()
     base["opponent_team"] = base.get("opponent_team", "").astype(str).str.strip().replace("", "Unknown Opponent")
-    base["map"] = base.get("map", "").astype(str).str.strip().replace("", "Unknown Map")
+    base["map"] = normalize_map_series(base.get("map", pd.Series(index=base.index, dtype=object)), unknown_label="Unknown Map")
     base["date"] = base.get("date", "").astype(str).str.strip()
     base["time"] = normalize_time_series(base.get("time", pd.Series([None] * len(base), index=base.index)))
     base["match_ts"] = build_match_timestamp(base["date"], base["time"])

@@ -14,6 +14,7 @@ except ModuleNotFoundError:
 
 from app.config import TIER_COLORS
 from app.datetime_utils import build_match_timestamp, normalize_time_series
+from app.map_utils import normalize_map_series
 from app.page_layout import is_mobile_view
 from app.tactics import (
     TACTIC_STATUS_ORDER,
@@ -110,7 +111,7 @@ def _tier_box(tier: str, value: float | None) -> str:
 
 def _prepare_tactics(tdf: pd.DataFrame, days_window: int) -> pd.DataFrame:
     tdf = tdf.copy()
-    tdf["map"] = tdf.get("map", "Unknown").astype(str).str.strip().replace("", "Unknown")
+    tdf["map"] = normalize_map_series(tdf.get("map", pd.Series(index=tdf.index, dtype=object)), unknown_label="Unknown")
     tdf["side"] = tdf.get("side", "Unknown").astype(str).str.strip().replace("", "Unknown")
     tdf["tactic_name"] = tdf.get("tactic_name", "Unknown Tactic").astype(str).str.strip().replace("", "Unknown Tactic")
     tdf["wins"] = pd.to_numeric(tdf.get("wins", 0), errors="coerce").fillna(0)

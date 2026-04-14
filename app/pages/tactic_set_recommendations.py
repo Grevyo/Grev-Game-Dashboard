@@ -4,6 +4,7 @@ import streamlit as st
 import re
 
 import app.tactics as shared_tactics
+from app.map_utils import normalize_map_name, normalize_map_series
 
 try:
     import plotly.express as px
@@ -141,7 +142,7 @@ def _route_role(name: str) -> str:
 
 
 def _canonical_map_name(map_name: str) -> str:
-    return str(map_name).strip().lower()
+    return normalize_map_name(map_name).lower()
 
 
 def _normalize_tactic_name(name: str) -> str:
@@ -504,7 +505,7 @@ def render(ctx):
 
     _inject_page_css()
 
-    tdf["map"] = tdf.get("map", "Unknown").astype(str).str.strip().replace("", "Unknown")
+    tdf["map"] = normalize_map_series(tdf.get("map", pd.Series(index=tdf.index, dtype=object)), unknown_label="Unknown")
     tdf["side"] = tdf.get("side", "Unknown").astype(str).str.strip().replace("", "Unknown")
     tdf["tactic_name"] = tdf.get("tactic_name", "Unknown Tactic").astype(str).str.strip().replace("", "Unknown Tactic")
     tdf["wins"] = pd.to_numeric(tdf.get("wins", 0), errors="coerce").fillna(0)

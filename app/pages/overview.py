@@ -14,6 +14,7 @@ from app.transforms import best_contexts, summarize_player
 from app.match_summaries import build_best_match_summary, build_last_match_summary
 from app.page_layout import section_header
 from app.datetime_utils import build_match_timestamp, normalize_time_string
+from app.map_utils import normalize_map_series
 
 
 def _resolve_favourite_map(meta: pd.DataFrame, player_key: str, default: str = "N/A") -> str:
@@ -53,7 +54,7 @@ def _best_map_for_player(
     subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
     if subset.empty:
         return default
-    subset["map"] = subset["map"].astype(str).str.strip()
+    subset["map"] = normalize_map_series(subset["map"])
     subset = subset[subset["map"] != ""]
     if subset.empty:
         return default
