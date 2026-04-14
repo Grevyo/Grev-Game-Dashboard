@@ -5,6 +5,7 @@ from app.data_loader import detect_our_team, load_data, reload_data, validate_co
 from app.filters import apply_filters, build_global_filters, filter_panel_toggle, global_filters_from_state
 from app.image_helpers import find_team_logo, image_data_uri
 from app.pages import (
+    medisports_timeline,
     overview,
     player_viewer,
     recent_tactics_breakdown,
@@ -22,6 +23,7 @@ from app.transforms import with_player_metrics
 
 PAGE_REGISTRY = [
     ("Overview", overview.render),
+    ("Medisports Timeline", medisports_timeline.render),
     ("Player Stats Viewer", player_viewer.render),
     ("Medisports vs Teams", vs_teams.render),
     ("Medisports vs Team", vs_team.render),
@@ -36,6 +38,7 @@ PAGE_REGISTRY = [
 PAGES = dict(PAGE_REGISTRY)
 TEAM_PAGE_PREFERENCE = [
     "Overview",
+    "Medisports Timeline",
     "Player Stats Viewer",
     "Medisports vs Teams",
     "Medisports vs Team",
@@ -184,6 +187,7 @@ def run_app():
         "tactics": apply_filters(t_df, filters),
         "players": data["players"],
         "achievements": data["achievements"],
+        "medisports_timeline": data.get("medisports_timeline"),
         "team_name": team_name,
         "filters": filters,
     }

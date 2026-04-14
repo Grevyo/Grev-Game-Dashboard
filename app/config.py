@@ -15,6 +15,7 @@ FILES = {
     "player_matches": DATA_DIR / "PlayerDataMatser.csv",
     "tactics": DATA_DIR / "TacticsDataMaster.csv",
     "achievements": DATA_DIR / "Achievements.csv",
+    "medisports_timeline": DATA_DIR / "medisports_timeline.csv",
 }
 REQUIRED_FILES = ("players", "player_matches", "tactics", "achievements")
 
