@@ -3,6 +3,7 @@ import streamlit as st
 
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.datetime_utils import safe_to_datetime
+from app.map_utils import normalize_map_name, normalize_map_series
 
 
 def _sorted_values(df: pd.DataFrame, col: str) -> list:
@@ -36,6 +37,9 @@ def get_current_season(df: pd.DataFrame, season_col: str = "season") -> str | No
 
 
 def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
+    player_df = player_df.copy()
+    if "map" in player_df.columns:
+        player_df["map"] = normalize_map_series(player_df["map"])
     season_options = _int_sorted_values(player_df, "resolved_season")
     current_season = get_current_season(player_df, "resolved_season")
     default_season = [current_season] if current_season and current_season in season_options else season_options
@@ -124,7 +128,7 @@ def build_global_filters(player_df: pd.DataFrame, tactics_df: pd.DataFrame):
         "competition_mode": comp_mode,
         "competition_col": competitions_col,
         "competition": competition_vals,
-        "map": map_vals,
+        "map": [normalize_map_name(v) for v in map_vals],
         "opponent": opp_vals,
         "side": side_vals,
         "last_days": last_days,
@@ -165,7 +169,7 @@ def global_filters_from_state(player_df: pd.DataFrame):
         "competition_mode": comp_mode,
         "competition_col": competitions_col,
         "competition": st.session_state.get("global_competition", []),
-        "map": st.session_state.get("global_map", []),
+        "map": [normalize_map_name(v) for v in st.session_state.get("global_map", [])],
         "opponent": st.session_state.get("global_opponent", []),
         "side": st.session_state.get("global_side", []),
         "last_days": st.session_state.get("global_last_days", None),
@@ -202,7 +206,8 @@ def apply_filters(df, filters):
         out = out[out[comp_col].isin(filters["competition"])]
 
     if filters.get("map") and "map" in out.columns:
-        out = out[out["map"].isin(filters["map"])]
+        out["map"] = normalize_map_series(out["map"])
+        out = out[out["map"].isin([normalize_map_name(v) for v in filters["map"]])]
     if filters.get("opponent") and "opponent_team" in out.columns:
         out = out[out["opponent_team"].isin(filters["opponent"])]
     if filters.get("side") and "side" in out.columns:

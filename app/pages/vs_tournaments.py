@@ -13,6 +13,7 @@ except ModuleNotFoundError:
 
 from app.competition import get_active_competition_col, is_grouped_mode
 from app.datetime_utils import build_match_timestamp, normalize_time_series
+from app.map_utils import normalize_map_series
 from app.metrics import confidence_from_sample
 from app.page_layout import is_mobile_view
 
@@ -84,7 +85,7 @@ def _chart_frame_end():
 def _build_tournament_views(tdf: pd.DataFrame, competition_col: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     base = tdf.copy()
     base[competition_col] = base[competition_col].astype(str).str.strip().replace("", "Unknown Event")
-    base["map"] = base.get("map", "").astype(str).str.strip().replace("", "Unknown Map")
+    base["map"] = normalize_map_series(base.get("map", pd.Series(index=base.index, dtype=object)), unknown_label="Unknown Map")
     base["opponent_team"] = base.get("opponent_team", "").astype(str).str.strip().replace("", "Unknown Opponent")
 
     date_series = base.get("date", "").astype(str).str.strip()
