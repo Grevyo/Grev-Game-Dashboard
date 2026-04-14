@@ -1,0 +1,49 @@
+season,date,event_type,category,title,details,opponent_or_org,competition,placement,record,from_entity,to_entity,fee_cpl,ranking_from,ranking_to,notes
+5,2025-09-22,founding,organisation,Organisation founded,Medicart eSports was founded by Grev.,,,,,,,,,,
+5,2025-09-23,community_join,community,Joined The CTea Party,"Medisports joined The CTea Party, founded by Grev and DontKnow of Dont Know Gaming.",The CTea Party,,,,,The CTea Party,,,,
+5,2025-09-25,transfer_in,roster,Signed Hunglow,Hunglow was signed from free agency.,,,,,Free agent,Medisports,2,,,Player: ⓜ | Hunglow
+5,2025-10-15,qualification,competition,Qualified for Cyber X Open,Medisports qualified for the Cyber X Open.,,Cyber X Open,,,,,,,,
+5,2025-10-17,result,competition,Cyber X Open Round of 16 exit,Medisports were eliminated in the Round of 16.,,Cyber X Open,Round of 16,,,,,,,
+6,2025-10-31,qualification,competition,Qualified for Cyber X Open,Medisports qualified for the Cyber X Open again.,,Cyber X Open,,,,,,,,
+6,2025-11-05,transfer_in,roster,Signed 8eeR,8eeR was signed from neXus Academy.,neXus Academy,,,,neXus Academy,Medisports,500,,,Player: ⓜ | 8eeR
+6,2025-11-09,transfer_in,roster,Signed Melted,Melted was signed from Rainbow Road.,Rainbow Road,,,,Rainbow Road,Medisports,3,,,Player: ⓜ | Melted
+6,2025-11-21,result,competition,Cyber X Series Season 6 Round of 16 exit,Medisports were eliminated in the Round of 16.,,Cyber X Series Season 6,Round of 16,,,,,,,
+7,2025-11-27,rebrand,organisation,Rebranded to Medicart,Medicart eSports rebranded to Medicart.,,,,,Medicart eSports,Medicart,,,,
+7,2025-12-04,qualification,competition,Qualified for Cyber X Open,Medisports qualified for the Cyber X Open.,,Cyber X Open,,,,,,,,
+7,2025-12-07,community_leave,community,Left The CTea Party,Medisports left The CTea Party after internal conflict and community closure.,The CTea Party,,,,The CTea Party,,,,,
+7,2025-12-07,community_join,community,Joined Lowlands9,Medisports joined Lowlands9 after discussions with the community leadership.,Lowlands9,,,,,Lowlands9,,,,
+7,2025-12-16,transfer_in,roster,Signed stroky,stroky was signed from BCB eSports.,BCB eSports,,,,BCB eSports,Medisports,5500,,,Player: ⓜ | stroky
+7,2025-12-22,transfer_in,roster,Signed GreekFreakKief,GreekFreakKief was signed from ᴄʜᴀᴏѕ ɪѕ ᴀ ʟᴀᴅᴅᴇʀ.,ᴄʜᴀᴏѕ ɪѕ ᴀ ʟᴀᴅᴅᴇʀ,,,,ᴄʜᴀᴏѕ ɪѕ ᴀ ʟᴀᴅᴅᴇʀ,Medisports,6053,,,Player: ⓜ | GreekFreakKief
+7,,result,competition,Cyber X Open Round of 16 exit,Medisports were eliminated in the Round of 16 by Hovsta Gubbs.,Hovsta Gubbs,Cyber X Open,Round of 16,,,,,,,Exact date unknown
+7,,transfer_out,roster,Sold badreN,badreN was sold to Chinelo Vuitton.,Chinelo Vuitton,,,,Medisports,Chinelo Vuitton,,,,Exact date and fee unknown; Player: badreN
+8,,tier_change,organisation,Promoted to B Tier,Medisports became a B Tier team.,,,,,C Tier,B Tier,,,,Exact date unknown
+8,2025-12-04,qualification,competition,Qualified for Epsylum Open,Medisports qualified for the Epsylum Open.,,Epsylum Open,,,,,,,,
+8,2025-12-26,result,competition,Epsylum Open Round of 16 exit,Medisports were eliminated in the Round of 16.,,Epsylum Open,Round of 16,,,,,,,
+8,,result,competition,Pondfillers Contenders Season 8 group-stage exit,"Medisports qualified for Pondfillers Contenders Season 8, made it past preliminaries, and went out in the group stage.",,Pondfillers Contenders Season 8,Group Stage,,,,,,,Preliminaries cleared; exact dates unknown
+8,2026-02-01,transfer_out,roster,Sold ricardochet,ricardochet was sold to The Night's Watch.,The Night's Watch,,,,Medisports,The Night's Watch,1000,,,Player: ricardochet
+9,2026-01-01,tier_change,organisation,Promoted to A Tier,Medisports were promoted to A Tier.,,,,,B Tier,A Tier,,,,
+9,2026-01-01,transfer_in,roster,Signed jazooka and onebody,jazooka and onebody were signed.,,,,,Unknown,Medisports,,,,Players: jazooka; onebody
+9,2026-01-16,qualification,competition,Qualified for Epsylum Open,Medisports qualified for the Epsylum Open again.,,Epsylum Open,,,,,,,,
+9,2026-01-30,result,competition,Epsylum Open quarter-final finish,Medisports reached the quarter-finals.,,Epsylum Open,Quarter-Finals,,,,,,,
+9,2026-02-05,result,competition,Zynora Championship Stage 1 finish,Medisports entered Zynora Championship Stage 1 and finished 22nd.,,Zynora Championship Stage 1,22nd,,,,,,,
+9,2026-02-07,result,competition,Zynora Championship Stage 2 finish,"Medisports moved into Zynora Championship Stage 2 and finished 82nd, missing the Major and dropping into the Minor route.",,Zynora Championship Stage 2,82nd,,,,,,,Missed Major qualification; entered Zynora Contenders Season 9
+9,2026-02-17,transfer_in,roster,Signed bonk,bonk was signed from ⲓⲛⲛⲉꞅⲥⲓⲁ.,ⲓⲛⲛⲉꞅⲥⲓⲁ,,,,ⲓⲛⲛⲉꞅⲥⲓⲁ,Medisports,5000,,,Player: ⓜ | bonk
+9,2026-02-18,community_leave,community,Left Lowlands9,Medisports left Lowlands9 after taking on too much responsibility.,Lowlands9,,,,Lowlands9,,,,,
+9,2026-02-21,community_join,community,Joined ᴍᴀᴅᴍᴇɴ,"Cyrus of Ginko approached Grev after Medisports left Lowlands9. After several days of talks, Medisports joined ᴍᴀᴅᴍᴇɴ directly into the main community, skipping academy.",ᴍᴀᴅᴍᴇɴ,,,,,ᴍᴀᴅᴍᴇɴ,,,,Approached by Cyrus of Ginko
+9,2026-03-05,transfer_in,roster,Signed SantiSupreme,SantiSupreme was signed from free agency.,,,,,Free agent,Medisports,4,,,Player: ⓜ | SantiSupreme
+9,2026-03-09,transfer_in,roster,Signed HazardiaN,HazardiaN was signed from C64.,C64,,,,C64,Medisports,10000,,,Player: ⓜ | HazardiaN
+9,,result,competition,Zynora Contenders Season 9 Round of 16 finish,"Medisports reached the Round of 16, the furthest the organisation had gone in Minor/Major competition to that point.",,Zynora Contenders Season 9,Round of 16,,,,,,,Exact date unknown
+10,,invite,competition,Direct invite to Nova Prime Championship Stage 2,Medisports received a direct invite to Nova Prime Championship Stage 2.,,Nova Prime Championship Stage 2,,,,,,,,Exact date unknown
+10,,result,competition,Qualified for Nova Prime Challengers Season 10,Medisports placed 7th in preliminaries to qualify for Nova Prime Challengers Season 10.,,Nova Prime Championship Stage 2 / Nova Prime Challengers Season 10,7th in preliminaries,,,,,,,Exact date unknown
+10,,result,competition,Nova Prime Challengers Season 10 group-stage exit,Medisports finished bottom of the groups in Nova Prime Challengers Season 10.,,Nova Prime Challengers Season 10,Group Stage,,,,,,,Season Major qualification
+10,2026-03-14,transfer_out,roster,Sold Hunglow,Hunglow was sold to Rule them all.,Rule them all,,,,Medisports,Rule them all,105,,,Player: ⓜ | Hunglow
+10,2026-04-04,qualification,competition,Qualified for Cyberathletes Open,Medisports qualified for the Cyberathletes Open.,,Cyberathletes Open,,,,,,,,
+10,2026-04-08,result,competition,Cyberathletes Open preliminary exit,"Medisports failed to make it past preliminaries, finishing 3–4 and placing 32nd.",,Cyberathletes Open,32nd,3-4,,,,,,Preliminary stage exit
+10,,status,organisation,Expected to remain A Tier,Medisports were expected to remain an A Tier team based on overall performance.,,,,,,,,,,Exact date unknown
+11,2026-04-13,season_start,organisation,Season 11 began,Season 11 began.,,,,,,,,,,
+11,2026-04-13,invite,competition,Direct invite to Cryonix Championship Stage 2,"Medisports received a direct invite to Cryonix Championship Stage 2, skipping Stage 1.",,Cryonix Championship Stage 2,,,,,,,,Skipped Stage 1
+11,,lineup_change,roster,bonk became IGL in main lineup,bonk moved into the main lineup as IGL.,,,,,,,,,,Player: ⓜ | bonk; exact date unknown
+11,,lineup_change,roster,stroky moved into main lineup,stroky moved into the main lineup.,,,,,,,,,,Player: ⓜ | stroky; exact date unknown
+11,,lineup_change,roster,8eeR benched,8eeR was moved to the bench.,,,,,,,,,,Player: ⓜ | 8eeR; exact date unknown
+11,,lineup_change,roster,GreekFreakKief benched,GreekFreakKief was moved to the bench.,,,,,,,,,,Player: ⓜ | GreekFreakKief; exact date unknown
+11,,ranking_change,ranking,World ranking improved,Medisports rose in the world rankings from 97th to 93rd.,,,,,,,,97,93,Exact date unknown
