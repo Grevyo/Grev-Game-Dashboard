@@ -1,6 +1,16 @@
+import html
+import re
+
 import pandas as pd
 import streamlit as st
 
+from app.data_loader import get_medisports_player_names, normalize_player_key
+from app.image_helpers import (
+    find_achievement_image,
+    image_data_uri_thumbnail,
+    resolve_achievement_image,
+    resolve_player_photo,
+)
 from app.page_layout import section_header
 
 
@@ -62,6 +72,134 @@ def _timeline_highlights(row: pd.Series) -> list[str]:
     return chips
 
 
+def _safe_html(value: object) -> str:
+    return html.escape(_display_value(value))
+
+
+def _normalize_for_match(value: object) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip().casefold()
+
+
+def _competition_from_row(row: pd.Series, known_competitions: list[str]) -> str:
+    structured = _display_value(row.get("competition"))
+    if structured:
+        return structured
+
+    row_text = _normalize_for_match(
+        " ".join(
+            _display_value(row.get(field))
+            for field in ["title", "details", "notes", "opponent_or_org"]
+        )
+    )
+    for competition in known_competitions:
+        if competition and _normalize_for_match(competition) in row_text:
+            return competition
+    return ""
+
+
+def _infer_gold_placement(row: pd.Series) -> str:
+    placement = _display_value(row.get("placement"))
+    if placement:
+        return placement
+
+    row_text = _normalize_for_match(" ".join(_display_value(row.get(field)) for field in ["title", "details", "notes"]))
+    if any(token in row_text for token in [" champion", " won ", " 1st", " first place", " gold "]):
+        return "1st"
+    return ""
+
+
+def _build_player_photo_index(data: dict) -> dict[str, str]:
+    players_df = data.get("players", pd.DataFrame())
+    matches_df = data.get("player_matches_full", pd.DataFrame())
+
+    candidates: list[str] = []
+    for col in ["player", "player_clean", "name"]:
+        if col in players_df.columns:
+            candidates.extend(players_df[col].dropna().astype(str).tolist())
+    candidates.extend(get_medisports_player_names(matches_df, player_col="player"))
+
+    index: dict[str, str] = {}
+    for player in candidates:
+        key = normalize_player_key(player)
+        if not key or key in index:
+            continue
+        photo = resolve_player_photo(player)
+        path = photo.get("path")
+        if path:
+            index[key] = str(path)
+    return index
+
+
+def _resolve_player_visual(row: pd.Series, player_photo_index: dict[str, str]) -> tuple[str | None, str | None]:
+    if not player_photo_index:
+        return None, None
+
+    fields = [
+        _display_value(row.get("title")),
+        _display_value(row.get("details")),
+        _display_value(row.get("notes")),
+        _display_value(row.get("opponent_or_org")),
+        _display_value(row.get("from_entity")),
+        _display_value(row.get("to_entity")),
+    ]
+    haystack = _normalize_for_match(" ".join(fields))
+
+    for key, path in player_photo_index.items():
+        if not key:
+            continue
+        pattern = re.compile(rf"(?<!\w){re.escape(key)}(?!\w)", flags=re.IGNORECASE)
+        if pattern.search(haystack):
+            return key, path
+    return None, None
+
+
+def _resolve_tournament_visual(row: pd.Series, known_competitions: list[str]) -> tuple[str | None, str | None]:
+    competition = _competition_from_row(row, known_competitions)
+    if not competition:
+        return None, None
+
+    placement = _infer_gold_placement(row)
+    resolved = resolve_achievement_image(
+        link_or_name=competition,
+        achievement_name=competition,
+        placement=placement,
+    )
+    final_path = resolved.get("final_path")
+    if final_path:
+        return competition, str(final_path)
+
+    if str(placement).strip().startswith("1"):
+        gold_path = find_achievement_image(
+            link_or_name=f"{competition} gold",
+            achievement_name=competition,
+            placement="1st",
+        )
+        if gold_path:
+            return competition, gold_path
+    return competition, None
+
+
+def _visual_priority(row: pd.Series, player_image_uri: str | None, trophy_image_uri: str | None) -> list[tuple[str, str]]:
+    event_type = _normalize_for_match(row.get("event_type"))
+    category = _normalize_for_match(row.get("category"))
+    player_centric = any(token in event_type for token in ["transfer", "sign", "roster"]) or category == "roster"
+    tournament_centric = category == "competition" or "qualification" in event_type or "result" in event_type
+
+    visuals: list[tuple[str, str]] = []
+    if player_image_uri and trophy_image_uri:
+        if player_centric and not tournament_centric:
+            visuals = [("Player", player_image_uri), ("Achievement", trophy_image_uri)]
+        elif tournament_centric and not player_centric:
+            visuals = [("Achievement", trophy_image_uri), ("Player", player_image_uri)]
+        else:
+            visuals = [("Player", player_image_uri), ("Achievement", trophy_image_uri)]
+    elif player_image_uri:
+        visuals = [("Player", player_image_uri)]
+    elif trophy_image_uri:
+        visuals = [("Achievement", trophy_image_uri)]
+    return visuals[:2]
+
+
 def render(data: dict):
     timeline_df = data.get("medisports_timeline", pd.DataFrame()).copy()
     section_header(
@@ -103,12 +241,19 @@ def render(data: dict):
 
     ascending = sort_order == "Oldest first"
     filtered = filtered.sort_values(["date_sort", "season", "title"], ascending=[ascending, ascending, True], na_position="last")
+    known_competitions = (
+        sorted({value for value in timeline_df.get("competition", pd.Series(dtype=str)).dropna().astype(str).map(str.strip) if value})
+        if "competition" in timeline_df.columns
+        else []
+    )
+    player_photo_index = _build_player_photo_index(data)
 
     st.markdown(
         """
         <style>
         .timeline-wrap { display:flex; flex-direction:column; gap:.6rem; margin-top:.35rem; }
-        .timeline-item { border:1px solid #2a3848; border-radius:10px; padding:.72rem .8rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); }
+        .timeline-item { border:1px solid #2a3848; border-radius:12px; padding:.76rem .84rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 8px 18px rgba(0, 0, 0, .22); }
+        .timeline-content { display:grid; grid-template-columns: minmax(0, 1fr) auto; gap:.75rem; align-items:start; }
         .timeline-head { display:flex; flex-wrap:wrap; align-items:center; gap:.45rem .72rem; justify-content:space-between; }
         .timeline-date { color:#d9e9f8; font-size:.82rem; letter-spacing:.06em; text-transform:uppercase; font-weight:750; }
         .timeline-season { color:#9fb7cc; font-size:.66rem; text-transform:uppercase; letter-spacing:.12em; border:1px solid #39516a; padding:.18rem .42rem; border-radius:999px; }
@@ -118,6 +263,10 @@ def render(data: dict):
         .timeline-chips { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.2rem; }
         .timeline-chip { border:1px solid #36516b; border-radius:4px; font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:#d0e2f5; padding:.2rem .44rem; background:#132131; }
         .timeline-notes { margin-top:.35rem; color:#8ea9c1; font-size:.74rem; }
+        .timeline-media { display:flex; flex-direction:column; gap:.34rem; min-width:90px; }
+        .timeline-media-card { width:90px; border:1px solid #2f4255; border-radius:9px; overflow:hidden; background:#0c1420; }
+        .timeline-media-card img { width:100%; height:72px; object-fit:cover; object-position:center; display:block; }
+        .timeline-media-card .label { color:#8ea8be; font-size:.58rem; letter-spacing:.1em; text-transform:uppercase; text-align:center; padding:.16rem .2rem; border-top:1px solid #23384e; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -137,27 +286,49 @@ def render(data: dict):
         meta_line = _timeline_meta_line(row)
         notes = _display_value(row.get("notes"))
         highlights = _timeline_highlights(row)
-        meta_html = f"<div class='timeline-meta'>{meta_line}</div>" if meta_line else ""
-        details_html = f"<p class='timeline-details'>{details}</p>" if details else ""
+        _, player_path = _resolve_player_visual(row, player_photo_index)
+        _, trophy_path = _resolve_tournament_visual(row, known_competitions)
+        player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
+        trophy_uri = image_data_uri_thumbnail(trophy_path, max_width=140, max_height=140) if trophy_path else None
+        visuals = _visual_priority(row, player_uri, trophy_uri)
+
+        meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
+        details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
+        media_html = ""
+        if visuals:
+            media_cards = "".join(
+                (
+                    "<div class='timeline-media-card'>"
+                    f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
+                    f"<div class='label'>{label}</div>"
+                    "</div>"
+                )
+                for label, uri in visuals
+            )
+            media_html = f"<div class='timeline-media'>{media_cards}</div>"
 
         st.markdown(
             (
                 "<div class='timeline-item'>"
+                "<div class='timeline-content'>"
+                "<div>"
                 "<div class='timeline-head'>"
-                f"<div class='timeline-date'>{date_text}</div>"
-                f"<div class='timeline-season'>Season {season_text}</div>"
+                f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
+                f"<div class='timeline-season'>Season {_safe_html(season_text)}</div>"
                 "</div>"
-                f"<div class='timeline-title'>{title}</div>"
-                f"{meta_html}"
-                f"{details_html}"
+                f"<div class='timeline-title'>{_safe_html(title)}</div>"
+                f"{meta_html}{details_html}"
+                "</div>"
+                f"{media_html}"
+                "</div>"
                 "</div>"
             ),
             unsafe_allow_html=True,
         )
 
         if highlights:
-            chips_html = "".join(f"<span class='timeline-chip'>{chip}</span>" for chip in highlights)
+            chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
             st.markdown(f"<div class='timeline-chips'>{chips_html}</div>", unsafe_allow_html=True)
         if notes:
-            st.markdown(f"<div class='timeline-notes'>Notes: {notes}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
