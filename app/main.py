@@ -1,6 +1,7 @@
 import streamlit as st
+from datetime import datetime, timezone
 
-from app.data_loader import detect_our_team, load_data, validate_columns
+from app.data_loader import detect_our_team, load_data, reload_data, validate_columns
 from app.filters import apply_filters, build_global_filters, filter_panel_toggle, global_filters_from_state
 from app.image_helpers import find_team_logo, image_data_uri
 from app.pages import (
@@ -154,6 +155,21 @@ def run_app():
         ),
         unsafe_allow_html=True,
     )
+
+    reload_col, reload_meta_col = st.columns([0.2, 0.8], gap="small")
+    with reload_col:
+        if st.button("Reload Data", key="reload_data_button", use_container_width=True):
+            with st.spinner("Reloading data files..."):
+                reload_data()
+            st.session_state["last_data_reload"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            st.rerun()
+    with reload_meta_col:
+        if st.session_state.get("last_data_reload"):
+            st.markdown(
+                f"<div class='muted' style='padding-top:.45rem;'>Last manual reload: {st.session_state['last_data_reload']}</div>",
+                unsafe_allow_html=True,
+            )
+
     page = _render_page_navigation()
 
     page_scope = page.lower().replace(" ", "_")

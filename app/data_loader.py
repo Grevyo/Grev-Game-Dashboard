@@ -524,6 +524,11 @@ def load_data() -> dict[str, pd.DataFrame]:
     return _load_data_cached(file_signature)
 
 
+def reload_data() -> dict[str, pd.DataFrame]:
+    _load_data_cached.clear()
+    return load_data()
+
+
 def detect_our_team(player_matches: pd.DataFrame, tactics: pd.DataFrame) -> str:
     team_cols = []
     for df in [player_matches, tactics]:
