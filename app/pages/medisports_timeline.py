@@ -612,7 +612,7 @@ def render(data: dict):
             --timeline-spine-main: rgb(var(--timeline-spine-rgb));
             --timeline-spine-soft: rgba(var(--timeline-spine-rgb), .3);
             --timeline-spine-glow: rgba(var(--timeline-spine-rgb), .22);
-            --timeline-rail-y: 15px;
+            --timeline-row-mid: 154px;
         }
         .timeline-wrap { display:flex; flex-direction:column; gap:1.02rem; margin-top:.5rem; }
         .timeline-season-block { position:relative; margin-bottom:.2rem; padding:.9rem .84rem .68rem .84rem; border:1px solid #213042; border-radius:18px; background:linear-gradient(180deg, rgba(10,17,27,.82) 0%, rgba(9,14,22,.96) 100%); }
@@ -625,11 +625,12 @@ def render(data: dict):
         .timeline-lane-row {
             position:relative;
             display:flex;
-            flex-wrap:wrap;
+            flex-wrap:nowrap;
             gap:.82rem .84rem;
-            align-items:flex-start;
-            align-content:flex-start;
-            padding:.12rem .16rem 0 .16rem;
+            align-items:stretch;
+            align-content:stretch;
+            padding:.16rem .16rem .18rem .16rem;
+            min-height:308px;
         }
         .timeline-lane-row.dir-rtl { direction:rtl; }
         .timeline-lane-row.dir-rtl .timeline-event { direction:ltr; }
@@ -638,7 +639,7 @@ def render(data: dict):
             position:absolute;
             left:.68rem;
             right:.68rem;
-            top:var(--timeline-rail-y);
+            top:var(--timeline-row-mid);
             height:3px;
             border-radius:999px;
             background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .18) 0%, rgba(var(--timeline-spine-rgb), .8) 16%, rgba(var(--timeline-spine-rgb), .8) 84%, rgba(var(--timeline-spine-rgb), .18) 100%);
@@ -684,51 +685,48 @@ def render(data: dict):
             min-width:min(100%, 210px);
             max-width:100%;
             flex:1 1 290px;
-            align-self:start;
-            height:auto;
-            display:flex;
-            flex-direction:column;
-            padding-top:calc(var(--timeline-rail-y) + .42rem);
+            display:grid;
+            grid-template-rows: 1fr 0 1fr;
+            align-items:stretch;
+            min-height:308px;
         }
-        .timeline-event::after {
+        .timeline-card-shell {
+            position:relative;
+            grid-column:1;
+            width:100%;
+        }
+        .timeline-event.pos-above .timeline-card-shell { grid-row:1; align-self:end; margin-bottom:26px; }
+        .timeline-event.pos-below .timeline-card-shell { grid-row:3; align-self:start; margin-top:26px; }
+        .timeline-card-shell::after {
             content:"";
             position:absolute;
-            top:calc(var(--timeline-rail-y) - 1px);
-            width:15px;
-            height:3px;
-            border-radius:999px;
-            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .5), rgba(var(--timeline-spine-rgb), .82));
-            box-shadow:0 0 7px rgba(var(--timeline-spine-rgb), .2);
-            z-index:3;
+            left:50%;
+            width:2px;
+            transform:translateX(-50%);
+            background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .8), rgba(var(--timeline-spine-rgb), .42));
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .1), 0 0 8px rgba(var(--timeline-spine-rgb), .2);
             pointer-events:none;
         }
-        .timeline-lane-row.dir-ltr .timeline-event::after { right:-.72rem; }
-        .timeline-lane-row.dir-rtl .timeline-event::after { left:-.72rem; }
-        .timeline-lane-row.dir-ltr .timeline-event:last-child::after,
-        .timeline-lane-row.dir-rtl .timeline-event:last-child::after { display:none; }
-        .timeline-lane-row.has-next.dir-ltr .timeline-event:last-child::after { display:block; width:24px; right:-1.22rem; }
-        .timeline-lane-row.has-next.dir-rtl .timeline-event:last-child::after { display:block; width:24px; left:-1.22rem; }
+        .timeline-event.pos-above .timeline-card-shell::after { bottom:-26px; height:26px; }
+        .timeline-event.pos-below .timeline-card-shell::after { top:-26px; height:26px; }
+        .timeline-node-anchor {
+            grid-row:2;
+            position:absolute;
+            top:var(--timeline-row-mid);
+            left:50%;
+            transform:translate(-50%, -50%);
+            z-index:4;
+            display:flex;
+            align-items:center;
+            gap:.34rem;
+            pointer-events:none;
+            white-space:nowrap;
+        }
         .timeline-event.compact { flex:0.8 1 220px; }
         .timeline-event.regular { flex:1 1 290px; }
         .timeline-event.expanded { flex:1.25 1 360px; }
         .timeline-event.featured { flex:1.45 1 430px; }
         .timeline-event.featured .timeline-item { border-left-width:3px; box-shadow:0 14px 28px rgba(0, 0, 0, .34); }
-        .timeline-track {
-            display:flex;
-            align-items:center;
-            gap:.4rem;
-            padding:0 .14rem .34rem .14rem;
-            margin-top:calc(-1 * var(--timeline-rail-y) - .02rem);
-            min-height:calc(var(--timeline-rail-y) + .34rem);
-        }
-        .timeline-track::after {
-            content:"";
-            flex:1;
-            height:2px;
-            border-radius:999px;
-            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .24), rgba(var(--timeline-spine-rgb), .75));
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .12), 0 0 8px rgba(var(--timeline-spine-rgb), .18);
-        }
         .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
         .timeline-node {
             width:14px;
@@ -803,7 +801,7 @@ def render(data: dict):
         .timeline-item.tone-general::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
         @media (max-width: 1280px) {
             .timeline-lane-row { gap:.66rem .66rem; }
-            .timeline-lane-row::before { left:.6rem; right:.6rem; top:var(--timeline-rail-y); height:3px; }
+            .timeline-lane-row::before { left:.6rem; right:.6rem; top:var(--timeline-row-mid); height:3px; }
             .timeline-bend { height:26px; }
             .timeline-bend::after { width:24px; height:24px; border-width:3px; }
             .timeline-event { flex:1 1 260px; min-width:min(100%, 200px); }
@@ -832,26 +830,36 @@ def render(data: dict):
                 flex-direction:column;
                 gap:.54rem;
                 padding:0 .06rem 0 .38rem;
+                min-height:unset;
             }
             .timeline-lane-row.dir-rtl { direction:ltr; }
             .timeline-lane-row::before { display:none; }
             .timeline-bend { display:none; }
-            .timeline-event { padding-top:0; }
-            .timeline-event::after {
+            .timeline-event { display:block; min-height:unset; padding-left:.42rem; }
+            .timeline-node-anchor {
+                position:absolute;
+                left:-.12rem;
+                top:16px;
+                transform:none;
+                gap:.24rem;
+            }
+            .timeline-card-shell,
+            .timeline-event.pos-above .timeline-card-shell,
+            .timeline-event.pos-below .timeline-card-shell { margin:0; }
+            .timeline-card-shell::after {
                 top:14px;
-                left:-.18rem;
+                bottom:auto;
+                left:-.05rem;
                 width:11px;
                 height:3px;
+                transform:none;
+                background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .75), rgba(var(--timeline-spine-rgb), .4));
             }
-            .timeline-lane-row.dir-ltr .timeline-event::after,
-            .timeline-lane-row.dir-rtl .timeline-event::after { left:-.12rem; right:auto; }
             .timeline-event,
             .timeline-event.compact,
             .timeline-event.regular,
             .timeline-event.expanded,
             .timeline-event.featured { flex:1 1 auto; min-width:0; width:100%; }
-            .timeline-track::after { height:2px; }
-            .timeline-track { margin-top:0; min-height:unset; padding:0 .08rem .22rem .08rem; }
             .timeline-node { width:15px; height:15px; }
             .timeline-item { padding:.54rem .6rem .5rem .6rem; border-radius:14px; }
             .timeline-item::before { margin:-.54rem -.6rem .4rem -.6rem; }
@@ -918,7 +926,7 @@ def render(data: dict):
                 lane_parts.append("has-next")
             lane_class = " ".join(lane_parts)
             row_html_parts: list[str] = [f"<div class='{lane_class}'>"]
-            for _, row in chunk:
+            for chunk_event_index, (_, row) in enumerate(chunk):
                 event_index += 1
                 date_value = row.get("date")
                 date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
@@ -973,15 +981,17 @@ def render(data: dict):
                     highlights_count=len(highlights),
                     priority=priority,
                 )
+                position_class = "pos-above" if chunk_event_index % 2 == 0 else "pos-below"
 
                 row_html_parts.append(
                     (
-                        f"<div class='timeline-event {_safe_html(priority)} {_safe_html(width_class)} tone-{_safe_html(tone)}'>"
-                        "<div class='timeline-track'>"
+                        f"<div class='timeline-event {_safe_html(priority)} {_safe_html(width_class)} {_safe_html(position_class)} tone-{_safe_html(tone)}'>"
+                        "<div class='timeline-node-anchor'>"
                         f"<span class='timeline-anchor-index'>#{event_index}</span>"
                         "<span class='timeline-node'></span>"
                         f"<span class='timeline-node-date'>{_safe_html(date_text)}</span>"
                         "</div>"
+                        "<div class='timeline-card-shell'>"
                         f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
                         "<div class='timeline-content'>"
                         "<div class='timeline-main'>"
@@ -996,6 +1006,7 @@ def render(data: dict):
                         f"{meta_html}{details_html}{footer_html}"
                         "</div>"
                         f"{media_html}"
+                        "</div>"
                         "</div>"
                         "</div>"
                         "</div>"
