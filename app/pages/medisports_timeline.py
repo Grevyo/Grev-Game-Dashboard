@@ -587,22 +587,27 @@ def render(data: dict):
         .timeline-season-header { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:.95rem; padding:.15rem .2rem .7rem .2rem; border-bottom:1px solid #223446; }
         .timeline-season-title { color:#e1eefc; font-size:.92rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
         .timeline-season-count { color:#89a0b7; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
-        .timeline-season-lanes { display:flex; flex-direction:column; gap:.95rem; }
-        .timeline-lane-row { position:relative; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:1rem .92rem; align-items:stretch; }
-        .timeline-lane-row.reverse { direction:rtl; }
-        .timeline-lane-row.reverse .timeline-event { direction:ltr; }
-        .timeline-lane-row::before { content:""; position:absolute; left:.45rem; right:.45rem; top:24px; border-top:1px dashed rgba(122,152,180,.38); pointer-events:none; }
-        .timeline-lane-row.reverse::before { left:.45rem; right:.45rem; }
-        .timeline-row-drop { display:flex; justify-content:flex-end; padding-right:.4rem; margin-top:-.2rem; margin-bottom:.1rem; }
-        .timeline-lane-row.reverse + .timeline-row-drop { justify-content:flex-start; padding-right:0; padding-left:.4rem; }
-        .timeline-row-drop .down-arrow { color:#89a8c6; font-size:.92rem; line-height:1; border:1px solid rgba(104,130,156,.32); border-radius:999px; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; background:rgba(11,20,30,.92); }
+        .timeline-season-lanes { display:flex; flex-direction:column; gap:.78rem; position:relative; }
+        .timeline-lane-row { position:relative; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:1.08rem .98rem; align-items:stretch; padding:0 .25rem; }
+        .timeline-lane-row.dir-rtl { direction:rtl; }
+        .timeline-lane-row.dir-rtl .timeline-event { direction:ltr; }
+        .timeline-lane-row::before { content:""; position:absolute; left:.7rem; right:.7rem; top:24px; border-top:1px dashed rgba(122,152,180,.4); pointer-events:none; }
+        .timeline-bend { position:relative; height:30px; margin:-.2rem 0 .1rem 0; }
+        .timeline-bend::before { content:""; position:absolute; top:-1px; bottom:0; width:28px; border:1px solid rgba(122,152,180,.42); border-top:none; }
+        .timeline-bend::after { content:"↓"; position:absolute; top:7px; color:#98b3cf; font-size:.72rem; width:16px; height:16px; border-radius:999px; border:1px solid rgba(104,130,156,.34); background:rgba(11,20,30,.95); display:flex; align-items:center; justify-content:center; }
+        .timeline-bend.to-right::before { right:.45rem; border-left:none; border-bottom-right-radius:18px; }
+        .timeline-bend.to-right::after { right:.28rem; }
+        .timeline-bend.to-left::before { left:.45rem; border-right:none; border-bottom-left-radius:18px; }
+        .timeline-bend.to-left::after { left:.28rem; }
         .timeline-event { position:relative; min-width:0; }
-        .timeline-event::after { content:"→"; position:absolute; right:-.55rem; top:17px; color:rgba(156,186,214,.55); font-size:.68rem; pointer-events:none; z-index:3; }
-        .timeline-lane-row.reverse .timeline-event::after { content:"←"; right:auto; left:-.55rem; }
-        .timeline-event:last-child::after { content:""; }
+        .timeline-event::after { content:""; position:absolute; top:20px; width:13px; border-top:1px solid rgba(156,186,214,.5); z-index:3; pointer-events:none; }
+        .timeline-lane-row.dir-ltr .timeline-event::after { right:-.72rem; }
+        .timeline-lane-row.dir-rtl .timeline-event::after { left:-.72rem; }
+        .timeline-lane-row.dir-ltr .timeline-event:last-child::after,
+        .timeline-lane-row.dir-rtl .timeline-event:last-child::after { display:none; }
         .timeline-event.featured { grid-column:span 2; }
         .timeline-event.featured .timeline-item { border-left-width:3px; box-shadow:0 14px 28px rgba(0, 0, 0, .34); }
-        .timeline-track { display:flex; align-items:center; gap:.5rem; padding:.04rem .2rem .5rem .2rem; }
+        .timeline-track { display:flex; align-items:center; gap:.5rem; padding:.03rem .2rem .48rem .2rem; }
         .timeline-track::after { content:""; flex:1; height:1px; border-top:1px solid rgba(122,152,180,.34); }
         .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
         .timeline-node { width:14px; height:14px; border-radius:50%; border:2px solid #9bb7d4; background:radial-gradient(circle, rgba(222,238,255,.96) 0%, rgba(134,170,205,.95) 38%, rgba(21,34,48,.98) 100%); box-shadow:0 0 0 4px rgba(112,146,179,.08), 0 0 14px rgba(112,146,179,.2); }
@@ -649,15 +654,16 @@ def render(data: dict):
         .tone-milestone .timeline-item::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
         .tone-general .timeline-item::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
         @media (max-width: 1280px) {
-            .timeline-lane-row { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+            .timeline-lane-row { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+            .timeline-lane-row::before { left:.6rem; right:.6rem; }
             .timeline-event.featured { grid-column:span 2; }
         }
         @media (max-width: 960px) {
             .timeline-season-lanes { gap:.72rem; }
             .timeline-lane-row { grid-template-columns:minmax(0, 1fr); gap:.72rem; }
-            .timeline-lane-row.reverse { direction:ltr; }
+            .timeline-lane-row.dir-rtl { direction:ltr; }
             .timeline-lane-row::before,
-            .timeline-row-drop,
+            .timeline-bend,
             .timeline-event::after { display:none; }
             .timeline-event.featured { grid-column:span 1; }
             .timeline-track { padding-bottom:.32rem; }
@@ -706,11 +712,11 @@ def render(data: dict):
 
         event_index = 0
         season_rows = list(season_events.iterrows())
-        row_size = 4
+        row_size = 3
         for chunk_index in range(0, len(season_rows), row_size):
             chunk = season_rows[chunk_index : chunk_index + row_size]
             lane_reverse = (chunk_index // row_size) % 2 == 1
-            lane_class = "timeline-lane-row reverse" if lane_reverse else "timeline-lane-row"
+            lane_class = "timeline-lane-row dir-rtl" if lane_reverse else "timeline-lane-row dir-ltr"
             row_html_parts: list[str] = [f"<div class='{lane_class}'>"]
             for _, row in chunk:
                 event_index += 1
@@ -791,7 +797,8 @@ def render(data: dict):
             row_html_parts.append("</div>")
             season_html_parts.append("".join(row_html_parts))
             if chunk_index + row_size < len(season_rows):
-                season_html_parts.append("<div class='timeline-row-drop'><span class='down-arrow'>↓</span></div>")
+                bend_class = "timeline-bend to-left" if lane_reverse else "timeline-bend to-right"
+                season_html_parts.append(f"<div class='{bend_class}'></div>")
 
         season_html_parts.extend(["</div>", "</div>"])
         timeline_html_parts.append("".join(season_html_parts))
