@@ -612,11 +612,11 @@ def render(data: dict):
             --timeline-spine-main: rgb(var(--timeline-spine-rgb));
             --timeline-spine-soft: rgba(var(--timeline-spine-rgb), .3);
             --timeline-spine-glow: rgba(var(--timeline-spine-rgb), .22);
+            --timeline-lane-y: 34px;
         }
         .timeline-wrap { display:flex; flex-direction:column; gap:1.02rem; margin-top:.5rem; }
         .timeline-season-block { position:relative; margin-bottom:.2rem; padding:.9rem .84rem .68rem .84rem; border:1px solid #213042; border-radius:18px; background:linear-gradient(180deg, rgba(10,17,27,.82) 0%, rgba(9,14,22,.96) 100%); }
         .timeline-season-block::before { content:""; position:absolute; left:1.15rem; right:1.15rem; top:0; height:2px; border-radius:999px; background:linear-gradient(90deg, rgba(160,190,220,.06), rgba(160,190,220,.28), rgba(160,190,220,.06)); }
-        .timeline-season-block::after { content:""; position:absolute; left:1.2rem; right:1.2rem; top:66px; border-top:1px dashed rgba(117,146,172,.26); }
         .timeline-season-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.74rem; padding:.1rem .16rem .54rem .16rem; border-bottom:1px solid #223446; }
         .timeline-season-title { color:#e1eefc; font-size:.92rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
         .timeline-season-count { color:#89a0b7; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
@@ -629,7 +629,7 @@ def render(data: dict):
             position:absolute;
             left:.72rem;
             right:.72rem;
-            top:22px;
+            top:var(--timeline-lane-y);
             height:5px;
             border-radius:999px;
             background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .22) 0%, rgba(var(--timeline-spine-rgb), .78) 14%, rgba(var(--timeline-spine-rgb), .82) 86%, rgba(var(--timeline-spine-rgb), .22) 100%);
@@ -639,8 +639,8 @@ def render(data: dict):
         }
         .timeline-bend {
             position:relative;
-            height:42px;
-            margin:-.08rem 0 -.02rem 0;
+            height:56px;
+            margin:-.03rem 0 .02rem 0;
             z-index:2;
         }
         .timeline-bend::before {
@@ -657,19 +657,18 @@ def render(data: dict):
         .timeline-bend::after {
             content:"";
             position:absolute;
-            top:-2px;
-            width:40px;
-            height:40px;
-            border:5px solid rgba(var(--timeline-spine-rgb), .72);
-            border-top-color:transparent;
-            background:transparent;
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .14), 0 0 14px rgba(var(--timeline-spine-rgb), .2);
+            bottom:0;
+            width:38px;
+            height:5px;
+            border-radius:999px;
+            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .75), rgba(var(--timeline-spine-rgb), .58));
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .14), 0 0 10px rgba(var(--timeline-spine-rgb), .2);
             pointer-events:none;
         }
         .timeline-bend.to-right::before { right:.65rem; }
-        .timeline-bend.to-right::after { right:.65rem; border-radius:0 0 0 34px; border-right-color:transparent; }
+        .timeline-bend.to-right::after { right:.65rem; transform-origin:right center; }
         .timeline-bend.to-left::before { left:.65rem; }
-        .timeline-bend.to-left::after { left:.65rem; border-radius:0 0 34px 0; border-left-color:transparent; }
+        .timeline-bend.to-left::after { left:.65rem; transform-origin:left center; }
         .timeline-event {
             position:relative;
             min-width:min(100%, 210px);
@@ -679,39 +678,15 @@ def render(data: dict):
             height:auto;
             display:flex;
             flex-direction:column;
+            padding-top:calc(var(--timeline-lane-y) + .58rem);
+            z-index:2;
         }
-        .timeline-event::after {
-            content:"";
-            position:absolute;
-            top:21px;
-            width:16px;
-            height:5px;
-            border-radius:999px;
-            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .5), rgba(var(--timeline-spine-rgb), .82));
-            box-shadow:0 0 8px rgba(var(--timeline-spine-rgb), .22);
-            z-index:3;
-            pointer-events:none;
-        }
-        .timeline-lane-row.dir-ltr .timeline-event::after { right:-.72rem; }
-        .timeline-lane-row.dir-rtl .timeline-event::after { left:-.72rem; }
-        .timeline-lane-row.dir-ltr .timeline-event:last-child::after,
-        .timeline-lane-row.dir-rtl .timeline-event:last-child::after { display:none; }
-        .timeline-lane-row.has-next.dir-ltr .timeline-event:last-child::after { display:block; width:24px; right:-1.22rem; }
-        .timeline-lane-row.has-next.dir-rtl .timeline-event:last-child::after { display:block; width:24px; left:-1.22rem; }
         .timeline-event.compact { flex:0.8 1 220px; }
         .timeline-event.regular { flex:1 1 290px; }
         .timeline-event.expanded { flex:1.25 1 360px; }
         .timeline-event.featured { flex:1.45 1 430px; }
         .timeline-event.featured .timeline-item { border-left-width:3px; box-shadow:0 14px 28px rgba(0, 0, 0, .34); }
-        .timeline-track { display:flex; align-items:center; gap:.42rem; padding:.01rem .14rem .3rem .14rem; }
-        .timeline-track::after {
-            content:"";
-            flex:1;
-            height:4px;
-            border-radius:999px;
-            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .35), rgba(var(--timeline-spine-rgb), .82));
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .16), 0 0 12px rgba(var(--timeline-spine-rgb), .25);
-        }
+        .timeline-track { position:absolute; top:calc(var(--timeline-lane-y) - 10px); left:.14rem; right:.14rem; display:flex; align-items:center; gap:.42rem; pointer-events:none; z-index:3; }
         .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
         .timeline-node {
             width:16px;
@@ -786,9 +761,9 @@ def render(data: dict):
         .timeline-item.tone-general::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
         @media (max-width: 1280px) {
             .timeline-lane-row { gap:.66rem .66rem; }
-            .timeline-lane-row::before { left:.6rem; right:.6rem; top:22px; height:3px; }
-            .timeline-bend { height:34px; }
-            .timeline-bend::after { width:32px; height:32px; border-width:4px; }
+            .timeline-lane-row::before { left:.6rem; right:.6rem; top:var(--timeline-lane-y); height:4px; }
+            .timeline-bend { height:48px; }
+            .timeline-bend::after { width:34px; height:4px; }
             .timeline-event { flex:1 1 260px; min-width:min(100%, 200px); }
             .timeline-event.compact { flex:0.9 1 220px; }
             .timeline-event.expanded { flex:1.2 1 320px; }
@@ -819,21 +794,19 @@ def render(data: dict):
             .timeline-lane-row.dir-rtl { direction:ltr; }
             .timeline-lane-row::before { display:none; }
             .timeline-bend { display:none; }
-            .timeline-event::after {
-                top:22px;
-                left:-.12rem;
-                width:12px;
-                height:4px;
-            }
-            .timeline-lane-row.dir-ltr .timeline-event::after,
-            .timeline-lane-row.dir-rtl .timeline-event::after { left:-.12rem; right:auto; }
             .timeline-event,
             .timeline-event.compact,
             .timeline-event.regular,
             .timeline-event.expanded,
-            .timeline-event.featured { flex:1 1 auto; min-width:0; width:100%; }
-            .timeline-track::after { height:3px; }
-            .timeline-track { padding-bottom:.22rem; }
+            .timeline-event.featured { flex:1 1 auto; min-width:0; width:100%; padding-top:0; }
+            .timeline-track {
+                position:relative;
+                top:auto;
+                left:auto;
+                right:auto;
+                padding-bottom:.22rem;
+                pointer-events:auto;
+            }
             .timeline-node { width:15px; height:15px; }
             .timeline-item { padding:.54rem .6rem .5rem .6rem; border-radius:14px; }
             .timeline-item::before { margin:-.54rem -.6rem .4rem -.6rem; }
