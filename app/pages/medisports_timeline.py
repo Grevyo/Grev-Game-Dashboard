@@ -620,77 +620,97 @@ def render(data: dict):
         .timeline-season-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.74rem; padding:.1rem .16rem .54rem .16rem; border-bottom:1px solid #223446; }
         .timeline-season-title { color:#e1eefc; font-size:.92rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
         .timeline-season-count { color:#89a0b7; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
-        .timeline-season-lanes {
-            position:relative;
-            display:flex;
-            flex-direction:column;
-            gap:.56rem;
-            padding:.08rem 0 .08rem 0;
-        }
-        .timeline-season-lanes::before {
+        .timeline-season-lanes { display:flex; flex-direction:column; gap:.7rem; position:relative; }
+        .timeline-lane-row { position:relative; display:flex; flex-wrap:wrap; gap:.74rem .78rem; align-items:flex-start; align-content:flex-start; padding:0 .16rem; }
+        .timeline-lane-row.dir-rtl { direction:rtl; }
+        .timeline-lane-row.dir-rtl .timeline-event { direction:ltr; }
+        .timeline-lane-row::before {
             content:"";
             position:absolute;
-            left:50%;
-            transform:translateX(-50%);
-            top:.15rem;
-            bottom:.15rem;
-            width:5px;
+            left:.72rem;
+            right:.72rem;
+            top:22px;
+            height:5px;
             border-radius:999px;
-            background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .28) 0%, rgba(var(--timeline-spine-rgb), .84) 28%, rgba(var(--timeline-spine-rgb), .86) 72%, rgba(var(--timeline-spine-rgb), .3) 100%);
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .16), 0 0 18px rgba(var(--timeline-spine-rgb), .24);
-            z-index:1;
+            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .22) 0%, rgba(var(--timeline-spine-rgb), .78) 14%, rgba(var(--timeline-spine-rgb), .82) 86%, rgba(var(--timeline-spine-rgb), .22) 100%);
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .15), 0 0 20px rgba(var(--timeline-spine-rgb), .28);
             pointer-events:none;
+            z-index:1;
         }
-        .timeline-event-row {
+        .timeline-bend {
             position:relative;
-            display:grid;
-            grid-template-columns:minmax(0, 1fr) 58px minmax(0, 1fr);
-            align-items:flex-start;
-            column-gap:.9rem;
+            height:42px;
+            margin:-.08rem 0 -.02rem 0;
             z-index:2;
         }
+        .timeline-bend::before {
+            content:"";
+            position:absolute;
+            top:0;
+            width:5px;
+            height:100%;
+            border-radius:999px;
+            background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .78) 0%, rgba(var(--timeline-spine-rgb), .52) 100%);
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .15), 0 0 16px rgba(var(--timeline-spine-rgb), .22);
+            pointer-events:none;
+        }
+        .timeline-bend::after {
+            content:"";
+            position:absolute;
+            top:-2px;
+            width:40px;
+            height:40px;
+            border:5px solid rgba(var(--timeline-spine-rgb), .72);
+            border-top-color:transparent;
+            background:transparent;
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .14), 0 0 14px rgba(var(--timeline-spine-rgb), .2);
+            pointer-events:none;
+        }
+        .timeline-bend.to-right::before { right:.65rem; }
+        .timeline-bend.to-right::after { right:.65rem; border-radius:0 0 0 34px; border-right-color:transparent; }
+        .timeline-bend.to-left::before { left:.65rem; }
+        .timeline-bend.to-left::after { left:.65rem; border-radius:0 0 34px 0; border-left-color:transparent; }
         .timeline-event {
             position:relative;
-            min-width:0;
+            min-width:min(100%, 210px);
             max-width:100%;
+            flex:1 1 290px;
             align-self:start;
+            height:auto;
             display:flex;
             flex-direction:column;
         }
-        .timeline-event.left-col { grid-column:1; }
-        .timeline-event.right-col { grid-column:3; }
-        .timeline-event.compact { max-width:380px; }
-        .timeline-event.regular { max-width:500px; }
-        .timeline-event.expanded { max-width:600px; }
-        .timeline-event.featured { max-width:680px; }
-        .timeline-event.left-col { justify-self:end; width:min(100%, 96%); }
-        .timeline-event.right-col { justify-self:start; width:min(100%, 96%); }
-        .timeline-event.featured .timeline-item { border-left-width:3px; box-shadow:0 14px 28px rgba(0, 0, 0, .34); }
-        .timeline-spine-anchor {
-            grid-column:2;
-            position:relative;
-            min-height:100%;
-            display:flex;
-            justify-content:center;
-            padding-top:.35rem;
-        }
-        .timeline-node-wrap { display:flex; flex-direction:column; align-items:center; gap:.26rem; }
-        .timeline-connector {
+        .timeline-event::after {
+            content:"";
             position:absolute;
-            top:16px;
-            height:4px;
-            width:calc(100% + .45rem);
+            top:21px;
+            width:16px;
+            height:5px;
             border-radius:999px;
-            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .35), rgba(var(--timeline-spine-rgb), .84));
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .14), 0 0 10px rgba(var(--timeline-spine-rgb), .2);
+            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .5), rgba(var(--timeline-spine-rgb), .82));
+            box-shadow:0 0 8px rgba(var(--timeline-spine-rgb), .22);
+            z-index:3;
             pointer-events:none;
         }
-        .timeline-event-row.left .timeline-connector {
-            right:100%;
-            transform:scaleX(-1);
-        }
-        .timeline-event-row.right .timeline-connector {
-            left:100%;
+        .timeline-lane-row.dir-ltr .timeline-event::after { right:-.72rem; }
+        .timeline-lane-row.dir-rtl .timeline-event::after { left:-.72rem; }
+        .timeline-lane-row.dir-ltr .timeline-event:last-child::after,
+        .timeline-lane-row.dir-rtl .timeline-event:last-child::after { display:none; }
+        .timeline-lane-row.has-next.dir-ltr .timeline-event:last-child::after { display:block; width:24px; right:-1.22rem; }
+        .timeline-lane-row.has-next.dir-rtl .timeline-event:last-child::after { display:block; width:24px; left:-1.22rem; }
+        .timeline-event.compact { flex:0.8 1 220px; }
+        .timeline-event.regular { flex:1 1 290px; }
+        .timeline-event.expanded { flex:1.25 1 360px; }
+        .timeline-event.featured { flex:1.45 1 430px; }
+        .timeline-event.featured .timeline-item { border-left-width:3px; box-shadow:0 14px 28px rgba(0, 0, 0, .34); }
+        .timeline-track { display:flex; align-items:center; gap:.42rem; padding:.01rem .14rem .3rem .14rem; }
+        .timeline-track::after {
+            content:"";
+            flex:1;
+            height:4px;
+            border-radius:999px;
+            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .35), rgba(var(--timeline-spine-rgb), .82));
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .16), 0 0 12px rgba(var(--timeline-spine-rgb), .25);
         }
         .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
         .timeline-node {
@@ -765,12 +785,14 @@ def render(data: dict):
         .timeline-item.tone-milestone::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
         .timeline-item.tone-general::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
         @media (max-width: 1280px) {
-            .timeline-event-row { grid-template-columns:minmax(0, 1fr) 52px minmax(0, 1fr); column-gap:.74rem; }
-            .timeline-event.compact { max-width:340px; }
-            .timeline-event.regular { max-width:460px; }
-            .timeline-event.expanded { max-width:540px; }
-            .timeline-event.featured { max-width:600px; }
-            .timeline-connector { width:calc(100% + .32rem); }
+            .timeline-lane-row { gap:.66rem .66rem; }
+            .timeline-lane-row::before { left:.6rem; right:.6rem; top:22px; height:3px; }
+            .timeline-bend { height:34px; }
+            .timeline-bend::after { width:32px; height:32px; border-width:4px; }
+            .timeline-event { flex:1 1 260px; min-width:min(100%, 200px); }
+            .timeline-event.compact { flex:0.9 1 220px; }
+            .timeline-event.expanded { flex:1.2 1 320px; }
+            .timeline-event.featured { flex:1.35 1 360px; }
         }
         @media (max-width: 960px) {
             .timeline-wrap { gap:.86rem; }
@@ -788,29 +810,30 @@ def render(data: dict):
                 background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .84), rgba(var(--timeline-spine-rgb), .5));
                 box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .2), 0 0 14px rgba(var(--timeline-spine-rgb), .24);
             }
-            .timeline-event-row {
-                grid-template-columns:24px minmax(0, 1fr);
-                column-gap:.46rem;
-                padding:0;
+            .timeline-lane-row {
+                display:flex;
+                flex-direction:column;
+                gap:.54rem;
+                padding:0 .06rem 0 .38rem;
             }
-            .timeline-spine-anchor { grid-column:1; justify-content:flex-start; align-items:flex-start; padding-top:.24rem; }
-            .timeline-node-wrap { align-items:flex-start; }
-            .timeline-event,
-            .timeline-event.left-col,
-            .timeline-event.right-col { grid-column:2; justify-self:stretch; width:100%; max-width:none; }
-            .timeline-event-row.left .timeline-connector,
-            .timeline-event-row.right .timeline-connector {
-                left:10px;
-                right:auto;
-                transform:none;
-                width:14px;
-                top:16px;
+            .timeline-lane-row.dir-rtl { direction:ltr; }
+            .timeline-lane-row::before { display:none; }
+            .timeline-bend { display:none; }
+            .timeline-event::after {
+                top:22px;
+                left:-.12rem;
+                width:12px;
+                height:4px;
             }
+            .timeline-lane-row.dir-ltr .timeline-event::after,
+            .timeline-lane-row.dir-rtl .timeline-event::after { left:-.12rem; right:auto; }
             .timeline-event,
             .timeline-event.compact,
             .timeline-event.regular,
             .timeline-event.expanded,
-            .timeline-event.featured { min-width:0; width:100%; max-width:none; }
+            .timeline-event.featured { flex:1 1 auto; min-width:0; width:100%; }
+            .timeline-track::after { height:3px; }
+            .timeline-track { padding-bottom:.22rem; }
             .timeline-node { width:15px; height:15px; }
             .timeline-item { padding:.54rem .6rem .5rem .6rem; border-radius:14px; }
             .timeline-item::before { margin:-.54rem -.6rem .4rem -.6rem; }
@@ -865,95 +888,106 @@ def render(data: dict):
         ]
 
         event_index = 0
-        for row_position, (_, row) in enumerate(season_events.iterrows()):
-            event_index += 1
-            date_value = row.get("date")
-            date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
-            title = _display_value(row.get("title")) or "Untitled event"
-            details = _display_value(row.get("details"))
-            meta_line = _timeline_meta_line(row)
-            notes = _display_value(row.get("notes"))
-            highlights = _timeline_highlights(row)
-            tone, tone_label = _event_tone(row)
-            priority = _event_priority(row)
+        season_rows = list(season_events.iterrows())
+        row_size = 3
+        total_chunks = (len(season_rows) + row_size - 1) // row_size
+        for chunk_index in range(0, len(season_rows), row_size):
+            chunk = season_rows[chunk_index : chunk_index + row_size]
+            row_position = chunk_index // row_size
+            lane_reverse = (chunk_index // row_size) % 2 == 1
+            lane_parts = ["timeline-lane-row", "dir-rtl" if lane_reverse else "dir-ltr"]
+            if row_position < total_chunks - 1:
+                lane_parts.append("has-next")
+            lane_class = " ".join(lane_parts)
+            row_html_parts: list[str] = [f"<div class='{lane_class}'>"]
+            for _, row in chunk:
+                event_index += 1
+                date_value = row.get("date")
+                date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
+                title = _display_value(row.get("title")) or "Untitled event"
+                details = _display_value(row.get("details"))
+                meta_line = _timeline_meta_line(row)
+                notes = _display_value(row.get("notes"))
+                highlights = _timeline_highlights(row)
+                tone, tone_label = _event_tone(row)
+                priority = _event_priority(row)
 
-            _, player_path = _resolve_player_visual(row, player_photo_index)
-            _, competition_logo_path, trophy_path = _resolve_tournament_visual(
-                row,
-                known_competitions,
-                competition_logo_index,
-                achievement_reference,
-            )
-            player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
-            competition_uri = (
-                image_data_uri_thumbnail(competition_logo_path, max_width=140, max_height=140) if competition_logo_path else None
-            )
-            trophy_uri = image_data_uri_thumbnail(trophy_path, max_width=140, max_height=140) if trophy_path else None
-            visuals = _visual_priority(row, player_uri, competition_uri, trophy_uri)
+                _, player_path = _resolve_player_visual(row, player_photo_index)
+                _, competition_logo_path, trophy_path = _resolve_tournament_visual(
+                    row,
+                    known_competitions,
+                    competition_logo_index,
+                    achievement_reference,
+                )
+                player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
+                competition_uri = (
+                    image_data_uri_thumbnail(competition_logo_path, max_width=140, max_height=140) if competition_logo_path else None
+                )
+                trophy_uri = image_data_uri_thumbnail(trophy_path, max_width=140, max_height=140) if trophy_path else None
+                visuals = _visual_priority(row, player_uri, competition_uri, trophy_uri)
 
-            meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
-            details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
-            media_html = ""
-            if visuals:
-                media_cards = "".join(
+                meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
+                details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
+                media_html = ""
+                if visuals:
+                    media_cards = "".join(
+                        (
+                            "<div class='timeline-media-card'>"
+                            f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
+                            f"<div class='label'>{label}</div>"
+                            "</div>"
+                        )
+                        for label, uri in visuals
+                    )
+                    media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}</div>"
+
+                chips_html = ""
+                if highlights:
+                    chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
+                    chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
+                notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
+                footer_html = f"<div class='timeline-footer'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
+
+                title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
+                width_class = _event_width_class(
+                    row,
+                    visuals_count=len(visuals),
+                    highlights_count=len(highlights),
+                    priority=priority,
+                )
+
+                row_html_parts.append(
                     (
-                        "<div class='timeline-media-card'>"
-                        f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
-                        f"<div class='label'>{label}</div>"
+                        f"<div class='timeline-event {_safe_html(priority)} {_safe_html(width_class)} tone-{_safe_html(tone)}'>"
+                        "<div class='timeline-track'>"
+                        f"<span class='timeline-anchor-index'>#{event_index}</span>"
+                        "<span class='timeline-node'></span>"
+                        f"<span class='timeline-node-date'>{_safe_html(date_text)}</span>"
+                        "</div>"
+                        f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
+                        "<div class='timeline-content'>"
+                        "<div class='timeline-main'>"
+                        "<div class='timeline-head'>"
+                        f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
+                        "<div class='timeline-badges'>"
+                        f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
+                        f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
+                        "</div>"
+                        "</div>"
+                        f"<div class='{title_class}'>{_safe_html(title)}</div>"
+                        f"{meta_html}{details_html}{footer_html}"
+                        "</div>"
+                        f"{media_html}"
+                        "</div>"
+                        "</div>"
                         "</div>"
                     )
-                    for label, uri in visuals
                 )
-                media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}</div>"
-
-            chips_html = ""
-            if highlights:
-                chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
-                chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
-            notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
-            footer_html = f"<div class='timeline-footer'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
-
-            title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
-            width_class = _event_width_class(
-                row,
-                visuals_count=len(visuals),
-                highlights_count=len(highlights),
-                priority=priority,
-            )
-            side = "left" if row_position % 2 == 0 else "right"
-            event_col_class = "left-col" if side == "left" else "right-col"
-
-            season_html_parts.append(
-                (
-                    f"<div class='timeline-event-row {side}'>"
-                    "<div class='timeline-spine-anchor'>"
-                    "<div class='timeline-node-wrap'>"
-                    f"<span class='timeline-anchor-index'>#{event_index}</span>"
-                    "<span class='timeline-node'></span>"
-                    f"<span class='timeline-node-date'>{_safe_html(date_text)}</span>"
-                    "</div>"
-                    "<span class='timeline-connector'></span>"
-                    "</div>"
-                    f"<div class='timeline-event {event_col_class} {_safe_html(priority)} {_safe_html(width_class)} tone-{_safe_html(tone)}'>"
-                    f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
-                    "<div class='timeline-content'>"
-                    "<div class='timeline-main'>"
-                    "<div class='timeline-head'>"
-                    f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
-                    "<div class='timeline-badges'>"
-                    f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
-                    f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
-                    "</div>"
-                    "</div>"
-                    f"<div class='{title_class}'>{_safe_html(title)}</div>"
-                    f"{meta_html}{details_html}{footer_html}"
-                    "</div>"
-                    f"{media_html}"
-                    "</div>"
-                    "</div>"
-                    "</div>"
-                )
-            )
+            row_html_parts.append("</div>")
+            season_html_parts.append("".join(row_html_parts))
+            if chunk_index + row_size < len(season_rows):
+                bend_class = "timeline-bend to-left" if lane_reverse else "timeline-bend to-right"
+                season_html_parts.append(f"<div class='{bend_class}'></div>")
 
         season_html_parts.extend(["</div>", "</div>"])
         timeline_html_parts.append("".join(season_html_parts))
