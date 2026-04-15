@@ -436,20 +436,33 @@ def render(data: dict):
         """
         <style>
         .timeline-wrap { display:flex; flex-direction:column; gap:1.5rem; margin-top:.55rem; }
-        .timeline-season-block { position:relative; margin-bottom:.4rem; padding:1.05rem .9rem .55rem .9rem; border:1px solid #213042; border-radius:16px; background:linear-gradient(180deg, rgba(10,17,27,.84) 0%, rgba(9,14,22,.95) 100%); }
+        .timeline-season-block { position:relative; margin-bottom:.4rem; padding:1.05rem .9rem .75rem .9rem; border:1px solid #213042; border-radius:16px; background:linear-gradient(180deg, rgba(10,17,27,.84) 0%, rgba(9,14,22,.95) 100%); }
         .timeline-season-header { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:.95rem; padding:.15rem .2rem .7rem .2rem; border-bottom:1px solid #223446; }
         .timeline-season-title { color:#e1eefc; font-size:.92rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
         .timeline-season-count { color:#89a0b7; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
         .timeline-period-stack { display:flex; flex-direction:column; gap:.9rem; }
-        .timeline-period-block { border:1px solid #243548; border-radius:12px; padding:.65rem .62rem .62rem .62rem; background:linear-gradient(180deg, rgba(16,24,35,.82) 0%, rgba(11,17,26,.95) 100%); }
-        .timeline-period-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.56rem; padding-bottom:.46rem; border-bottom:1px dashed rgba(120,142,166,.26); }
+        .timeline-period-block { border:1px solid #243548; border-radius:12px; padding:.65rem .62rem .72rem .62rem; background:linear-gradient(180deg, rgba(16,24,35,.82) 0%, rgba(11,17,26,.95) 100%); }
+        .timeline-period-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.62rem; padding-bottom:.46rem; border-bottom:1px dashed rgba(120,142,166,.26); }
         .timeline-period-title { color:#c6daef; font-size:.68rem; letter-spacing:.11em; text-transform:uppercase; font-weight:760; }
         .timeline-period-count { color:#7390ac; font-size:.55rem; letter-spacing:.11em; text-transform:uppercase; }
-        .timeline-group { display:grid; grid-template-columns: minmax(0, 1fr); gap:.58rem; }
-        .timeline-item-wrap { position:relative; padding-left:.62rem; }
-        .timeline-item-wrap::before { content:""; position:absolute; left:.03rem; top:.72rem; bottom:.72rem; width:2px; border-radius:999px; background:linear-gradient(180deg, rgba(125,143,164,.38), rgba(60,74,90,.18)); }
+        .timeline-axis { position:relative; display:flex; flex-direction:column; gap:.85rem; padding:.18rem .1rem .1rem .1rem; }
+        .timeline-axis::before { content:""; position:absolute; left:50%; top:.2rem; bottom:.4rem; width:2px; border-radius:999px; transform:translateX(-50%); background:linear-gradient(180deg, rgba(139,165,192,.45) 0%, rgba(109,128,150,.2) 20%, rgba(109,128,150,.16) 80%, rgba(139,165,192,.35) 100%); }
+        .timeline-event { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 118px minmax(0, 1fr); align-items:start; column-gap:.9rem; }
+        .timeline-anchor { position:relative; grid-column:2; justify-self:center; display:flex; flex-direction:column; align-items:center; gap:.32rem; z-index:2; }
+        .timeline-node { width:18px; height:18px; border-radius:50%; border:2px solid #9bb7d4; background:radial-gradient(circle, rgba(222,238,255,.95) 0%, rgba(134,170,205,.95) 44%, rgba(21,34,48,.98) 100%); box-shadow:0 0 0 4px rgba(112,146,179,.12), 0 0 14px rgba(112,146,179,.25); }
+        .timeline-node-date { color:#b7cee4; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; background:rgba(13,24,35,.86); border:1px solid rgba(95,124,151,.43); border-radius:999px; padding:.16rem .42rem; white-space:nowrap; }
+        .timeline-card-wrap { position:relative; }
+        .timeline-event.left .timeline-card-wrap { grid-column:1; }
+        .timeline-event.right .timeline-card-wrap { grid-column:3; }
+        .timeline-event.left .timeline-card-wrap::after,
+        .timeline-event.right .timeline-card-wrap::after { content:""; position:absolute; top:1.22rem; width:26px; border-top:1px dashed rgba(132,157,181,.45); }
+        .timeline-event.left .timeline-card-wrap::after { right:-26px; }
+        .timeline-event.right .timeline-card-wrap::after { left:-26px; }
+        .timeline-event.featured .timeline-card-wrap { grid-column:1 / 4; justify-self:center; width:min(840px, calc(100% - 28px)); margin-top:.26rem; }
+        .timeline-event.featured .timeline-node { width:22px; height:22px; border-width:3px; box-shadow:0 0 0 5px rgba(189,153,75,.14), 0 0 16px rgba(189,153,75,.34); }
+        .timeline-event.featured .timeline-node-date { color:#f4dfb8; border-color:rgba(184,146,72,.55); }
         .timeline-item { border:1px solid #2a3848; border-radius:12px; padding:.78rem .88rem .72rem .88rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 7px 18px rgba(0, 0, 0, .18); border-left-width:3px; }
-        .timeline-item.featured { padding-top:.88rem; border-width:1px; border-left-width:4px; box-shadow:0 10px 22px rgba(0, 0, 0, .24); }
+        .timeline-item.featured { padding:.92rem 1rem .82rem 1rem; border-width:1px; border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
         .timeline-content { display:grid; grid-template-columns: minmax(0, 1fr) auto; gap:.85rem; align-items:start; }
         .timeline-head { display:flex; flex-wrap:wrap; align-items:center; gap:.38rem .58rem; justify-content:space-between; }
         .timeline-date { color:#e8f4ff; font-size:.75rem; letter-spacing:.1em; text-transform:uppercase; font-weight:770; padding:.15rem .42rem; border:1px solid rgba(160,185,210,.32); border-radius:999px; background:rgba(16,27,39,.65); }
@@ -479,8 +492,18 @@ def render(data: dict):
         .tone-organisation .timeline-tag { color:#cce0ff; border-color:rgba(77,121,189,.45); background:rgba(77,121,189,.14); }
         .tone-milestone .timeline-tag { color:#d5f0d8; border-color:rgba(92,157,98,.42); background:rgba(92,157,98,.15); }
         .tone-general .timeline-tag { color:#d2deea; border-color:rgba(95,115,138,.42); background:rgba(95,115,138,.13); }
-        @media (min-width: 1080px) {
-            .timeline-group { grid-template-columns: repeat(2, minmax(0, 1fr)); gap:.62rem .72rem; }
+        @media (max-width: 960px) {
+            .timeline-axis::before { left:15px; transform:none; }
+            .timeline-event { grid-template-columns:34px minmax(0, 1fr); column-gap:.52rem; }
+            .timeline-anchor { grid-column:1; }
+            .timeline-card-wrap,
+            .timeline-event.left .timeline-card-wrap,
+            .timeline-event.right .timeline-card-wrap,
+            .timeline-event.featured .timeline-card-wrap { grid-column:2; width:100%; justify-self:stretch; margin-top:0; }
+            .timeline-event.left .timeline-card-wrap::after,
+            .timeline-event.right .timeline-card-wrap::after { left:-19px; right:auto; width:19px; }
+            .timeline-content { grid-template-columns:minmax(0, 1fr); gap:.62rem; }
+            .timeline-media { justify-content:start; }
         }
         </style>
         """,
@@ -544,11 +567,12 @@ def render(data: dict):
                     f"<div class='timeline-period-title'>{_safe_html(period_label)}</div>"
                     f"<div class='timeline-period-count'>{len(period_events)} events</div>"
                     "</div>"
-                    "<div class='timeline-group'>"
+                    "<div class='timeline-axis'>"
                 ),
                 unsafe_allow_html=True,
             )
 
+            side_cursor = 0
             for _, row in period_events.iterrows():
                 date_value = row.get("date")
                 date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
@@ -559,6 +583,9 @@ def render(data: dict):
                 highlights = _timeline_highlights(row)
                 tone, tone_label = _event_tone(row)
                 priority = _event_priority(row)
+                side = "featured" if priority == "featured" else ("left" if side_cursor % 2 == 0 else "right")
+                if priority != "featured":
+                    side_cursor += 1
 
                 _, player_path = _resolve_player_visual(row, player_photo_index)
                 _, competition_logo_path, trophy_path = _resolve_tournament_visual(
@@ -598,7 +625,12 @@ def render(data: dict):
                 title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
                 st.markdown(
                     (
-                        "<div class='timeline-item-wrap'>"
+                        f"<div class='timeline-event {_safe_html(side)} {_safe_html(priority)} tone-{_safe_html(tone)}'>"
+                        "<div class='timeline-anchor'>"
+                        "<div class='timeline-node'></div>"
+                        f"<div class='timeline-node-date'>{_safe_html(date_text)}</div>"
+                        "</div>"
+                        "<div class='timeline-card-wrap'>"
                         f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
                         "<div class='timeline-content'>"
                         "<div>"
@@ -606,7 +638,7 @@ def render(data: dict):
                         f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
                         "<div class='timeline-badges'>"
                         f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
-                        f"<span class='timeline-tag'>{_safe_html(priority.title())}</span>"
+                        f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
                         "</div>"
                         "</div>"
                         f"<div class='{title_class}'>{_safe_html(title)}</div>"
