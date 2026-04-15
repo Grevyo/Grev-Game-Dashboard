@@ -607,273 +607,60 @@ def render(data: dict):
     st.markdown(
         """
         <style>
-        :root {
-            --timeline-spine-rgb: 96, 152, 231;
-            --timeline-spine-main: rgb(var(--timeline-spine-rgb));
-            --timeline-spine-soft: rgba(var(--timeline-spine-rgb), .3);
-            --timeline-spine-glow: rgba(var(--timeline-spine-rgb), .22);
-            --timeline-row-mid: 154px;
-        }
-        .timeline-wrap { display:flex; flex-direction:column; gap:1.02rem; margin-top:.5rem; }
-        .timeline-season-block { position:relative; margin-bottom:.2rem; padding:.9rem .84rem .68rem .84rem; border:1px solid #213042; border-radius:18px; background:linear-gradient(180deg, rgba(10,17,27,.82) 0%, rgba(9,14,22,.96) 100%); }
-        .timeline-season-block::before { content:""; position:absolute; left:1.15rem; right:1.15rem; top:0; height:2px; border-radius:999px; background:linear-gradient(90deg, rgba(160,190,220,.06), rgba(160,190,220,.28), rgba(160,190,220,.06)); }
-        .timeline-season-block::after { content:""; position:absolute; left:1.2rem; right:1.2rem; top:66px; border-top:1px dashed rgba(117,146,172,.26); }
-        .timeline-season-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.74rem; padding:.1rem .16rem .54rem .16rem; border-bottom:1px solid #223446; }
-        .timeline-season-title { color:#e1eefc; font-size:.92rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
-        .timeline-season-count { color:#89a0b7; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
-        .timeline-season-lanes { display:flex; flex-direction:column; gap:.82rem; position:relative; }
-        .timeline-lane-row {
-            position:relative;
-            display:flex;
-            flex-wrap:nowrap;
-            gap:.82rem .84rem;
-            align-items:stretch;
-            align-content:stretch;
-            padding:.16rem .16rem .18rem .16rem;
-            min-height:308px;
-        }
-        .timeline-lane-row.dir-rtl { direction:rtl; }
-        .timeline-lane-row.dir-rtl .timeline-event { direction:ltr; }
-        .timeline-lane-row::before {
-            content:"";
-            position:absolute;
-            left:.68rem;
-            right:.68rem;
-            top:var(--timeline-row-mid);
-            height:3px;
-            border-radius:999px;
-            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .18) 0%, rgba(var(--timeline-spine-rgb), .8) 16%, rgba(var(--timeline-spine-rgb), .8) 84%, rgba(var(--timeline-spine-rgb), .18) 100%);
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .14), 0 0 14px rgba(var(--timeline-spine-rgb), .2);
-            pointer-events:none;
-            z-index:1;
-        }
-        .timeline-bend {
-            position:relative;
-            height:30px;
-            margin:-.15rem 0 -.12rem 0;
-            z-index:2;
-        }
-        .timeline-bend::before {
-            content:"";
-            position:absolute;
-            top:0;
-            width:3px;
-            height:100%;
-            border-radius:999px;
-            background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .78) 0%, rgba(var(--timeline-spine-rgb), .46) 100%);
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .12), 0 0 12px rgba(var(--timeline-spine-rgb), .18);
-            pointer-events:none;
-        }
-        .timeline-bend::after {
-            content:"";
-            position:absolute;
-            top:-1px;
-            width:28px;
-            height:28px;
-            border:3px solid rgba(var(--timeline-spine-rgb), .72);
-            border-top-color:transparent;
-            background:transparent;
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .12), 0 0 10px rgba(var(--timeline-spine-rgb), .18);
-            pointer-events:none;
-        }
-        .timeline-bend.to-right::before { right:.62rem; }
-        .timeline-bend.to-right::after { right:.62rem; border-radius:0 0 0 24px; border-right-color:transparent; }
-        .timeline-bend.to-left::before { left:.62rem; }
-        .timeline-bend.to-left::after { left:.62rem; border-radius:0 0 24px 0; border-left-color:transparent; }
-        .timeline-event {
-            position:relative;
-            min-width:min(100%, 210px);
-            max-width:100%;
-            flex:1 1 290px;
-            display:grid;
-            grid-template-rows: 1fr 0 1fr;
-            align-items:stretch;
-            min-height:308px;
-        }
-        .timeline-card-shell {
-            position:relative;
-            grid-column:1;
-            width:100%;
-        }
-        .timeline-event.pos-above .timeline-card-shell { grid-row:1; align-self:end; margin-bottom:26px; }
-        .timeline-event.pos-below .timeline-card-shell { grid-row:3; align-self:start; margin-top:26px; }
-        .timeline-card-shell::after {
-            content:"";
-            position:absolute;
-            left:50%;
-            width:2px;
-            transform:translateX(-50%);
-            background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .8), rgba(var(--timeline-spine-rgb), .42));
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .1), 0 0 8px rgba(var(--timeline-spine-rgb), .2);
-            pointer-events:none;
-        }
-        .timeline-event.pos-above .timeline-card-shell::after { bottom:-26px; height:26px; }
-        .timeline-event.pos-below .timeline-card-shell::after { top:-26px; height:26px; }
-        .timeline-node-anchor {
-            grid-row:2;
-            position:absolute;
-            top:var(--timeline-row-mid);
-            left:50%;
-            transform:translate(-50%, -50%);
-            z-index:4;
-            display:flex;
-            align-items:center;
-            gap:.34rem;
-            pointer-events:none;
-            white-space:nowrap;
-        }
-        .timeline-event.compact { flex:0.8 1 220px; }
-        .timeline-event.regular { flex:1 1 290px; }
-        .timeline-event.expanded { flex:1.25 1 360px; }
-        .timeline-event.featured { flex:1.45 1 430px; }
-        .timeline-event.featured .timeline-item { border-left-width:3px; box-shadow:0 14px 28px rgba(0, 0, 0, .34); }
-        .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
-        .timeline-node {
-            width:14px;
-            height:14px;
-            border-radius:50%;
-            border:2px solid rgba(var(--timeline-spine-rgb), .9);
-            background:radial-gradient(circle, rgba(224,239,255,.98) 0%, rgba(157,194,238,.96) 44%, rgba(20,34,52,.99) 100%);
-            box-shadow:0 0 0 4px rgba(var(--timeline-spine-rgb), .16), 0 0 14px rgba(var(--timeline-spine-rgb), .28);
-        }
-        .timeline-node-date { color:#b7cee4; font-size:.54rem; letter-spacing:.1em; text-transform:uppercase; background:rgba(13,24,35,.76); border:1px solid rgba(95,124,151,.33); border-radius:999px; padding:.16rem .46rem; white-space:nowrap; }
-        .timeline-event.featured .timeline-node { width:20px; height:20px; border-width:3px; box-shadow:0 0 0 5px rgba(189,153,75,.15), 0 0 16px rgba(189,153,75,.32); }
-        .timeline-event.featured .timeline-node-date { color:#f4dfb8; border-color:rgba(184,146,72,.55); }
-        .timeline-item { border:1px solid #2a3848; border-radius:16px; padding:.54rem .62rem .5rem .62rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 8px 18px rgba(0, 0, 0, .2); border-left-width:3px; overflow:hidden; width:100%; height:auto; align-self:start; }
-        .timeline-item::before { content:""; display:block; height:2px; margin:-.54rem -.62rem .38rem -.62rem; background:linear-gradient(90deg, rgba(160,190,220,.02), rgba(160,190,220,.33), rgba(160,190,220,.02)); }
-        .timeline-item.featured { padding:.62rem .72rem .56rem .72rem; border-width:1px; border-left-width:4px; box-shadow:0 12px 26px rgba(0, 0, 0, .3); }
-        .timeline-item.featured::before { margin:-.62rem -.72rem .44rem -.72rem; height:3px; }
-        .timeline-content { display:flex; gap:.48rem; align-items:flex-start; justify-content:space-between; }
-        .timeline-main { flex:1 1 auto; min-width:0; }
-        .timeline-head { display:flex; flex-wrap:wrap; align-items:center; gap:.28rem .44rem; justify-content:space-between; }
-        .timeline-date { color:#e8f4ff; font-size:.7rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; padding:.14rem .4rem; border:1px solid rgba(160,185,210,.3); border-radius:999px; background:rgba(16,27,39,.58); }
-        .timeline-badges { display:flex; flex-wrap:wrap; gap:.3rem; justify-content:flex-end; }
-        .timeline-tag { font-size:.58rem; letter-spacing:.11em; text-transform:uppercase; border-radius:999px; padding:.16rem .42rem; border:1px solid rgba(152,176,199,.34); color:#bdd4ea; }
-        .timeline-title { color:#f2f8ff; font-size:.91rem; font-weight:760; margin:.22rem 0 .1rem 0; line-height:1.23; }
-        .timeline-title.featured { font-size:1.02rem; }
-        .timeline-meta { color:#9cb0c5; font-size:.63rem; margin-bottom:.14rem; letter-spacing:.065em; text-transform:uppercase; }
-        .timeline-details { color:#c9d8e8; font-size:.78rem; line-height:1.4; margin:0 0 .2rem 0; }
-        .timeline-footer { border-top:1px solid rgba(85,108,130,.22); margin-top:.2rem; padding-top:.2rem; }
-        .timeline-chips { display:flex; flex-wrap:wrap; gap:.24rem; margin-top:.05rem; }
-        .timeline-chip { border-radius:5px; font-size:.57rem; letter-spacing:.09em; text-transform:uppercase; color:#d0e2f5; padding:.16rem .36rem; background:#132131; border:1px solid #36516b; }
-        .timeline-notes { margin-top:.18rem; color:#8ea9c1; font-size:.68rem; line-height:1.34; }
-        .timeline-media {
-            display:flex;
-            flex-direction:column;
-            gap:.22rem;
-            min-width:78px;
-            max-width:110px;
-            flex:0 1 30%;
-            justify-content:flex-start;
-            align-content:flex-start;
-            align-self:start;
-        }
-        .timeline-media-card { width:100%; border:1px solid #2f4255; border-radius:10px; overflow:hidden; background:#0c1420; }
-        .timeline-media-card img { width:100%; height:52px; object-fit:contain; object-position:center; display:block; background:radial-gradient(circle at center, #0f1d2b 0%, #09121c 100%); }
-        .timeline-media.media-2 .timeline-media-card img { height:48px; }
-        .timeline-media.media-3 .timeline-media-card img { height:42px; }
-        .timeline-event.featured .timeline-media.media-1 .timeline-media-card img { height:56px; }
-        .timeline-event.compact .timeline-content { gap:.4rem; }
-        .timeline-event.compact .timeline-media { min-width:68px; max-width:88px; }
-        .timeline-event.compact .timeline-media-card img { height:44px; }
-        .timeline-event.expanded .timeline-media { min-width:88px; max-width:124px; }
-        .timeline-event.expanded .timeline-media-card img { height:58px; }
-        .timeline-event.featured .timeline-media { min-width:96px; max-width:132px; }
-        .timeline-event.featured .timeline-media-card img { height:60px; }
-        .timeline-media-card .label { color:#8ea8be; font-size:.49rem; letter-spacing:.11em; text-transform:uppercase; text-align:center; padding:.12rem .18rem; border-top:1px solid #23384e; }
-        .timeline-item.tone-competition { border-left-color:#b89248; background:linear-gradient(162deg, rgba(184,146,72,.16), rgba(13,20,29,.95) 42%); }
-        .timeline-item.tone-transfer { border-left-color:#3f9b99; background:linear-gradient(162deg, rgba(63,155,153,.16), rgba(13,20,29,.95) 42%); }
-        .timeline-item.tone-ranking { border-left-color:#7f63b8; background:linear-gradient(162deg, rgba(127,99,184,.16), rgba(13,20,29,.95) 42%); }
-        .timeline-item.tone-organisation { border-left-color:#4d79bd; background:linear-gradient(162deg, rgba(77,121,189,.16), rgba(13,20,29,.95) 42%); }
-        .timeline-item.tone-milestone { border-left-color:#5c9d62; background:linear-gradient(162deg, rgba(92,157,98,.16), rgba(13,20,29,.95) 42%); }
-        .timeline-item.tone-general { border-left-color:#5f738a; background:linear-gradient(162deg, rgba(95,115,138,.16), rgba(13,20,29,.95) 42%); }
-        .timeline-item.tone-competition .timeline-tag { color:#f1deb8; border-color:rgba(184,146,72,.45); background:rgba(184,146,72,.12); }
-        .timeline-item.tone-transfer .timeline-tag { color:#b9ece9; border-color:rgba(63,155,153,.45); background:rgba(63,155,153,.14); }
-        .timeline-item.tone-ranking .timeline-tag { color:#d8c8ff; border-color:rgba(127,99,184,.44); background:rgba(127,99,184,.15); }
-        .timeline-item.tone-organisation .timeline-tag { color:#cce0ff; border-color:rgba(77,121,189,.45); background:rgba(77,121,189,.14); }
-        .timeline-item.tone-milestone .timeline-tag { color:#d5f0d8; border-color:rgba(92,157,98,.42); background:rgba(92,157,98,.15); }
-        .timeline-item.tone-general .timeline-tag { color:#d2deea; border-color:rgba(95,115,138,.42); background:rgba(95,115,138,.13); }
-        .timeline-item.tone-competition::before { background:linear-gradient(90deg, rgba(184,146,72,.08), rgba(184,146,72,.55), rgba(184,146,72,.08)); }
-        .timeline-item.tone-transfer::before { background:linear-gradient(90deg, rgba(63,155,153,.08), rgba(63,155,153,.55), rgba(63,155,153,.08)); }
-        .timeline-item.tone-ranking::before { background:linear-gradient(90deg, rgba(127,99,184,.08), rgba(127,99,184,.55), rgba(127,99,184,.08)); }
-        .timeline-item.tone-organisation::before { background:linear-gradient(90deg, rgba(77,121,189,.08), rgba(77,121,189,.55), rgba(77,121,189,.08)); }
-        .timeline-item.tone-milestone::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
-        .timeline-item.tone-general::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
-        @media (max-width: 1280px) {
-            .timeline-lane-row { gap:.66rem .66rem; }
-            .timeline-lane-row::before { left:.6rem; right:.6rem; top:var(--timeline-row-mid); height:3px; }
-            .timeline-bend { height:26px; }
-            .timeline-bend::after { width:24px; height:24px; border-width:3px; }
-            .timeline-event { flex:1 1 260px; min-width:min(100%, 200px); }
-            .timeline-event.compact { flex:0.9 1 220px; }
-            .timeline-event.expanded { flex:1.2 1 320px; }
-            .timeline-event.featured { flex:1.35 1 360px; }
-        }
-        @media (max-width: 960px) {
-            .timeline-wrap { gap:.86rem; }
-            .timeline-season-block { padding:.74rem .68rem .56rem .68rem; border-radius:16px; }
-            .timeline-season-header { margin-bottom:.58rem; padding:.08rem .1rem .42rem .1rem; }
-            .timeline-season-lanes { gap:.48rem; padding-left:.3rem; }
-            .timeline-season-lanes::before {
-                content:"";
-                position:absolute;
-                left:9px;
-                top:0;
-                bottom:0;
-                width:4px;
-                border-radius:999px;
-                background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .84), rgba(var(--timeline-spine-rgb), .5));
-                box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .2), 0 0 14px rgba(var(--timeline-spine-rgb), .24);
-            }
-            .timeline-lane-row {
-                display:flex;
-                flex-direction:column;
-                gap:.54rem;
-                padding:0 .06rem 0 .38rem;
-                min-height:unset;
-            }
-            .timeline-lane-row.dir-rtl { direction:ltr; }
-            .timeline-lane-row::before { display:none; }
-            .timeline-bend { display:none; }
-            .timeline-event { display:block; min-height:unset; padding-left:.42rem; }
-            .timeline-node-anchor {
-                position:absolute;
-                left:-.12rem;
-                top:16px;
-                transform:none;
-                gap:.24rem;
-            }
-            .timeline-card-shell,
-            .timeline-event.pos-above .timeline-card-shell,
-            .timeline-event.pos-below .timeline-card-shell { margin:0; }
-            .timeline-card-shell::after {
-                top:14px;
-                bottom:auto;
-                left:-.05rem;
-                width:11px;
-                height:3px;
-                transform:none;
-                background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .75), rgba(var(--timeline-spine-rgb), .4));
-            }
-            .timeline-event,
-            .timeline-event.compact,
-            .timeline-event.regular,
-            .timeline-event.expanded,
-            .timeline-event.featured { flex:1 1 auto; min-width:0; width:100%; }
-            .timeline-node { width:15px; height:15px; }
-            .timeline-item { padding:.54rem .6rem .5rem .6rem; border-radius:14px; }
-            .timeline-item::before { margin:-.54rem -.6rem .4rem -.6rem; }
-            .timeline-content { display:flex; flex-direction:column; gap:.46rem; }
-            .timeline-media { justify-content:start; min-width:0; max-width:180px; flex:0 1 auto; }
-            .timeline-media-card img { height:52px; }
-            .timeline-media.media-2 .timeline-media-card img { height:48px; }
-            .timeline-media.media-3 .timeline-media-card img { height:44px; }
-            .timeline-anchor-index { font-size:.49rem; padding:.11rem .28rem; }
-            .timeline-node-date { font-size:.52rem; }
-            .timeline-title { font-size:.86rem; margin:.22rem 0 .1rem 0; }
-            .timeline-title.featured { font-size:.95rem; }
-            .timeline-details { font-size:.75rem; margin:0 0 .22rem 0; }
-            .timeline-footer { margin-top:.2rem; padding-top:.22rem; }
+        .timeline-wrap { display:flex; flex-direction:column; gap:1rem; margin-top:.45rem; max-width:1040px; }
+        .timeline-season-block { border:1px solid #223246; border-radius:18px; padding:.8rem .9rem .84rem .9rem; background:linear-gradient(180deg, rgba(10,16,24,.86) 0%, rgba(9,14,22,.98) 100%); }
+        .timeline-season-header { display:flex; align-items:baseline; justify-content:space-between; gap:.4rem; border-bottom:1px solid rgba(81,106,132,.35); padding-bottom:.42rem; margin-bottom:.68rem; }
+        .timeline-season-title { color:#e5f2ff; font-size:.88rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
+        .timeline-season-count { color:#9ab1c8; font-size:.6rem; letter-spacing:.09em; text-transform:uppercase; }
+        .timeline-month-group { margin-top:.68rem; }
+        .timeline-month-header { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.38rem; }
+        .timeline-month-title { color:#b6cee6; font-size:.66rem; letter-spacing:.11em; text-transform:uppercase; font-weight:700; }
+        .timeline-month-count { color:#7f97af; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; }
+        .timeline-month-events { display:flex; flex-direction:column; gap:.42rem; }
+        .timeline-event { border:1px solid #2b3b4e; border-left-width:3px; border-radius:14px; background:linear-gradient(165deg, rgba(19,28,40,.9) 0%, rgba(12,19,28,.98) 58%); box-shadow:0 8px 18px rgba(0,0,0,.22); overflow:hidden; }
+        .timeline-event.featured { border-left-width:4px; box-shadow:0 12px 24px rgba(0,0,0,.28); }
+        .timeline-event-grid { display:grid; grid-template-columns:112px minmax(0, 1fr); gap:.58rem; padding:.52rem .6rem .52rem .6rem; }
+        .timeline-rail { border-right:1px solid rgba(95,121,146,.3); padding-right:.48rem; display:flex; flex-direction:column; gap:.24rem; }
+        .timeline-date { color:#e8f4ff; font-size:.6rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; line-height:1.2; }
+        .timeline-meta { color:#88a2ba; font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; line-height:1.25; }
+        .timeline-badges { display:flex; flex-direction:column; align-items:flex-start; gap:.22rem; }
+        .timeline-tag { font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border-radius:999px; padding:.12rem .36rem; border:1px solid rgba(152,176,199,.36); color:#c5dbf1; }
+        .timeline-main { min-width:0; display:grid; grid-template-columns:minmax(0, 1fr) 94px; gap:.48rem; align-items:start; }
+        .timeline-copy { min-width:0; }
+        .timeline-title { color:#f2f8ff; font-size:.89rem; font-weight:760; line-height:1.26; margin:0 0 .14rem 0; }
+        .timeline-title.featured { font-size:.97rem; }
+        .timeline-details { color:#c9d8e8; font-size:.73rem; line-height:1.37; margin:0 0 .18rem 0; }
+        .timeline-chips { display:flex; flex-wrap:wrap; gap:.22rem; }
+        .timeline-chip { border-radius:6px; font-size:.52rem; letter-spacing:.085em; text-transform:uppercase; color:#d3e4f6; padding:.12rem .32rem; background:#132233; border:1px solid #36506a; }
+        .timeline-notes { margin-top:.16rem; color:#90a9c1; font-size:.64rem; line-height:1.32; }
+        .timeline-media { display:flex; flex-direction:column; gap:.24rem; }
+        .timeline-media-card { border:1px solid #32465c; border-radius:9px; overflow:hidden; background:#0d1724; }
+        .timeline-media-card img { width:100%; height:58px; object-fit:contain; object-position:center; display:block; background:radial-gradient(circle at center, #111f2f 0%, #0b1521 100%); }
+        .timeline-media.media-2 .timeline-media-card img { height:52px; }
+        .timeline-media-card .label { color:#90a9c1; font-size:.48rem; letter-spacing:.1em; text-transform:uppercase; text-align:center; padding:.1rem .16rem; border-top:1px solid #293d53; }
+
+        .timeline-event.tone-competition { border-left-color:#b89248; background:linear-gradient(162deg, rgba(184,146,72,.18), rgba(12,19,28,.98) 58%); }
+        .timeline-event.tone-transfer { border-left-color:#3f9b99; background:linear-gradient(162deg, rgba(63,155,153,.18), rgba(12,19,28,.98) 58%); }
+        .timeline-event.tone-ranking { border-left-color:#7f63b8; background:linear-gradient(162deg, rgba(127,99,184,.18), rgba(12,19,28,.98) 58%); }
+        .timeline-event.tone-organisation { border-left-color:#4d79bd; background:linear-gradient(162deg, rgba(77,121,189,.18), rgba(12,19,28,.98) 58%); }
+        .timeline-event.tone-milestone { border-left-color:#5c9d62; background:linear-gradient(162deg, rgba(92,157,98,.18), rgba(12,19,28,.98) 58%); }
+        .timeline-event.tone-general { border-left-color:#5f738a; background:linear-gradient(162deg, rgba(95,115,138,.18), rgba(12,19,28,.98) 58%); }
+
+        .timeline-event.tone-competition .timeline-tag { color:#f1deb8; border-color:rgba(184,146,72,.45); background:rgba(184,146,72,.12); }
+        .timeline-event.tone-transfer .timeline-tag { color:#b9ece9; border-color:rgba(63,155,153,.45); background:rgba(63,155,153,.14); }
+        .timeline-event.tone-ranking .timeline-tag { color:#d8c8ff; border-color:rgba(127,99,184,.44); background:rgba(127,99,184,.15); }
+        .timeline-event.tone-organisation .timeline-tag { color:#cce0ff; border-color:rgba(77,121,189,.45); background:rgba(77,121,189,.14); }
+        .timeline-event.tone-milestone .timeline-tag { color:#d5f0d8; border-color:rgba(92,157,98,.42); background:rgba(92,157,98,.15); }
+        .timeline-event.tone-general .timeline-tag { color:#d2deea; border-color:rgba(95,115,138,.42); background:rgba(95,115,138,.13); }
+
+        @media (max-width: 980px) {
+            .timeline-wrap { gap:.84rem; }
+            .timeline-season-block { padding:.72rem .72rem .76rem .72rem; }
+            .timeline-event-grid { grid-template-columns:1fr; gap:.42rem; padding:.52rem; }
+            .timeline-rail { border-right:none; border-bottom:1px solid rgba(95,121,146,.3); padding-right:0; padding-bottom:.34rem; }
+            .timeline-badges { flex-direction:row; flex-wrap:wrap; gap:.24rem; }
+            .timeline-main { grid-template-columns:1fr; }
+            .timeline-media { display:grid; grid-template-columns:repeat(2, minmax(0, 120px)); gap:.3rem; }
         }
         </style>
         """,
@@ -910,24 +697,24 @@ def render(data: dict):
             f"<div class='timeline-season-title'>Season {_safe_html(season_key)}</div>",
             f"<div class='timeline-season-count'>{len(season_events)} events</div>",
             "</div>",
-            "<div class='timeline-season-lanes'>",
         ]
 
-        event_index = 0
-        season_rows = list(season_events.iterrows())
-        row_size = 3
-        total_chunks = (len(season_rows) + row_size - 1) // row_size
-        for chunk_index in range(0, len(season_rows), row_size):
-            chunk = season_rows[chunk_index : chunk_index + row_size]
-            row_position = chunk_index // row_size
-            lane_reverse = (chunk_index // row_size) % 2 == 1
-            lane_parts = ["timeline-lane-row", "dir-rtl" if lane_reverse else "dir-ltr"]
-            if row_position < total_chunks - 1:
-                lane_parts.append("has-next")
-            lane_class = " ".join(lane_parts)
-            row_html_parts: list[str] = [f"<div class='{lane_class}'>"]
-            for chunk_event_index, (_, row) in enumerate(chunk):
-                event_index += 1
+        month_labels = season_events["date_sort"].dt.strftime("%B %Y").fillna("Month TBD")
+        season_events = season_events.assign(_month_label=month_labels)
+        month_order = season_events["_month_label"].drop_duplicates().tolist()
+
+        for month_label in month_order:
+            month_events = season_events[season_events["_month_label"] == month_label]
+            month_html_parts: list[str] = [
+                "<div class='timeline-month-group'>",
+                "<div class='timeline-month-header'>",
+                f"<div class='timeline-month-title'>{_safe_html(month_label)}</div>",
+                f"<div class='timeline-month-count'>{len(month_events)} events</div>",
+                "</div>",
+                "<div class='timeline-month-events'>",
+            ]
+
+            for _, row in month_events.iterrows():
                 date_value = row.get("date")
                 date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
                 title = _display_value(row.get("title")) or "Untitled event"
@@ -972,53 +759,36 @@ def render(data: dict):
                     chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
                     chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
                 notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
-                footer_html = f"<div class='timeline-footer'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
+                footer_html = f"{chips_html}{notes_html}" if (chips_html or notes_html) else ""
 
                 title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
-                width_class = _event_width_class(
-                    row,
-                    visuals_count=len(visuals),
-                    highlights_count=len(highlights),
-                    priority=priority,
-                )
-                position_class = "pos-above" if chunk_event_index % 2 == 0 else "pos-below"
-
-                row_html_parts.append(
+                month_html_parts.append(
                     (
-                        f"<div class='timeline-event {_safe_html(priority)} {_safe_html(width_class)} {_safe_html(position_class)} tone-{_safe_html(tone)}'>"
-                        "<div class='timeline-node-anchor'>"
-                        f"<span class='timeline-anchor-index'>#{event_index}</span>"
-                        "<span class='timeline-node'></span>"
-                        f"<span class='timeline-node-date'>{_safe_html(date_text)}</span>"
-                        "</div>"
-                        "<div class='timeline-card-shell'>"
-                        f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
-                        "<div class='timeline-content'>"
-                        "<div class='timeline-main'>"
-                        "<div class='timeline-head'>"
+                        f"<div class='timeline-event tone-{_safe_html(tone)} {_safe_html(priority)}'>"
+                        "<div class='timeline-event-grid'>"
+                        "<div class='timeline-rail'>"
                         f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
+                        f"{meta_html}"
                         "<div class='timeline-badges'>"
                         f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
                         f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
                         "</div>"
                         "</div>"
+                        "<div class='timeline-main'>"
+                        "<div class='timeline-copy'>"
                         f"<div class='{title_class}'>{_safe_html(title)}</div>"
-                        f"{meta_html}{details_html}{footer_html}"
+                        f"{details_html}{footer_html}"
                         "</div>"
                         f"{media_html}"
                         "</div>"
                         "</div>"
-                        "</div>"
-                        "</div>"
                     )
                 )
-            row_html_parts.append("</div>")
-            season_html_parts.append("".join(row_html_parts))
-            if chunk_index + row_size < len(season_rows):
-                bend_class = "timeline-bend to-left" if lane_reverse else "timeline-bend to-right"
-                season_html_parts.append(f"<div class='{bend_class}'></div>")
 
-        season_html_parts.extend(["</div>", "</div>"])
+            month_html_parts.extend(["</div>", "</div>"])
+            season_html_parts.append("".join(month_html_parts))
+
+        season_html_parts.append("</div>")
         timeline_html_parts.append("".join(season_html_parts))
     timeline_html_parts.append("</div>")
     st.markdown("".join(timeline_html_parts), unsafe_allow_html=True)
