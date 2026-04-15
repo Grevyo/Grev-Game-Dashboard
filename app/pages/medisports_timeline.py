@@ -130,6 +130,21 @@ def _timeline_highlights(row: pd.Series) -> list[str]:
     return chips
 
 
+def _timeline_identity_chips(row: pd.Series, *, tone_label: str, priority: str) -> list[tuple[str, str]]:
+    chips: list[tuple[str, str]] = []
+    event_type = _display_value(row.get("event_type")).replace("_", " ").title()
+    category = _display_value(row.get("category")).replace("_", " ").title()
+    if event_type:
+        chips.append(("identity", event_type))
+    if category and category.casefold() != event_type.casefold():
+        chips.append(("identity-soft", category))
+    if tone_label:
+        chips.append(("tone", tone_label))
+    if priority == "featured":
+        chips.append(("priority", "Featured"))
+    return chips
+
+
 def _event_tone(row: pd.Series) -> tuple[str, str]:
     event_type = _normalize_for_match(row.get("event_type"))
     category = _normalize_for_match(row.get("category"))
@@ -817,8 +832,8 @@ def render(data: dict):
         .timeline-event-shell.stagger-sm { margin-top:1.6rem; }
         .timeline-event-shell.stagger-md { margin-top:3.1rem; }
         .timeline-event-shell.stagger-lg { margin-top:4.6rem; }
-        .timeline-event { border:1px solid #2b3b4e; border-left-width:3px; border-radius:14px; background:linear-gradient(165deg, rgba(19,28,40,.9) 0%, rgba(12,19,28,.98) 58%); box-shadow:0 8px 18px rgba(0,0,0,.22); overflow:hidden; }
-        .timeline-event.featured { border-left-width:4px; box-shadow:0 12px 24px rgba(0,0,0,.28); }
+        .timeline-event { border:1px solid #31485f; border-left-width:4px; border-radius:14px; background:linear-gradient(165deg, rgba(20,31,45,.93) 0%, rgba(11,18,28,.99) 58%); box-shadow:0 10px 20px rgba(0,0,0,.28), inset 0 1px 0 rgba(207,231,255,.05); overflow:hidden; }
+        .timeline-event.featured { border-left-width:5px; box-shadow:0 14px 28px rgba(0,0,0,.34), 0 0 0 1px rgba(178,204,233,.1); }
         .timeline-event-grid { display:grid; grid-template-columns:clamp(56px, 6.2vw, 72px) minmax(0, 1fr); gap:.42rem; padding:.5rem .48rem; }
         .timeline-rail { min-width:0; max-width:72px; border-right:1px solid rgba(95,121,146,.3); padding-right:.1rem; display:flex; flex-direction:column; gap:.14rem; }
         .timeline-date { color:#e8f4ff; font-size:.6rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; line-height:1.2; }
@@ -826,12 +841,16 @@ def render(data: dict):
         .timeline-main { min-width:0; width:100%; display:grid; grid-template-columns:minmax(0, 1fr) auto; column-gap:.26rem; align-items:flex-start; }
         .timeline-main.without-media { grid-template-columns:minmax(0, 1fr); }
         .timeline-copy { min-width:0; width:100%; max-width:none; margin:0; padding:0; flex:1 1 auto; align-self:start; }
-        .timeline-title { color:#f2f8ff; font-size:.89rem; font-weight:760; line-height:1.26; margin:0 0 .1rem 0; max-width:none; }
+        .timeline-title { color:#f5faff; font-size:.9rem; font-weight:770; line-height:1.26; margin:0 0 .12rem 0; max-width:none; text-shadow:0 1px 0 rgba(0,0,0,.35); }
         .timeline-title.featured { font-size:.97rem; }
-        .timeline-details { color:#c9d8e8; font-size:.73rem; line-height:1.37; margin:0 0 .12rem 0; max-width:none; }
-        .timeline-chips { display:flex; flex-wrap:wrap; gap:.2rem; margin:0; width:100%; }
-        .timeline-chip { border-radius:6px; font-size:.52rem; letter-spacing:.085em; text-transform:uppercase; color:#d3e4f6; padding:.12rem .32rem; background:#132233; border:1px solid #36506a; }
-        .timeline-notes { margin-top:.12rem; color:#90a9c1; font-size:.64rem; line-height:1.32; max-width:none; }
+        .timeline-details { color:#d2deeb; font-size:.74rem; line-height:1.37; margin:0 0 .14rem 0; max-width:none; }
+        .timeline-chips { display:flex; flex-wrap:wrap; gap:.24rem; margin:.06rem 0 0 0; width:100%; }
+        .timeline-chip { border-radius:999px; font-size:.52rem; letter-spacing:.082em; text-transform:uppercase; color:#e3eefb; padding:.16rem .44rem; background:linear-gradient(180deg, rgba(32,49,68,.95), rgba(18,31,45,.95)); border:1px solid #4a6584; box-shadow:inset 0 1px 0 rgba(214,231,249,.12), 0 0 0 1px rgba(8,16,24,.42); }
+        .timeline-chip.chip-identity { border-color:rgba(173,203,235,.74); color:#f0f8ff; background:linear-gradient(180deg, rgba(58,84,112,.88), rgba(32,53,75,.94)); }
+        .timeline-chip.chip-identity-soft { border-color:rgba(113,147,182,.64); color:#dbeaf9; background:linear-gradient(180deg, rgba(42,64,86,.86), rgba(24,41,60,.92)); }
+        .timeline-chip.chip-priority { border-color:rgba(247,208,130,.88); color:#fff3d0; background:linear-gradient(180deg, rgba(97,72,24,.95), rgba(64,46,14,.98)); }
+        .timeline-chip.chip-tone { border-color:rgba(151,185,224,.78); color:#eaf5ff; background:linear-gradient(180deg, rgba(44,69,96,.88), rgba(22,42,64,.95)); }
+        .timeline-notes { margin-top:.14rem; color:#9ab4cc; font-size:.64rem; line-height:1.33; max-width:none; padding-top:.1rem; border-top:1px dashed rgba(96,123,151,.36); }
         .timeline-media { display:flex; flex-direction:column; gap:.16rem; width:clamp(34px, 2.6vw, 50px); max-width:50px; flex:0 0 auto; }
         .timeline-main.layout-roster .timeline-media,
         .timeline-main.layout-story .timeline-media { width:clamp(36px, 2.9vw, 56px); max-width:56px; }
@@ -846,17 +865,23 @@ def render(data: dict):
         .timeline-event-photo-block img { width:100%; height:100%; min-height:122px; object-fit:cover; object-position:center; display:block; }
         .timeline-event-photo-caption { color:#9db3c9; font-size:.56rem; line-height:1.3; padding:.34rem .42rem .38rem .42rem; border-top:1px solid rgba(63,88,112,.5); }
 
-        .timeline-event.tone-competition { border-left-color:#b89248; background:linear-gradient(162deg, rgba(184,146,72,.18), rgba(12,19,28,.98) 58%); }
-        .timeline-event.tone-transfer { border-left-color:#3f9b99; background:linear-gradient(162deg, rgba(63,155,153,.18), rgba(12,19,28,.98) 58%); }
-        .timeline-event.tone-ranking { border-left-color:#7f63b8; background:linear-gradient(162deg, rgba(127,99,184,.18), rgba(12,19,28,.98) 58%); }
-        .timeline-event.tone-organisation { border-left-color:#4d79bd; background:linear-gradient(162deg, rgba(77,121,189,.18), rgba(12,19,28,.98) 58%); }
-        .timeline-event.tone-milestone { border-left-color:#5c9d62; background:linear-gradient(162deg, rgba(92,157,98,.18), rgba(12,19,28,.98) 58%); }
-        .timeline-event.tone-general { border-left-color:#5f738a; background:linear-gradient(162deg, rgba(95,115,138,.18), rgba(12,19,28,.98) 58%); }
-        .timeline-event-shell.tone-competition .timeline-event-node { border-color:#c49d54; }
-        .timeline-event-shell.tone-transfer .timeline-event-node { border-color:#4cb6b2; }
-        .timeline-event-shell.tone-ranking .timeline-event-node { border-color:#9276ce; }
-        .timeline-event-shell.tone-organisation .timeline-event-node { border-color:#6995db; }
-        .timeline-event-shell.tone-milestone .timeline-event-node { border-color:#72bb79; }
+        .timeline-event.tone-competition { border-left-color:#d9a94d; background:linear-gradient(162deg, rgba(216,169,77,.28), rgba(13,20,30,.98) 60%); box-shadow:0 14px 24px rgba(21,14,3,.35); }
+        .timeline-event.tone-transfer { border-left-color:#3fc5c1; background:linear-gradient(162deg, rgba(56,174,169,.29), rgba(12,20,30,.98) 60%); box-shadow:0 14px 24px rgba(3,21,24,.34); }
+        .timeline-event.tone-ranking { border-left-color:#a587f0; background:linear-gradient(162deg, rgba(147,116,223,.29), rgba(12,20,30,.98) 60%); box-shadow:0 14px 24px rgba(15,7,30,.34); }
+        .timeline-event.tone-organisation { border-left-color:#6da8ff; background:linear-gradient(162deg, rgba(90,140,223,.29), rgba(12,20,30,.98) 60%); box-shadow:0 14px 24px rgba(6,12,30,.32); }
+        .timeline-event.tone-milestone { border-left-color:#7dcf7f; background:linear-gradient(162deg, rgba(102,180,103,.29), rgba(12,20,30,.98) 60%); box-shadow:0 14px 24px rgba(5,24,8,.31); }
+        .timeline-event.tone-general { border-left-color:#88a2bc; background:linear-gradient(162deg, rgba(110,136,166,.27), rgba(12,20,30,.98) 60%); }
+        .timeline-event-shell.tone-competition .timeline-event-node { border-color:#dfb160; box-shadow:0 0 0 3px rgba(52,35,10,.62), 0 0 14px rgba(217,169,77,.45); }
+        .timeline-event-shell.tone-transfer .timeline-event-node { border-color:#49cdc8; box-shadow:0 0 0 3px rgba(10,43,40,.62), 0 0 14px rgba(74,205,200,.43); }
+        .timeline-event-shell.tone-ranking .timeline-event-node { border-color:#b295ff; box-shadow:0 0 0 3px rgba(35,20,60,.62), 0 0 14px rgba(161,132,236,.46); }
+        .timeline-event-shell.tone-organisation .timeline-event-node { border-color:#7bb1ff; box-shadow:0 0 0 3px rgba(18,28,58,.62), 0 0 14px rgba(123,177,255,.44); }
+        .timeline-event-shell.tone-milestone .timeline-event-node { border-color:#86d98d; box-shadow:0 0 0 3px rgba(16,44,21,.62), 0 0 14px rgba(122,201,130,.45); }
+        .timeline-event-shell.tone-general .timeline-event-node { border-color:#90abc8; box-shadow:0 0 0 3px rgba(17,32,48,.62), 0 0 14px rgba(130,161,193,.35); }
+        .timeline-event.tone-competition .timeline-chip.chip-tone { border-color:rgba(235,191,106,.88); background:linear-gradient(180deg, rgba(95,70,26,.94), rgba(69,51,19,.96)); color:#fff2d3; }
+        .timeline-event.tone-transfer .timeline-chip.chip-tone { border-color:rgba(116,238,229,.85); background:linear-gradient(180deg, rgba(20,82,78,.92), rgba(14,58,56,.96)); color:#dbfffb; }
+        .timeline-event.tone-ranking .timeline-chip.chip-tone { border-color:rgba(186,158,255,.86); background:linear-gradient(180deg, rgba(60,43,100,.92), rgba(45,32,78,.96)); color:#efe5ff; }
+        .timeline-event.tone-organisation .timeline-chip.chip-tone { border-color:rgba(138,189,255,.86); background:linear-gradient(180deg, rgba(31,63,110,.92), rgba(22,47,84,.96)); color:#e8f2ff; }
+        .timeline-event.tone-milestone .timeline-chip.chip-tone { border-color:rgba(149,224,154,.86); background:linear-gradient(180deg, rgba(29,82,36,.92), rgba(21,61,27,.96)); color:#e6ffe9; }
 
         @media (max-width: 980px) {
             .timeline-wrap { gap:.84rem; }
@@ -931,7 +956,7 @@ def render(data: dict):
             meta_line = _timeline_meta_line(row)
             notes = _display_value(row.get("notes"))
             highlights = _timeline_highlights(row)
-            tone, _ = _event_tone(row)
+            tone, tone_label = _event_tone(row)
             priority = _event_priority(row)
 
             _, player_path = _resolve_player_visual(row, player_photo_index)
@@ -979,9 +1004,15 @@ def render(data: dict):
                 )
                 media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}</div>"
 
+            chips = _timeline_identity_chips(row, tone_label=tone_label, priority=priority)
+            chips.extend([("detail", chip) for chip in highlights])
+
             chips_html = ""
-            if highlights:
-                chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
+            if chips:
+                chips_html = "".join(
+                    f"<span class='timeline-chip chip-{_safe_html(kind)}'>{_safe_html(chip)}</span>"
+                    for kind, chip in chips
+                )
                 chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
             notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
             footer_html = f"{chips_html}{notes_html}" if (chips_html or notes_html) else ""
