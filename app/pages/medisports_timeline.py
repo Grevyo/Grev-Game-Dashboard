@@ -27,6 +27,43 @@ TIMELINE_TROPHY_EVENT_TYPES = {
     "invite",
 }
 TIMELINE_TROPHY_CATEGORIES = {"competition"}
+EVENT_PHOTO_OVERRIDES = (
+    {
+        "asset": "bonk_transfer.png",
+        "label": "Event Photo",
+        "caption": "Taken by Barry Snail back in Season 8 before PAX Disbanded",
+        "match": {
+            "tokens_any": ("bonk",),
+            "event_types": ("transfer_in", "transfer_out"),
+            "categories": ("roster",),
+        },
+    },
+    {
+        "asset": "stroky_transfer.png",
+        "label": "Event Photo",
+        "caption": "After a failed run at the opens, Stroky venting frustrations",
+        "match": {
+            "tokens_any": ("stroky",),
+            "event_types": ("transfer_in", "transfer_out"),
+            "categories": ("roster",),
+        },
+    },
+    {
+        "asset": "S10_Nova.png",
+        "label": "Event Photo",
+        "caption": "Snap of the moment Medicart made it their furthest ever in Major qualifications, taken by Barry Snail",
+        "match": {
+            "tokens_all": (
+                "qualified",
+                "nova prime challengers",
+                "season 10",
+            ),
+            "event_types": ("result", "qualification"),
+            "categories": ("competition",),
+            "season": "10",
+        },
+    },
+)
 
 
 def _display_value(value: object) -> str:
@@ -522,12 +559,78 @@ def _resolve_truthful_trophy_visual(competition: str, placement: str) -> str | N
     return None
 
 
+def _timeline_text_blob(row: pd.Series) -> str:
+    return _normalize_for_match(
+        " ".join(
+            _display_value(row.get(field))
+            for field in [
+                "title",
+                "details",
+                "notes",
+                "competition",
+                "opponent_or_org",
+                "from_entity",
+                "to_entity",
+            ]
+        )
+    )
+
+
+def _resolve_event_photo_override(row: pd.Series) -> dict[str, str] | None:
+    photos_dir = IMAGES.get("news_photos")
+    if not photos_dir or not photos_dir.exists():
+        return None
+
+    blob = _timeline_text_blob(row)
+    event_type = _normalize_for_match(row.get("event_type"))
+    category = _normalize_for_match(row.get("category"))
+    season = _to_int_text(row.get("season"))
+
+    for override in EVENT_PHOTO_OVERRIDES:
+        matcher = override["match"]
+
+        token_any = tuple(_normalize_for_match(token) for token in matcher.get("tokens_any", ()))
+        if token_any and not any(token and token in blob for token in token_any):
+            continue
+
+        token_all = tuple(_normalize_for_match(token) for token in matcher.get("tokens_all", ()))
+        if token_all and not all(token and token in blob for token in token_all):
+            continue
+
+        event_types = tuple(_normalize_for_match(token) for token in matcher.get("event_types", ()))
+        if event_types and event_type not in event_types:
+            continue
+
+        categories = tuple(_normalize_for_match(token) for token in matcher.get("categories", ()))
+        if categories and category not in categories:
+            continue
+
+        expected_season = matcher.get("season")
+        if expected_season and season != expected_season:
+            continue
+
+        path = photos_dir / override["asset"]
+        if not path.exists() or not path.is_file():
+            continue
+
+        return {
+            "label": override["label"],
+            "caption": override["caption"],
+            "path": str(path),
+        }
+    return None
+
+
 def _visual_priority(
     row: pd.Series,
+    event_photo_visual: tuple[str, str] | None,
     player_image_uri: str | None,
     competition_image_uri: str | None,
     trophy_image_uri: str | None,
 ) -> list[tuple[str, str]]:
+    if event_photo_visual:
+        return [event_photo_visual]
+
     event_type = _normalize_for_match(row.get("event_type"))
     category = _normalize_for_match(row.get("category"))
     player_centric = any(token in event_type for token in ["transfer", "sign", "roster"]) or category == "roster"
@@ -665,6 +768,7 @@ def render(data: dict):
         .timeline-media-card img { width:100%; height:58px; object-fit:contain; object-position:center; display:block; background:radial-gradient(circle at center, #111f2f 0%, #0b1521 100%); }
         .timeline-media.media-2 .timeline-media-card img { height:52px; }
         .timeline-media-card .label { color:#90a9c1; font-size:.48rem; letter-spacing:.1em; text-transform:uppercase; text-align:center; padding:.1rem .16rem; border-top:1px solid #293d53; }
+        .timeline-media-caption { color:#7f97af; font-size:.52rem; line-height:1.28; margin-top:-.08rem; }
 
         .timeline-event.tone-competition { border-left-color:#b89248; background:linear-gradient(162deg, rgba(184,146,72,.18), rgba(12,19,28,.98) 58%); }
         .timeline-event.tone-transfer { border-left-color:#3f9b99; background:linear-gradient(162deg, rgba(63,155,153,.18), rgba(12,19,28,.98) 58%); }
@@ -785,12 +889,17 @@ def render(data: dict):
                     competition_logo_index,
                     achievement_reference,
                 )
+                event_override = _resolve_event_photo_override(row)
+                event_photo_uri = (
+                    image_data_uri_thumbnail(event_override["path"], max_width=180, max_height=180) if event_override else None
+                )
                 player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
                 competition_uri = (
                     image_data_uri_thumbnail(competition_logo_path, max_width=140, max_height=140) if competition_logo_path else None
                 )
                 trophy_uri = image_data_uri_thumbnail(trophy_path, max_width=140, max_height=140) if trophy_path else None
-                visuals = _visual_priority(row, player_uri, competition_uri, trophy_uri)
+                event_visual = (event_override["label"], event_photo_uri) if event_photo_uri and event_override else None
+                visuals = _visual_priority(row, event_visual, player_uri, competition_uri, trophy_uri)
 
                 meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
                 details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
@@ -805,7 +914,10 @@ def render(data: dict):
                         )
                         for label, uri in visuals
                     )
-                    media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}</div>"
+                    caption_html = ""
+                    if event_override and event_photo_uri:
+                        caption_html = f"<div class='timeline-media-caption'>{_safe_html(event_override['caption'])}</div>"
+                    media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}{caption_html}</div>"
 
                 chips_html = ""
                 if highlights:

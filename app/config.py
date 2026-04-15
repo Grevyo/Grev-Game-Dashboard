@@ -8,6 +8,7 @@ IMAGES = {
     "achievements": ROOT / "Achievement_png",
     "team_logos": ROOT / "team_logos",
     "player_photos": ROOT / "player_photos",
+    "news_photos": ROOT / "news_photos",
 }
 
 FILES = {
