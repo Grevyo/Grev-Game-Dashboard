@@ -202,6 +202,59 @@ def _event_width_class(row: pd.Series, *, visuals_count: int, highlights_count: 
     return "regular"
 
 
+def _event_layout_variant(
+    row: pd.Series,
+    *,
+    visuals_count: int,
+    highlights_count: int,
+    details: str,
+    notes: str,
+    priority: str,
+) -> str:
+    category = _normalize_for_match(row.get("category"))
+    event_type = _normalize_for_match(row.get("event_type"))
+    placement = _normalize_for_match(row.get("placement"))
+    title_blob = _normalize_for_match(_display_value(row.get("title")))
+
+    has_ranking_signal = (
+        category == "ranking"
+        or "ranking" in event_type
+        or "tier change" in event_type
+        or "promoted" in title_blob
+        or "demoted" in title_blob
+    )
+    if has_ranking_signal:
+        return "ranking"
+
+    if category in {"organisation", "community"}:
+        return "org"
+
+    if category == "roster" or any(token in event_type for token in ["transfer", "lineup", "sign", "bench"]):
+        return "roster"
+
+    if category == "competition" or any(token in event_type for token in ["result", "qualification", "final"]):
+        if visuals_count >= 1 or any(token in placement for token in ["1", "2", "3", "champion"]):
+            return "competition"
+        return "result-compact"
+
+    text_len = len(details) + len(notes)
+    if visuals_count == 0 and text_len < 90 and highlights_count <= 2 and priority != "featured":
+        return "compact"
+    if text_len > 170 or priority == "featured":
+        return "story"
+    return "milestone"
+
+
+def _event_media_limit(layout_variant: str) -> int:
+    if layout_variant in {"ranking", "org", "compact", "result-compact"}:
+        return 0
+    if layout_variant in {"roster", "milestone", "story"}:
+        return 1
+    if layout_variant == "competition":
+        return 2
+    return 1
+
+
 def _safe_html(value: object) -> str:
     return html.escape(_display_value(value))
 
@@ -743,14 +796,14 @@ def render(data: dict):
         .timeline-season-count { color:#9ab1c8; font-size:.6rem; letter-spacing:.09em; text-transform:uppercase; }
         .timeline-season-flow { position:relative; display:grid; grid-template-columns:repeat(12, minmax(0, 1fr)); row-gap:.44rem; column-gap:1.04rem; padding:0 .16rem; }
         .timeline-season-flow::before { content:""; position:absolute; left:50%; transform:translateX(-50%); top:.2rem; bottom:.18rem; width:4px; border-radius:10px; background:linear-gradient(180deg, rgba(118,152,184,.95) 0%, rgba(97,129,159,.58) 36%, rgba(76,101,126,.24) 100%); box-shadow:0 0 0 1px rgba(15,29,44,.72), 0 0 20px rgba(86,116,145,.28); }
-        .timeline-event-shell { --meta-col:clamp(54px, 5.2vw, 68px); --media-col:clamp(48px, 5vw, 64px); position:relative; min-width:0; width:100%; }
+        .timeline-event-shell { --meta-col:clamp(44px, 4.2vw, 56px); --media-col:clamp(52px, 5vw, 88px); position:relative; min-width:0; width:100%; }
         .timeline-event-shell.lane-left { grid-column:1 / span 6; justify-self:stretch; padding-right:2.05rem; }
         .timeline-event-shell.lane-right { grid-column:7 / span 6; justify-self:stretch; padding-left:2.05rem; margin-top:1.7rem; }
         .timeline-event-shell.width-expanded,
         .timeline-event-shell.width-regular,
         .timeline-event-shell.width-compact { max-width:none; width:100%; }
-        .timeline-event-shell.width-expanded { --meta-col:clamp(50px, 4.8vw, 62px); --media-col:clamp(44px, 4.2vw, 56px); }
-        .timeline-event-shell.width-compact { --meta-col:clamp(58px, 5.8vw, 72px); --media-col:clamp(52px, 5.6vw, 68px); }
+        .timeline-event-shell.width-expanded { --meta-col:clamp(42px, 4vw, 54px); --media-col:clamp(60px, 5.3vw, 96px); }
+        .timeline-event-shell.width-compact { --meta-col:clamp(44px, 4.2vw, 56px); --media-col:clamp(48px, 4.4vw, 70px); }
         .timeline-event-shell::before { content:""; position:absolute; top:1.2rem; height:2px; z-index:1; }
         .timeline-event-shell.lane-left::before { right:-2.08rem; width:2.08rem; background:linear-gradient(90deg, rgba(118,145,170,.15) 0%, rgba(118,145,170,.9) 85%, rgba(118,145,170,.95) 100%); }
         .timeline-event-shell.lane-right::before { left:-2.08rem; width:2.08rem; background:linear-gradient(90deg, rgba(118,145,170,.95) 0%, rgba(118,145,170,.86) 18%, rgba(118,145,170,.16) 100%); }
@@ -766,22 +819,38 @@ def render(data: dict):
         .timeline-event-shell.stagger-lg { margin-top:4.6rem; }
         .timeline-event { border:1px solid #2b3b4e; border-left-width:3px; border-radius:14px; background:linear-gradient(165deg, rgba(19,28,40,.9) 0%, rgba(12,19,28,.98) 58%); box-shadow:0 8px 18px rgba(0,0,0,.22); overflow:hidden; }
         .timeline-event.featured { border-left-width:4px; box-shadow:0 12px 24px rgba(0,0,0,.28); }
-        .timeline-event-grid { display:grid; grid-template-columns:minmax(52px, var(--meta-col)) minmax(0, 1fr); gap:.46rem; padding:.56rem .6rem; }
-        .timeline-rail { border-right:1px solid rgba(95,121,146,.3); padding-right:.38rem; display:flex; flex-direction:column; gap:.2rem; }
+        .timeline-event-grid { display:grid; grid-template-columns:minmax(44px, var(--meta-col)) minmax(0, 1fr); gap:.54rem; padding:.56rem .62rem; }
+        .timeline-rail { border-right:1px solid rgba(95,121,146,.3); padding-right:.32rem; display:flex; flex-direction:column; gap:.18rem; }
         .timeline-date { color:#e8f4ff; font-size:.6rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; line-height:1.2; }
         .timeline-meta { color:#88a2ba; font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; line-height:1.25; }
         .timeline-badges { display:flex; flex-direction:column; align-items:flex-start; gap:.22rem; }
         .timeline-tag { font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border-radius:999px; padding:.12rem .36rem; border:1px solid rgba(152,176,199,.36); color:#c5dbf1; }
-        .timeline-main { min-width:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(42px, var(--media-col)); gap:.38rem; align-items:start; }
+        .timeline-main { min-width:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(52px, var(--media-col)); gap:.5rem; align-items:start; }
         .timeline-main.without-media { grid-template-columns:minmax(0, 1fr); }
-        .timeline-event-shell.lane-left .timeline-main { grid-template-columns:minmax(42px, var(--media-col)) minmax(0, 1fr); }
+        .timeline-main.layout-ranking,
+        .timeline-main.layout-org,
+        .timeline-main.layout-compact,
+        .timeline-main.layout-result-compact { grid-template-columns:minmax(0, 1fr); }
+        .timeline-main.layout-roster,
+        .timeline-main.layout-competition { grid-template-columns:minmax(0, 1fr) minmax(64px, var(--media-col)); }
+        .timeline-main.layout-story { grid-template-columns:minmax(0, 1fr) minmax(58px, var(--media-col)); }
+        .timeline-event-shell.lane-left .timeline-main { grid-template-columns:minmax(52px, var(--media-col)) minmax(0, 1fr); }
         .timeline-event-shell.lane-left .timeline-main.without-media { grid-template-columns:minmax(0, 1fr); }
+        .timeline-event-shell.lane-left .timeline-main.layout-ranking,
+        .timeline-event-shell.lane-left .timeline-main.layout-org,
+        .timeline-event-shell.lane-left .timeline-main.layout-compact,
+        .timeline-event-shell.lane-left .timeline-main.layout-result-compact { grid-template-columns:minmax(0, 1fr); }
+        .timeline-event-shell.lane-left .timeline-main.layout-roster,
+        .timeline-event-shell.lane-left .timeline-main.layout-competition { grid-template-columns:minmax(64px, var(--media-col)) minmax(0, 1fr); }
+        .timeline-event-shell.lane-left .timeline-main.layout-story { grid-template-columns:minmax(58px, var(--media-col)) minmax(0, 1fr); }
         .timeline-event-shell.lane-left .timeline-copy { order:2; }
         .timeline-event-shell.lane-left .timeline-media { order:1; }
-        .timeline-event-shell.width-expanded .timeline-main { grid-template-columns:minmax(0, 1fr) minmax(40px, var(--media-col)); }
-        .timeline-event-shell.lane-left.width-expanded .timeline-main { grid-template-columns:minmax(40px, var(--media-col)) minmax(0, 1fr); }
-        .timeline-event-shell.width-compact .timeline-main { grid-template-columns:minmax(0, 1fr) minmax(46px, var(--media-col)); }
-        .timeline-event-shell.lane-left.width-compact .timeline-main { grid-template-columns:minmax(46px, var(--media-col)) minmax(0, 1fr); }
+        .timeline-event-shell.width-expanded .timeline-main.layout-story { grid-template-columns:minmax(0, 1fr) minmax(66px, var(--media-col)); }
+        .timeline-event-shell.lane-left.width-expanded .timeline-main.layout-story { grid-template-columns:minmax(66px, var(--media-col)) minmax(0, 1fr); }
+        .timeline-event-shell.width-compact .timeline-main.layout-roster,
+        .timeline-event-shell.width-compact .timeline-main.layout-competition { grid-template-columns:minmax(0, 1fr) minmax(56px, var(--media-col)); }
+        .timeline-event-shell.lane-left.width-compact .timeline-main.layout-roster,
+        .timeline-event-shell.lane-left.width-compact .timeline-main.layout-competition { grid-template-columns:minmax(56px, var(--media-col)) minmax(0, 1fr); }
         .timeline-copy { min-width:0; }
         .timeline-title { color:#f2f8ff; font-size:.89rem; font-weight:760; line-height:1.26; margin:0 0 .14rem 0; }
         .timeline-title.featured { font-size:.97rem; }
@@ -791,6 +860,9 @@ def render(data: dict):
         .timeline-notes { margin-top:.16rem; color:#90a9c1; font-size:.64rem; line-height:1.32; }
         .timeline-media { display:flex; flex-direction:column; gap:.22rem; width:100%; max-width:var(--media-col); justify-self:end; }
         .timeline-event-shell.lane-left .timeline-media { justify-self:start; }
+        .timeline-main.layout-roster .timeline-media,
+        .timeline-main.layout-story .timeline-media { max-width:clamp(64px, 6.2vw, 98px); }
+        .timeline-main.layout-competition .timeline-media { max-width:clamp(70px, 6.6vw, 110px); }
         .timeline-media-card { border:1px solid #32465c; border-radius:9px; overflow:hidden; background:#0d1724; }
         .timeline-media-card img { width:100%; height:62px; object-fit:contain; object-position:center; display:block; background:radial-gradient(circle at center, #111f2f 0%, #0b1521 100%); }
         .timeline-media.media-2 .timeline-media-card img { height:54px; }
@@ -909,6 +981,19 @@ def render(data: dict):
             trophy_uri = _image_uri_with_fallback(trophy_path, max_width=140, max_height=140)
             event_visual = (event_override["label"], event_photo_uri) if event_photo_uri and event_override else None
             visuals = _visual_priority(row, event_visual, player_uri, competition_uri, trophy_uri)
+            layout_variant = _event_layout_variant(
+                row,
+                visuals_count=len(visuals),
+                highlights_count=len(highlights),
+                details=details,
+                notes=notes,
+                priority=priority,
+            )
+            media_limit = _event_media_limit(layout_variant)
+            if media_limit <= 0:
+                visuals = []
+            elif len(visuals) > media_limit:
+                visuals = visuals[:media_limit]
 
             meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
             details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
@@ -943,7 +1028,8 @@ def render(data: dict):
             lane_class = "lane-right" if event_index % 2 else "lane-left"
             stagger_cycle = ["stagger-none", "stagger-md", "stagger-lg", "stagger-sm"]
             stagger_class = stagger_cycle[event_index % len(stagger_cycle)]
-            main_class = "timeline-main with-media" if media_html else "timeline-main without-media"
+            media_presence_class = "with-media" if media_html else "without-media"
+            main_class = f"timeline-main {media_presence_class} layout-{layout_variant}"
 
             title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
             season_html_parts.append(
