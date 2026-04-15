@@ -616,16 +616,28 @@ def render(data: dict):
         .timeline-month-header { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.38rem; }
         .timeline-month-title { color:#b6cee6; font-size:.66rem; letter-spacing:.11em; text-transform:uppercase; font-weight:700; }
         .timeline-month-count { color:#7f97af; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; }
-        .timeline-month-events { display:flex; flex-direction:column; gap:.42rem; }
+        .timeline-month-events { position:relative; display:flex; flex-direction:column; gap:.46rem; padding:0 .2rem 0 2rem; }
+        .timeline-month-events::before { content:""; position:absolute; left:.9rem; top:.12rem; bottom:.14rem; width:2px; border-radius:4px; background:linear-gradient(180deg, rgba(105,132,158,.55) 0%, rgba(77,103,128,.26) 100%); }
+        .timeline-event-shell { position:relative; max-width:min(100%, 940px); }
+        .timeline-event-shell.lane-right { margin-left:clamp(0rem, 2.8vw, 2rem); }
+        .timeline-event-shell.lane-left { margin-left:0; }
+        .timeline-event-shell.width-expanded { max-width:min(100%, 940px); }
+        .timeline-event-shell.width-regular { max-width:min(100%, 860px); }
+        .timeline-event-shell.width-compact { max-width:min(100%, 760px); }
+        .timeline-event-node { position:absolute; left:-1.45rem; top:1rem; width:.7rem; height:.7rem; border-radius:999px; border:2px solid #6685a5; background:#0e1825; box-shadow:0 0 0 3px rgba(20,33,47,.65); z-index:2; }
+        .timeline-event-node::after { content:""; position:absolute; left:calc(100% + 3px); top:50%; width:.85rem; height:1px; transform:translateY(-50%); background:linear-gradient(90deg, rgba(100,127,152,.72) 0%, rgba(100,127,152,.1) 100%); }
+        .timeline-event-shell.lane-right .timeline-event-node::after { width:1.18rem; }
         .timeline-event { border:1px solid #2b3b4e; border-left-width:3px; border-radius:14px; background:linear-gradient(165deg, rgba(19,28,40,.9) 0%, rgba(12,19,28,.98) 58%); box-shadow:0 8px 18px rgba(0,0,0,.22); overflow:hidden; }
         .timeline-event.featured { border-left-width:4px; box-shadow:0 12px 24px rgba(0,0,0,.28); }
-        .timeline-event-grid { display:grid; grid-template-columns:112px minmax(0, 1fr); gap:.58rem; padding:.52rem .6rem .52rem .6rem; }
+        .timeline-event-grid { display:grid; grid-template-columns:106px minmax(0, 1fr); gap:.58rem; padding:.52rem .6rem .52rem .6rem; }
         .timeline-rail { border-right:1px solid rgba(95,121,146,.3); padding-right:.48rem; display:flex; flex-direction:column; gap:.24rem; }
         .timeline-date { color:#e8f4ff; font-size:.6rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; line-height:1.2; }
         .timeline-meta { color:#88a2ba; font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; line-height:1.25; }
         .timeline-badges { display:flex; flex-direction:column; align-items:flex-start; gap:.22rem; }
         .timeline-tag { font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border-radius:999px; padding:.12rem .36rem; border:1px solid rgba(152,176,199,.36); color:#c5dbf1; }
         .timeline-main { min-width:0; display:grid; grid-template-columns:minmax(0, 1fr) 94px; gap:.48rem; align-items:start; }
+        .timeline-event-shell.width-compact .timeline-main { grid-template-columns:minmax(0, 1fr) 82px; }
+        .timeline-event-shell.width-expanded .timeline-main { grid-template-columns:minmax(0, 1fr) 108px; }
         .timeline-copy { min-width:0; }
         .timeline-title { color:#f2f8ff; font-size:.89rem; font-weight:760; line-height:1.26; margin:0 0 .14rem 0; }
         .timeline-title.featured { font-size:.97rem; }
@@ -645,6 +657,11 @@ def render(data: dict):
         .timeline-event.tone-organisation { border-left-color:#4d79bd; background:linear-gradient(162deg, rgba(77,121,189,.18), rgba(12,19,28,.98) 58%); }
         .timeline-event.tone-milestone { border-left-color:#5c9d62; background:linear-gradient(162deg, rgba(92,157,98,.18), rgba(12,19,28,.98) 58%); }
         .timeline-event.tone-general { border-left-color:#5f738a; background:linear-gradient(162deg, rgba(95,115,138,.18), rgba(12,19,28,.98) 58%); }
+        .timeline-event-shell.tone-competition .timeline-event-node { border-color:#c49d54; }
+        .timeline-event-shell.tone-transfer .timeline-event-node { border-color:#4cb6b2; }
+        .timeline-event-shell.tone-ranking .timeline-event-node { border-color:#9276ce; }
+        .timeline-event-shell.tone-organisation .timeline-event-node { border-color:#6995db; }
+        .timeline-event-shell.tone-milestone .timeline-event-node { border-color:#72bb79; }
 
         .timeline-event.tone-competition .timeline-tag { color:#f1deb8; border-color:rgba(184,146,72,.45); background:rgba(184,146,72,.12); }
         .timeline-event.tone-transfer .timeline-tag { color:#b9ece9; border-color:rgba(63,155,153,.45); background:rgba(63,155,153,.14); }
@@ -656,6 +673,11 @@ def render(data: dict):
         @media (max-width: 980px) {
             .timeline-wrap { gap:.84rem; }
             .timeline-season-block { padding:.72rem .72rem .76rem .72rem; }
+            .timeline-month-events { padding-left:1.58rem; }
+            .timeline-month-events::before { left:.62rem; }
+            .timeline-event-shell { max-width:100% !important; margin-left:0 !important; }
+            .timeline-event-node { left:-1.05rem; top:.82rem; width:.62rem; height:.62rem; }
+            .timeline-event-node::after { width:.7rem; }
             .timeline-event-grid { grid-template-columns:1fr; gap:.42rem; padding:.52rem; }
             .timeline-rail { border-right:none; border-bottom:1px solid rgba(95,121,146,.3); padding-right:0; padding-bottom:.34rem; }
             .timeline-badges { flex-direction:row; flex-wrap:wrap; gap:.24rem; }
@@ -714,7 +736,7 @@ def render(data: dict):
                 "<div class='timeline-month-events'>",
             ]
 
-            for _, row in month_events.iterrows():
+            for event_index, (_, row) in enumerate(month_events.iterrows()):
                 date_value = row.get("date")
                 date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
                 title = _display_value(row.get("title")) or "Untitled event"
@@ -760,10 +782,19 @@ def render(data: dict):
                     chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
                 notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
                 footer_html = f"{chips_html}{notes_html}" if (chips_html or notes_html) else ""
+                width_class = _event_width_class(
+                    row,
+                    visuals_count=len(visuals),
+                    highlights_count=len(highlights),
+                    priority=priority,
+                )
+                lane_class = "lane-right" if event_index % 2 else "lane-left"
 
                 title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
                 month_html_parts.append(
                     (
+                        f"<div class='timeline-event-shell {lane_class} width-{_safe_html(width_class)} tone-{_safe_html(tone)}'>"
+                        "<div class='timeline-event-node'></div>"
                         f"<div class='timeline-event tone-{_safe_html(tone)} {_safe_html(priority)}'>"
                         "<div class='timeline-event-grid'>"
                         "<div class='timeline-rail'>"
@@ -780,6 +811,8 @@ def render(data: dict):
                         f"{details_html}{footer_html}"
                         "</div>"
                         f"{media_html}"
+                        "</div>"
+                        "</div>"
                         "</div>"
                         "</div>"
                     )
