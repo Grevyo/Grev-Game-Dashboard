@@ -723,7 +723,7 @@ def render(data: dict):
         ]
 
     ascending = sort_order == "Oldest first"
-    filtered = filtered.sort_values(["date_sort", "season", "title"], ascending=[ascending, ascending, True], na_position="last")
+    filtered = filtered.sort_values(["season", "date_sort", "title"], ascending=[ascending, ascending, True], na_position="last")
     known_competitions = (
         sorted({value for value in timeline_df.get("competition", pd.Series(dtype=str)).dropna().astype(str).map(str.strip) if value})
         if "competition" in timeline_df.columns
@@ -741,12 +741,8 @@ def render(data: dict):
         .timeline-season-header { display:flex; align-items:baseline; justify-content:space-between; gap:.4rem; border-bottom:1px solid rgba(81,106,132,.35); padding-bottom:.42rem; margin-bottom:.68rem; }
         .timeline-season-title { color:#e5f2ff; font-size:.88rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
         .timeline-season-count { color:#9ab1c8; font-size:.6rem; letter-spacing:.09em; text-transform:uppercase; }
-        .timeline-month-group { margin-top:.68rem; }
-        .timeline-month-header { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.38rem; }
-        .timeline-month-title { color:#b6cee6; font-size:.66rem; letter-spacing:.11em; text-transform:uppercase; font-weight:700; }
-        .timeline-month-count { color:#7f97af; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; }
-        .timeline-month-events { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 4.9rem minmax(0, 1fr); row-gap:.44rem; column-gap:0; padding:0 .12rem; }
-        .timeline-month-events::before { content:""; position:absolute; left:50%; transform:translateX(-50%); top:.2rem; bottom:.18rem; width:4px; border-radius:10px; background:linear-gradient(180deg, rgba(118,152,184,.95) 0%, rgba(97,129,159,.58) 36%, rgba(76,101,126,.24) 100%); box-shadow:0 0 0 1px rgba(15,29,44,.72), 0 0 20px rgba(86,116,145,.28); }
+        .timeline-season-flow { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 4.9rem minmax(0, 1fr); row-gap:.44rem; column-gap:0; padding:0 .12rem; }
+        .timeline-season-flow::before { content:""; position:absolute; left:50%; transform:translateX(-50%); top:.2rem; bottom:.18rem; width:4px; border-radius:10px; background:linear-gradient(180deg, rgba(118,152,184,.95) 0%, rgba(97,129,159,.58) 36%, rgba(76,101,126,.24) 100%); box-shadow:0 0 0 1px rgba(15,29,44,.72), 0 0 20px rgba(86,116,145,.28); }
         .timeline-event-shell { position:relative; min-width:0; width:100%; }
         .timeline-event-shell.lane-left { grid-column:1; justify-self:stretch; padding-right:.7rem; }
         .timeline-event-shell.lane-right { grid-column:3; justify-self:stretch; padding-left:.7rem; margin-top:1.7rem; }
@@ -819,8 +815,8 @@ def render(data: dict):
         @media (max-width: 980px) {
             .timeline-wrap { gap:.84rem; }
             .timeline-season-block { padding:.72rem .72rem .76rem .72rem; }
-            .timeline-month-events { display:flex; flex-direction:column; row-gap:0; padding-left:1.58rem; }
-            .timeline-month-events::before { left:.62rem; transform:none; }
+            .timeline-season-flow { display:flex; flex-direction:column; row-gap:0; padding-left:1.58rem; }
+            .timeline-season-flow::before { left:.62rem; transform:none; }
             .timeline-event-shell,
             .timeline-event-shell.width-expanded,
             .timeline-event-shell.width-regular,
@@ -855,16 +851,11 @@ def render(data: dict):
         st.info("No timeline events match the selected filters.")
         return
 
-    season_values = filtered["season"].dropna().tolist()
-    season_order = []
-    seen = set()
-    for season in season_values:
-        season_key = _to_int_text(season, fallback="N/A")
-        if season_key not in seen:
-            seen.add(season_key)
-            season_order.append(season_key)
-    if filtered["season"].isna().any():
-        season_order.append("N/A")
+    season_order = sorted(
+        {_to_int_text(season, fallback="N/A") for season in filtered["season"]},
+        key=lambda value: float("-inf") if value == "N/A" else int(value),
+        reverse=not ascending,
+    )
 
     timeline_html_parts: list[str] = ["<div class='timeline-wrap'>"]
     for season_key in season_order:
@@ -883,116 +874,102 @@ def render(data: dict):
             "</div>",
         ]
 
-        month_labels = season_events["date_sort"].dt.strftime("%B %Y").fillna("Month TBD")
-        season_events = season_events.assign(_month_label=month_labels)
-        month_order = season_events["_month_label"].drop_duplicates().tolist()
+        season_html_parts.append("<div class='timeline-season-flow'>")
 
-        for month_label in month_order:
-            month_events = season_events[season_events["_month_label"] == month_label]
-            month_html_parts: list[str] = [
-                "<div class='timeline-month-group'>",
-                "<div class='timeline-month-header'>",
-                f"<div class='timeline-month-title'>{_safe_html(month_label)}</div>",
-                f"<div class='timeline-month-count'>{len(month_events)} events</div>",
-                "</div>",
-                "<div class='timeline-month-events'>",
-            ]
+        for event_index, (_, row) in enumerate(season_events.iterrows()):
+            date_value = row.get("date")
+            date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
+            title = _display_value(row.get("title")) or "Untitled event"
+            details = _display_value(row.get("details"))
+            meta_line = _timeline_meta_line(row)
+            notes = _display_value(row.get("notes"))
+            highlights = _timeline_highlights(row)
+            tone, tone_label = _event_tone(row)
+            priority = _event_priority(row)
 
-            for event_index, (_, row) in enumerate(month_events.iterrows()):
-                date_value = row.get("date")
-                date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
-                title = _display_value(row.get("title")) or "Untitled event"
-                details = _display_value(row.get("details"))
-                meta_line = _timeline_meta_line(row)
-                notes = _display_value(row.get("notes"))
-                highlights = _timeline_highlights(row)
-                tone, tone_label = _event_tone(row)
-                priority = _event_priority(row)
+            _, player_path = _resolve_player_visual(row, player_photo_index)
+            _, competition_logo_path, trophy_path = _resolve_tournament_visual(
+                row,
+                known_competitions,
+                competition_logo_index,
+                achievement_reference,
+            )
+            event_override = _resolve_event_photo_override(row)
+            event_photo_uri = _image_uri_with_fallback(
+                event_override["path"] if event_override else None,
+                max_width=220,
+                max_height=220,
+            )
+            player_uri = _image_uri_with_fallback(player_path, max_width=140, max_height=140)
+            competition_uri = _image_uri_with_fallback(competition_logo_path, max_width=140, max_height=140)
+            trophy_uri = _image_uri_with_fallback(trophy_path, max_width=140, max_height=140)
+            event_visual = (event_override["label"], event_photo_uri) if event_photo_uri and event_override else None
+            visuals = _visual_priority(row, event_visual, player_uri, competition_uri, trophy_uri)
 
-                _, player_path = _resolve_player_visual(row, player_photo_index)
-                _, competition_logo_path, trophy_path = _resolve_tournament_visual(
-                    row,
-                    known_competitions,
-                    competition_logo_index,
-                    achievement_reference,
-                )
-                event_override = _resolve_event_photo_override(row)
-                event_photo_uri = _image_uri_with_fallback(
-                    event_override["path"] if event_override else None,
-                    max_width=220,
-                    max_height=220,
-                )
-                player_uri = _image_uri_with_fallback(player_path, max_width=140, max_height=140)
-                competition_uri = _image_uri_with_fallback(competition_logo_path, max_width=140, max_height=140)
-                trophy_uri = _image_uri_with_fallback(trophy_path, max_width=140, max_height=140)
-                event_visual = (event_override["label"], event_photo_uri) if event_photo_uri and event_override else None
-                visuals = _visual_priority(row, event_visual, player_uri, competition_uri, trophy_uri)
-
-                meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
-                details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
-                media_html = ""
-                if visuals:
-                    media_cards = "".join(
-                        (
-                            "<div class='timeline-media-card'>"
-                            f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
-                            f"<div class='label'>{label}</div>"
-                            "</div>"
-                        )
-                        for label, uri in visuals
-                    )
-                    caption_html = ""
-                    if event_override and event_photo_uri:
-                        caption_html = f"<div class='timeline-media-caption'>{_safe_html(event_override['caption'])}</div>"
-                    media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}{caption_html}</div>"
-
-                chips_html = ""
-                if highlights:
-                    chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
-                    chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
-                notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
-                footer_html = f"{chips_html}{notes_html}" if (chips_html or notes_html) else ""
-                width_class = _event_width_class(
-                    row,
-                    visuals_count=len(visuals),
-                    highlights_count=len(highlights),
-                    priority=priority,
-                )
-                lane_class = "lane-right" if event_index % 2 else "lane-left"
-                stagger_cycle = ["stagger-none", "stagger-md", "stagger-lg", "stagger-sm"]
-                stagger_class = stagger_cycle[event_index % len(stagger_cycle)]
-
-                title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
-                month_html_parts.append(
+            meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
+            details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
+            media_html = ""
+            if visuals:
+                media_cards = "".join(
                     (
-                        f"<div class='timeline-event-shell {lane_class} {stagger_class} "
-                        f"width-{_safe_html(width_class)} tone-{_safe_html(tone)}'>"
-                        "<div class='timeline-event-node'></div>"
-                        f"<div class='timeline-event tone-{_safe_html(tone)} {_safe_html(priority)}'>"
-                        "<div class='timeline-event-grid'>"
-                        "<div class='timeline-rail'>"
-                        f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
-                        f"{meta_html}"
-                        "<div class='timeline-badges'>"
-                        f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
-                        f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
-                        "</div>"
-                        "</div>"
-                        "<div class='timeline-main'>"
-                        "<div class='timeline-copy'>"
-                        f"<div class='{title_class}'>{_safe_html(title)}</div>"
-                        f"{details_html}{footer_html}"
-                        "</div>"
-                        f"{media_html}"
-                        "</div>"
-                        "</div>"
-                        "</div>"
+                        "<div class='timeline-media-card'>"
+                        f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
+                        f"<div class='label'>{label}</div>"
                         "</div>"
                     )
+                    for label, uri in visuals
                 )
+                caption_html = ""
+                if event_override and event_photo_uri:
+                    caption_html = f"<div class='timeline-media-caption'>{_safe_html(event_override['caption'])}</div>"
+                media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}{caption_html}</div>"
 
-            month_html_parts.extend(["</div>", "</div>"])
-            season_html_parts.append("".join(month_html_parts))
+            chips_html = ""
+            if highlights:
+                chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
+                chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
+            notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
+            footer_html = f"{chips_html}{notes_html}" if (chips_html or notes_html) else ""
+            width_class = _event_width_class(
+                row,
+                visuals_count=len(visuals),
+                highlights_count=len(highlights),
+                priority=priority,
+            )
+            lane_class = "lane-right" if event_index % 2 else "lane-left"
+            stagger_cycle = ["stagger-none", "stagger-md", "stagger-lg", "stagger-sm"]
+            stagger_class = stagger_cycle[event_index % len(stagger_cycle)]
+
+            title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
+            season_html_parts.append(
+                (
+                    f"<div class='timeline-event-shell {lane_class} {stagger_class} "
+                    f"width-{_safe_html(width_class)} tone-{_safe_html(tone)}'>"
+                    "<div class='timeline-event-node'></div>"
+                    f"<div class='timeline-event tone-{_safe_html(tone)} {_safe_html(priority)}'>"
+                    "<div class='timeline-event-grid'>"
+                    "<div class='timeline-rail'>"
+                    f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
+                    f"{meta_html}"
+                    "<div class='timeline-badges'>"
+                    f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
+                    f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
+                    "</div>"
+                    "</div>"
+                    "<div class='timeline-main'>"
+                    "<div class='timeline-copy'>"
+                    f"<div class='{title_class}'>{_safe_html(title)}</div>"
+                    f"{details_html}{footer_html}"
+                    "</div>"
+                    f"{media_html}"
+                    "</div>"
+                    "</div>"
+                    "</div>"
+                    "</div>"
+                )
+            )
+
+        season_html_parts.append("</div>")
 
         season_html_parts.append("</div>")
         timeline_html_parts.append("".join(season_html_parts))
