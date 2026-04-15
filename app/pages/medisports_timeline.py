@@ -602,12 +602,16 @@ def render(data: dict):
         .timeline-period-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.62rem; padding-bottom:.46rem; border-bottom:1px dashed rgba(120,142,166,.26); }
         .timeline-period-title { color:#c6daef; font-size:.68rem; letter-spacing:.11em; text-transform:uppercase; font-weight:760; }
         .timeline-period-count { color:#7390ac; font-size:.55rem; letter-spacing:.11em; text-transform:uppercase; }
-        .timeline-lane-grid { display:grid; grid-template-columns:repeat(12, minmax(0, 1fr)); gap:.95rem; align-items:stretch; }
-        .timeline-event { position:relative; grid-column:span 4; min-width:0; }
-        .timeline-event.span-4 { grid-column:span 4; }
-        .timeline-event.span-6 { grid-column:span 6; }
-        .timeline-event.span-8 { grid-column:span 8; }
-        .timeline-event.span-12 { grid-column:1 / -1; }
+        .timeline-lane-stack { display:flex; flex-direction:column; gap:.95rem; }
+        .timeline-lane-row { position:relative; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.9rem; align-items:stretch; }
+        .timeline-lane-row.reverse { direction:rtl; }
+        .timeline-lane-row.reverse .timeline-event { direction:ltr; }
+        .timeline-lane-row::before { content:""; position:absolute; left:.45rem; right:.45rem; top:22px; border-top:1px dashed rgba(122,152,180,.44); pointer-events:none; }
+        .timeline-lane-row.reverse::before { left:.45rem; right:.45rem; }
+        .timeline-row-drop { display:flex; justify-content:flex-end; padding-right:.4rem; margin-top:-.2rem; margin-bottom:.1rem; }
+        .timeline-lane-row.reverse + .timeline-row-drop { justify-content:flex-start; padding-right:0; padding-left:.4rem; }
+        .timeline-row-drop .down-arrow { color:#89a8c6; font-size:.92rem; line-height:1; border:1px solid rgba(104,130,156,.32); border-radius:999px; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; background:rgba(11,20,30,.92); }
+        .timeline-event { position:relative; min-width:0; }
         .timeline-event.featured .timeline-item { border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
         .timeline-track { display:flex; align-items:center; gap:.46rem; padding:.08rem .12rem .45rem .12rem; }
         .timeline-track::after { content:""; flex:1; height:1px; border-top:1px dashed rgba(122,152,180,.46); }
@@ -656,12 +660,11 @@ def render(data: dict):
         .tone-milestone .timeline-item::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
         .tone-general .timeline-item::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
         @media (max-width: 960px) {
-            .timeline-lane-grid { grid-template-columns:minmax(0, 1fr); gap:.72rem; }
-            .timeline-event,
-            .timeline-event.span-4,
-            .timeline-event.span-6,
-            .timeline-event.span-8,
-            .timeline-event.span-12 { grid-column:1 / -1; }
+            .timeline-lane-stack { gap:.72rem; }
+            .timeline-lane-row { grid-template-columns:minmax(0, 1fr); gap:.72rem; }
+            .timeline-lane-row.reverse { direction:ltr; }
+            .timeline-lane-row::before,
+            .timeline-row-drop { display:none; }
             .timeline-track { padding-bottom:.32rem; }
             .timeline-content { grid-template-columns:minmax(0, 1fr); gap:.62rem; }
             .timeline-media { justify-content:start; }
@@ -730,94 +733,99 @@ def render(data: dict):
                     f"<div class='timeline-period-title'>{_safe_html(period_label)}</div>"
                     f"<div class='timeline-period-count'>{len(period_events)} events</div>"
                     "</div>"
-                    "<div class='timeline-lane-grid'>"
+                    "<div class='timeline-lane-stack'>"
                 ),
                 unsafe_allow_html=True,
             )
 
             event_index = 0
-            for _, row in period_events.iterrows():
-                event_index += 1
-                date_value = row.get("date")
-                date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
-                title = _display_value(row.get("title")) or "Untitled event"
-                details = _display_value(row.get("details"))
-                meta_line = _timeline_meta_line(row)
-                notes = _display_value(row.get("notes"))
-                highlights = _timeline_highlights(row)
-                tone, tone_label = _event_tone(row)
-                priority = _event_priority(row)
-                if priority == "featured":
-                    span_class = "span-12" if event_index % 2 == 0 else "span-8"
-                elif event_index % 5 == 0:
-                    span_class = "span-6"
-                else:
-                    span_class = "span-4"
+            period_rows = list(period_events.iterrows())
+            row_size = 3
+            for chunk_index in range(0, len(period_rows), row_size):
+                chunk = period_rows[chunk_index : chunk_index + row_size]
+                lane_reverse = (chunk_index // row_size) % 2 == 1
+                lane_class = "timeline-lane-row reverse" if lane_reverse else "timeline-lane-row"
+                st.markdown(f"<div class='{lane_class}'>", unsafe_allow_html=True)
+                for _, row in chunk:
+                    event_index += 1
+                    date_value = row.get("date")
+                    date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
+                    title = _display_value(row.get("title")) or "Untitled event"
+                    details = _display_value(row.get("details"))
+                    meta_line = _timeline_meta_line(row)
+                    notes = _display_value(row.get("notes"))
+                    highlights = _timeline_highlights(row)
+                    tone, tone_label = _event_tone(row)
+                    priority = _event_priority(row)
 
-                _, player_path = _resolve_player_visual(row, player_photo_index)
-                _, competition_logo_path, trophy_path = _resolve_tournament_visual(
-                    row,
-                    known_competitions,
-                    competition_logo_index,
-                    achievement_reference,
-                )
-                player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
-                competition_uri = (
-                    image_data_uri_thumbnail(competition_logo_path, max_width=140, max_height=140) if competition_logo_path else None
-                )
-                trophy_uri = image_data_uri_thumbnail(trophy_path, max_width=140, max_height=140) if trophy_path else None
-                visuals = _visual_priority(row, player_uri, competition_uri, trophy_uri)
-
-                meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
-                details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
-                media_html = ""
-                if visuals:
-                    media_cards = "".join(
-                        (
-                            "<div class='timeline-media-card'>"
-                            f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
-                            f"<div class='label'>{label}</div>"
-                            "</div>"
-                        )
-                        for label, uri in visuals
+                    _, player_path = _resolve_player_visual(row, player_photo_index)
+                    _, competition_logo_path, trophy_path = _resolve_tournament_visual(
+                        row,
+                        known_competitions,
+                        competition_logo_index,
+                        achievement_reference,
                     )
-                    media_html = f"<div class='timeline-media'>{media_cards}</div>"
+                    player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
+                    competition_uri = (
+                        image_data_uri_thumbnail(competition_logo_path, max_width=140, max_height=140) if competition_logo_path else None
+                    )
+                    trophy_uri = image_data_uri_thumbnail(trophy_path, max_width=140, max_height=140) if trophy_path else None
+                    visuals = _visual_priority(row, player_uri, competition_uri, trophy_uri)
 
-                chips_html = ""
-                if highlights:
-                    chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
-                    chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
-                notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
-                footer_html = f"<div class='timeline-footer'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
+                    meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
+                    details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
+                    media_html = ""
+                    if visuals:
+                        media_cards = "".join(
+                            (
+                                "<div class='timeline-media-card'>"
+                                f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
+                                f"<div class='label'>{label}</div>"
+                                "</div>"
+                            )
+                            for label, uri in visuals
+                        )
+                        media_html = f"<div class='timeline-media'>{media_cards}</div>"
 
-                title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
-                st.markdown(
-                    (
-                        f"<div class='timeline-event {_safe_html(priority)} {_safe_html(span_class)} tone-{_safe_html(tone)}'>"
-                        "<div class='timeline-track'>"
-                        f"<span class='timeline-anchor-index'>#{event_index}</span>"
-                        "<span class='timeline-node'></span>"
-                        f"<span class='timeline-node-date'>{_safe_html(date_text)}</span>"
-                        "</div>"
-                        f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
-                        "<div class='timeline-content'>"
-                        "<div>"
-                        "<div class='timeline-head'>"
-                        f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
-                        "<div class='timeline-badges'>"
-                        f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
-                        f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
-                        "</div>"
-                        "</div>"
-                        f"<div class='{title_class}'>{_safe_html(title)}</div>"
-                        f"{meta_html}{details_html}{footer_html}"
-                        "</div>"
-                        f"{media_html}"
-                        "</div>"
-                        "</div>"
-                    ),
-                    unsafe_allow_html=True,
-                )
+                    chips_html = ""
+                    if highlights:
+                        chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
+                        chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
+                    notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
+                    footer_html = f"<div class='timeline-footer'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
+
+                    title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
+                    st.markdown(
+                        (
+                            f"<div class='timeline-event {_safe_html(priority)} tone-{_safe_html(tone)}'>"
+                            "<div class='timeline-track'>"
+                            f"<span class='timeline-anchor-index'>#{event_index}</span>"
+                            "<span class='timeline-node'></span>"
+                            f"<span class='timeline-node-date'>{_safe_html(date_text)}</span>"
+                            "</div>"
+                            f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
+                            "<div class='timeline-content'>"
+                            "<div>"
+                            "<div class='timeline-head'>"
+                            f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
+                            "<div class='timeline-badges'>"
+                            f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
+                            f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
+                            "</div>"
+                            "</div>"
+                            f"<div class='{title_class}'>{_safe_html(title)}</div>"
+                            f"{meta_html}{details_html}{footer_html}"
+                            "</div>"
+                            f"{media_html}"
+                            "</div>"
+                            "</div>"
+                            "</div>"
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                st.markdown("</div>", unsafe_allow_html=True)
+                if chunk_index + row_size < len(period_rows):
+                    st.markdown("<div class='timeline-row-drop'><span class='down-arrow'>↓</span></div>", unsafe_allow_html=True)
 
             st.markdown(
                 (
