@@ -607,7 +607,7 @@ def render(data: dict):
     st.markdown(
         """
         <style>
-        .timeline-wrap { display:flex; flex-direction:column; gap:1rem; margin-top:.45rem; max-width:1520px; width:min(100%, 1520px); margin-inline:auto; }
+        .timeline-wrap { display:flex; flex-direction:column; gap:1rem; margin-top:.45rem; max-width:2100px; width:min(98vw, 2100px); margin-inline:auto; }
         .timeline-season-block { border:1px solid #223246; border-radius:18px; padding:.8rem 1.15rem .9rem 1.15rem; background:linear-gradient(180deg, rgba(10,16,24,.86) 0%, rgba(9,14,22,.98) 100%); }
         .timeline-season-header { display:flex; align-items:baseline; justify-content:space-between; gap:.4rem; border-bottom:1px solid rgba(81,106,132,.35); padding-bottom:.42rem; margin-bottom:.68rem; }
         .timeline-season-title { color:#e5f2ff; font-size:.88rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
@@ -616,29 +616,27 @@ def render(data: dict):
         .timeline-month-header { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.38rem; }
         .timeline-month-title { color:#b6cee6; font-size:.66rem; letter-spacing:.11em; text-transform:uppercase; font-weight:700; }
         .timeline-month-count { color:#7f97af; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; }
-        .timeline-month-events { position:relative; display:flex; flex-direction:column; gap:.18rem; padding:0 .35rem; }
-        .timeline-month-events::before { content:""; position:absolute; left:50%; transform:translateX(-50%); top:.15rem; bottom:.16rem; width:3px; border-radius:8px; background:linear-gradient(180deg, rgba(118,152,184,.9) 0%, rgba(97,129,159,.52) 34%, rgba(76,101,126,.26) 100%); box-shadow:0 0 0 1px rgba(15,29,44,.65), 0 0 18px rgba(86,116,145,.24); }
-        .timeline-event-shell { position:relative; width:calc(50% - 2.5rem); min-width:300px; }
-        .timeline-event-shell.lane-left { align-self:flex-start; margin-right:auto; }
-        .timeline-event-shell.lane-right { align-self:flex-end; margin-left:auto; }
-        .timeline-event-shell.width-expanded { max-width:760px; }
-        .timeline-event-shell.width-regular { max-width:640px; }
-        .timeline-event-shell.width-compact { max-width:560px; }
-        .timeline-event-shell.lane-left.width-expanded { width:calc(50% - 1.75rem); }
-        .timeline-event-shell.lane-right.width-expanded { width:calc(50% - 1.75rem); }
+        .timeline-month-events { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 7.4rem minmax(0, 1fr); row-gap:.44rem; column-gap:0; padding:0 .25rem; }
+        .timeline-month-events::before { content:""; position:absolute; left:50%; transform:translateX(-50%); top:.2rem; bottom:.18rem; width:4px; border-radius:10px; background:linear-gradient(180deg, rgba(118,152,184,.95) 0%, rgba(97,129,159,.58) 36%, rgba(76,101,126,.24) 100%); box-shadow:0 0 0 1px rgba(15,29,44,.72), 0 0 20px rgba(86,116,145,.28); }
+        .timeline-event-shell { position:relative; min-width:0; width:100%; }
+        .timeline-event-shell.lane-left { grid-column:1; justify-self:stretch; padding-right:.95rem; }
+        .timeline-event-shell.lane-right { grid-column:3; justify-self:stretch; padding-left:.95rem; margin-top:2.35rem; }
+        .timeline-event-shell.width-expanded,
+        .timeline-event-shell.width-regular,
+        .timeline-event-shell.width-compact { max-width:none; width:100%; }
         .timeline-event-shell::before { content:""; position:absolute; top:1.2rem; height:2px; z-index:1; }
-        .timeline-event-shell.lane-left::before { right:-1.92rem; width:1.92rem; background:linear-gradient(90deg, rgba(118,145,170,.18) 0%, rgba(118,145,170,.8) 100%); }
-        .timeline-event-shell.lane-right::before { left:-1.92rem; width:1.92rem; background:linear-gradient(90deg, rgba(118,145,170,.8) 0%, rgba(118,145,170,.18) 100%); }
+        .timeline-event-shell.lane-left::before { right:-6.25rem; width:6.25rem; background:linear-gradient(90deg, rgba(118,145,170,.15) 0%, rgba(118,145,170,.9) 85%, rgba(118,145,170,.95) 100%); }
+        .timeline-event-shell.lane-right::before { left:-6.25rem; width:6.25rem; background:linear-gradient(90deg, rgba(118,145,170,.95) 0%, rgba(118,145,170,.86) 18%, rgba(118,145,170,.16) 100%); }
         .timeline-event-shell::after { content:""; position:absolute; top:.76rem; width:1.02rem; height:.9rem; border-top:2px solid rgba(118,145,170,.42); z-index:1; }
-        .timeline-event-shell.lane-left::after { right:-2.02rem; border-right:2px solid rgba(118,145,170,.42); border-top-right-radius:.88rem; }
-        .timeline-event-shell.lane-right::after { left:-2.02rem; border-left:2px solid rgba(118,145,170,.42); border-top-left-radius:.88rem; }
+        .timeline-event-shell.lane-left::after { right:-6.35rem; border-right:2px solid rgba(118,145,170,.45); border-top-right-radius:.88rem; }
+        .timeline-event-shell.lane-right::after { left:-6.35rem; border-left:2px solid rgba(118,145,170,.45); border-top-left-radius:.88rem; }
         .timeline-event-node { position:absolute; top:.81rem; width:.74rem; height:.74rem; border-radius:999px; border:2px solid #6685a5; background:#0e1825; box-shadow:0 0 0 3px rgba(20,33,47,.65); z-index:2; }
-        .timeline-event-shell.lane-left .timeline-event-node { right:-2.34rem; }
-        .timeline-event-shell.lane-right .timeline-event-node { left:-2.34rem; }
-        .timeline-event-shell.stagger-none { margin-top:.12rem; }
-        .timeline-event-shell.stagger-sm { margin-top:.7rem; }
-        .timeline-event-shell.stagger-md { margin-top:1.28rem; }
-        .timeline-event-shell.stagger-lg { margin-top:1.86rem; }
+        .timeline-event-shell.lane-left .timeline-event-node { right:-6.7rem; }
+        .timeline-event-shell.lane-right .timeline-event-node { left:-6.7rem; }
+        .timeline-event-shell.stagger-none { margin-top:.2rem; }
+        .timeline-event-shell.stagger-sm { margin-top:1.6rem; }
+        .timeline-event-shell.stagger-md { margin-top:3.1rem; }
+        .timeline-event-shell.stagger-lg { margin-top:4.6rem; }
         .timeline-event { border:1px solid #2b3b4e; border-left-width:3px; border-radius:14px; background:linear-gradient(165deg, rgba(19,28,40,.9) 0%, rgba(12,19,28,.98) 58%); box-shadow:0 8px 18px rgba(0,0,0,.22); overflow:hidden; }
         .timeline-event.featured { border-left-width:4px; box-shadow:0 12px 24px rgba(0,0,0,.28); }
         .timeline-event-grid { display:grid; grid-template-columns:106px minmax(0, 1fr); gap:.58rem; padding:.52rem .6rem .52rem .6rem; }
@@ -690,12 +688,13 @@ def render(data: dict):
         @media (max-width: 980px) {
             .timeline-wrap { gap:.84rem; }
             .timeline-season-block { padding:.72rem .72rem .76rem .72rem; }
-            .timeline-month-events { padding-left:1.58rem; }
+            .timeline-month-events { display:flex; flex-direction:column; row-gap:0; padding-left:1.58rem; }
             .timeline-month-events::before { left:.62rem; transform:none; }
             .timeline-event-shell,
             .timeline-event-shell.width-expanded,
             .timeline-event-shell.width-regular,
-            .timeline-event-shell.width-compact { width:100% !important; max-width:100% !important; min-width:0 !important; margin-left:0 !important; margin-right:0 !important; align-self:stretch !important; }
+            .timeline-event-shell.width-compact { width:100% !important; max-width:100% !important; min-width:0 !important; margin-left:0 !important; margin-right:0 !important; align-self:stretch !important; padding-left:0 !important; padding-right:0 !important; }
+            .timeline-event-shell.lane-right { margin-top:.42rem !important; }
             .timeline-event-shell::before { left:-.92rem !important; right:auto !important; width:.92rem !important; background:linear-gradient(90deg, rgba(118,145,170,.72) 0%, rgba(118,145,170,.2) 100%) !important; }
             .timeline-event-shell::after { display:none !important; }
             .timeline-event-node,
