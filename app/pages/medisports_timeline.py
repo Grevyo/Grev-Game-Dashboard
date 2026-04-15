@@ -1,6 +1,7 @@
 import html
 import re
 import unicodedata
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -289,26 +290,65 @@ def _resolve_tournament_visual(
         return None, None, None
 
     placement = _infer_gold_placement(row)
-    resolved = resolve_achievement_image(
-        link_or_name=competition,
-        achievement_name=competition,
-        placement=placement,
-    )
-    trophy_path = None
-    final_path = resolved.get("final_path")
-    if final_path:
-        trophy_path = str(final_path)
-    elif str(placement).strip().startswith("1"):
-        gold_path = find_achievement_image(
-            link_or_name=f"{competition} gold",
-            achievement_name=competition,
-            placement="1st",
-        )
-        if gold_path:
-            trophy_path = gold_path
+    trophy_path = _resolve_truthful_trophy_visual(competition=competition, placement=placement)
 
     competition_logo = competition_logo_index.get(_normalize_for_match(competition))
     return competition, competition_logo, trophy_path
+
+
+def _resolve_truthful_trophy_visual(competition: str, placement: str) -> str | None:
+    """Resolve a trophy/achievement image only when we have a confident, truthful match."""
+    competition_text = _normalize_for_match(competition)
+    placement_text = _display_value(placement)
+
+    if not competition_text:
+        return None
+
+    # Use known explicit mapping logic (e.g. CPLOpen1..4) but reject fuzzy fallbacks.
+    resolved = resolve_achievement_image(
+        link_or_name=competition,
+        achievement_name=competition,
+        placement=placement_text,
+    )
+    if resolved.get("source") == "cpl_open_position_map":
+        final_path = resolved.get("final_path")
+        return str(final_path) if final_path else None
+
+    # Strict league medal mapping: only use assets when league + placement genuinely match.
+    if "league" in competition_text:
+        placement_rank = _to_int_text(placement_text)
+        league_tier = None
+        for tier in ("bronze", "silver", "gold", "emerald", "diamond", "daimond"):
+            if tier in competition_text:
+                league_tier = "diamond" if tier == "daimond" else tier
+                break
+
+        if league_tier and placement_rank:
+            # Diamond has dedicated finishing-place assets (4th..9th) in this project.
+            if league_tier == "diamond" and placement_rank in {"4", "5", "6", "7", "8", "9"}:
+                variants = [f"league-diamond-{placement_rank}th", f"league-daimond-{placement_rank}th"]
+                for variant in variants:
+                    direct = find_achievement_image(
+                        link_or_name=variant,
+                        achievement_name=competition,
+                        placement=placement_rank,
+                    )
+                    if direct and _normalize_for_match(variant) in _normalize_for_match(Path(direct).stem):
+                        return direct
+
+            if placement_rank in {"1", "2", "3"}:
+                medal_name = {"1": "gold", "2": "silver", "3": "bronze"}[placement_rank]
+                expected = f"league-{league_tier}-{medal_name}"
+                direct = find_achievement_image(
+                    link_or_name=expected,
+                    achievement_name=competition,
+                    placement=placement_rank,
+                )
+                if direct and _normalize_for_match(expected) in _normalize_for_match(Path(direct).stem):
+                    return direct
+
+    # No confident match -> no trophy visual.
+    return None
 
 
 def _visual_priority(
@@ -325,17 +365,18 @@ def _visual_priority(
     visuals: list[tuple[str, str]] = []
     if player_image_uri:
         visuals.append(("Player", player_image_uri))
-    if tournament_centric and trophy_image_uri:
-        visuals.append(("Achievement", trophy_image_uri))
-    elif competition_image_uri:
+    if competition_image_uri:
         visuals.append(("Competition", competition_image_uri))
-    elif trophy_image_uri:
+    if trophy_image_uri:
         visuals.append(("Achievement", trophy_image_uri))
 
     if player_centric and len(visuals) > 1:
         visuals = sorted(visuals, key=lambda item: 0 if item[0] == "Player" else 1)
     elif tournament_centric and len(visuals) > 1:
-        visuals = sorted(visuals, key=lambda item: 0 if item[0] in {"Achievement", "Competition"} else 1)
+        visuals = sorted(
+            visuals,
+            key=lambda item: 0 if item[0] == "Competition" else (1 if item[0] == "Achievement" else 2),
+        )
 
     if not visuals and player_image_uri:
         visuals = [("Player", player_image_uri)]
@@ -422,9 +463,9 @@ def render(data: dict):
         .timeline-chips { display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.1rem; }
         .timeline-chip { border-radius:4px; font-size:.6rem; letter-spacing:.09em; text-transform:uppercase; color:#d0e2f5; padding:.2rem .42rem; background:#132131; border:1px solid #36516b; }
         .timeline-notes { margin-top:.32rem; color:#8ea9c1; font-size:.72rem; }
-        .timeline-media { display:flex; flex-direction:column; gap:.34rem; min-width:96px; }
+        .timeline-media { display:grid; grid-template-columns:repeat(2, minmax(0, 96px)); gap:.34rem; min-width:96px; justify-content:end; }
         .timeline-media-card { width:96px; border:1px solid #2f4255; border-radius:9px; overflow:hidden; background:#0c1420; }
-        .timeline-media-card img { width:100%; height:74px; object-fit:cover; object-position:center; display:block; }
+        .timeline-media-card img { width:100%; height:74px; object-fit:contain; object-position:center; display:block; background:#0a121b; }
         .timeline-media-card .label { color:#8ea8be; font-size:.56rem; letter-spacing:.11em; text-transform:uppercase; text-align:center; padding:.16rem .2rem; border-top:1px solid #23384e; }
         .tone-competition { border-left-color:#b89248; background:linear-gradient(165deg, rgba(184,146,72,.14), rgba(13,20,29,.95) 45%); }
         .tone-transfer { border-left-color:#3f9b99; background:linear-gradient(165deg, rgba(63,155,153,.14), rgba(13,20,29,.95) 46%); }
