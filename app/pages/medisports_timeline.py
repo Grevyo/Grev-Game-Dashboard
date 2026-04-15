@@ -19,14 +19,14 @@ from app.page_layout import section_header
 
 
 def _display_value(value: object) -> str:
-    if value is None or pd.isna(value):
+    if _is_missing(value):
         return ""
     text = str(value).strip()
     return "" if not text else text
 
 
 def _to_int_text(value: object, *, fallback: str = "") -> str:
-    if value is None or pd.isna(value):
+    if _is_missing(value):
         return fallback
     try:
         return str(int(float(value)))
@@ -129,8 +129,20 @@ def _safe_html(value: object) -> str:
     return html.escape(_display_value(value))
 
 
+def _is_missing(value: object) -> bool:
+    if value is None:
+        return True
+    if not pd.api.types.is_scalar(value):
+        return False
+    return bool(pd.isna(value))
+
+
 def _normalize_for_match(value: object) -> str:
-    text = unicodedata.normalize("NFKD", str(value or "")).casefold()
+    if _is_missing(value):
+        text = ""
+    else:
+        text = str(value)
+    text = unicodedata.normalize("NFKD", text).casefold()
     text = text.replace("ⓜ", "m")
     text = re.sub(r"[|/\\•·]+", " ", text)
     text = re.sub(r"[^a-z0-9]+", " ", text)
@@ -523,4 +535,3 @@ def render(data: dict):
 
         st.markdown("</div></div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
-
