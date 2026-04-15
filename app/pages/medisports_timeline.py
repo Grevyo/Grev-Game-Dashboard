@@ -825,44 +825,44 @@ def render(data: dict):
         .timeline-meta { color:#88a2ba; font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; line-height:1.25; }
         .timeline-badges { display:flex; flex-direction:column; align-items:flex-start; gap:.22rem; }
         .timeline-tag { font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border-radius:999px; padding:.12rem .36rem; border:1px solid rgba(152,176,199,.36); color:#c5dbf1; }
-        .timeline-main { min-width:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(42px, var(--media-col)); gap:.3rem; align-items:start; }
+        .timeline-main { min-width:0; width:100%; display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:.26rem; align-items:start; }
         .timeline-main.without-media { grid-template-columns:minmax(0, 1fr); }
         .timeline-main.layout-ranking,
         .timeline-main.layout-org,
         .timeline-main.layout-compact,
         .timeline-main.layout-result-compact { grid-template-columns:minmax(0, 1fr); }
         .timeline-main.layout-roster,
-        .timeline-main.layout-competition { grid-template-columns:minmax(0, 1fr) minmax(50px, var(--media-col)); }
-        .timeline-main.layout-story { grid-template-columns:minmax(0, 1fr) minmax(46px, var(--media-col)); }
-        .timeline-event-shell.lane-left .timeline-main { grid-template-columns:minmax(42px, var(--media-col)) minmax(0, 1fr); }
+        .timeline-main.layout-competition,
+        .timeline-main.layout-story { grid-template-columns:minmax(0, 1fr) auto; }
+        .timeline-event-shell.lane-left .timeline-main { grid-template-columns:auto minmax(0, 1fr); }
         .timeline-event-shell.lane-left .timeline-main.without-media { grid-template-columns:minmax(0, 1fr); }
         .timeline-event-shell.lane-left .timeline-main.layout-ranking,
         .timeline-event-shell.lane-left .timeline-main.layout-org,
         .timeline-event-shell.lane-left .timeline-main.layout-compact,
         .timeline-event-shell.lane-left .timeline-main.layout-result-compact { grid-template-columns:minmax(0, 1fr); }
         .timeline-event-shell.lane-left .timeline-main.layout-roster,
-        .timeline-event-shell.lane-left .timeline-main.layout-competition { grid-template-columns:minmax(50px, var(--media-col)) minmax(0, 1fr); }
-        .timeline-event-shell.lane-left .timeline-main.layout-story { grid-template-columns:minmax(46px, var(--media-col)) minmax(0, 1fr); }
+        .timeline-event-shell.lane-left .timeline-main.layout-competition,
+        .timeline-event-shell.lane-left .timeline-main.layout-story { grid-template-columns:auto minmax(0, 1fr); }
         .timeline-event-shell.lane-left .timeline-copy { order:2; }
         .timeline-event-shell.lane-left .timeline-media { order:1; }
-        .timeline-event-shell.width-expanded .timeline-main.layout-story { grid-template-columns:minmax(0, 1fr) minmax(52px, var(--media-col)); }
-        .timeline-event-shell.lane-left.width-expanded .timeline-main.layout-story { grid-template-columns:minmax(52px, var(--media-col)) minmax(0, 1fr); }
+        .timeline-event-shell.width-expanded .timeline-main.layout-story { grid-template-columns:minmax(0, 1fr) auto; }
+        .timeline-event-shell.lane-left.width-expanded .timeline-main.layout-story { grid-template-columns:auto minmax(0, 1fr); }
         .timeline-event-shell.width-compact .timeline-main.layout-roster,
-        .timeline-event-shell.width-compact .timeline-main.layout-competition { grid-template-columns:minmax(0, 1fr) minmax(44px, var(--media-col)); }
+        .timeline-event-shell.width-compact .timeline-main.layout-competition { grid-template-columns:minmax(0, 1fr) auto; }
         .timeline-event-shell.lane-left.width-compact .timeline-main.layout-roster,
-        .timeline-event-shell.lane-left.width-compact .timeline-main.layout-competition { grid-template-columns:minmax(44px, var(--media-col)) minmax(0, 1fr); }
-        .timeline-copy { min-width:0; width:100%; margin:0; padding:0; }
+        .timeline-event-shell.lane-left.width-compact .timeline-main.layout-competition { grid-template-columns:auto minmax(0, 1fr); }
+        .timeline-copy { min-width:0; width:100%; max-width:none; margin:0; padding:0; justify-self:stretch; align-self:start; }
         .timeline-title { color:#f2f8ff; font-size:.89rem; font-weight:760; line-height:1.26; margin:0 0 .1rem 0; max-width:none; }
         .timeline-title.featured { font-size:.97rem; }
         .timeline-details { color:#c9d8e8; font-size:.73rem; line-height:1.37; margin:0 0 .12rem 0; max-width:none; }
         .timeline-chips { display:flex; flex-wrap:wrap; gap:.2rem; margin:0; width:100%; }
         .timeline-chip { border-radius:6px; font-size:.52rem; letter-spacing:.085em; text-transform:uppercase; color:#d3e4f6; padding:.12rem .32rem; background:#132233; border:1px solid #36506a; }
         .timeline-notes { margin-top:.12rem; color:#90a9c1; font-size:.64rem; line-height:1.32; max-width:none; }
-        .timeline-media { display:flex; flex-direction:column; gap:.16rem; width:100%; max-width:var(--media-col); justify-self:end; }
+        .timeline-media { display:flex; flex-direction:column; gap:.16rem; width:clamp(42px, 4.4vw, 80px); max-width:100%; justify-self:end; }
         .timeline-event-shell.lane-left .timeline-media { justify-self:start; }
         .timeline-main.layout-roster .timeline-media,
-        .timeline-main.layout-story .timeline-media { max-width:clamp(52px, 4.8vw, 80px); }
-        .timeline-main.layout-competition .timeline-media { max-width:clamp(56px, 5.2vw, 86px); }
+        .timeline-main.layout-story .timeline-media { width:clamp(50px, 4.8vw, 82px); }
+        .timeline-main.layout-competition .timeline-media { width:clamp(54px, 5.2vw, 88px); }
         .timeline-media-card { border:1px solid #32465c; border-radius:9px; overflow:hidden; background:#0d1724; }
         .timeline-media-card img { width:100%; height:62px; object-fit:contain; object-position:center; display:block; background:radial-gradient(circle at center, #111f2f 0%, #0b1521 100%); }
         .timeline-media.media-2 .timeline-media-card img { height:54px; }
