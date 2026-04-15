@@ -593,8 +593,9 @@ def render(data: dict):
     st.markdown(
         """
         <style>
-        .timeline-wrap { display:flex; flex-direction:column; gap:1.5rem; margin-top:.55rem; }
+        .timeline-wrap { display:flex; flex-direction:column; gap:1.35rem; margin-top:.55rem; }
         .timeline-season-block { position:relative; margin-bottom:.4rem; padding:1.05rem .9rem .75rem .9rem; border:1px solid #213042; border-radius:16px; background:linear-gradient(180deg, rgba(10,17,27,.84) 0%, rgba(9,14,22,.95) 100%); }
+        .timeline-season-block::before { content:""; position:absolute; left:1.15rem; right:1.15rem; top:0; height:2px; border-radius:999px; background:linear-gradient(90deg, rgba(160,190,220,.06), rgba(160,190,220,.28), rgba(160,190,220,.06)); }
         .timeline-season-header { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:.95rem; padding:.15rem .2rem .7rem .2rem; border-bottom:1px solid #223446; }
         .timeline-season-title { color:#e1eefc; font-size:.92rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
         .timeline-season-count { color:#89a0b7; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
@@ -603,10 +604,11 @@ def render(data: dict):
         .timeline-period-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.62rem; padding-bottom:.46rem; border-bottom:1px dashed rgba(120,142,166,.26); }
         .timeline-period-title { color:#c6daef; font-size:.68rem; letter-spacing:.11em; text-transform:uppercase; font-weight:760; }
         .timeline-period-count { color:#7390ac; font-size:.55rem; letter-spacing:.11em; text-transform:uppercase; }
-        .timeline-axis { position:relative; display:flex; flex-direction:column; gap:.85rem; padding:.18rem .1rem .1rem .1rem; }
+        .timeline-axis { position:relative; display:flex; flex-direction:column; gap:1.05rem; padding:.18rem .1rem .1rem .1rem; }
         .timeline-axis::before { content:""; position:absolute; left:50%; top:.2rem; bottom:.4rem; width:2px; border-radius:999px; transform:translateX(-50%); background:linear-gradient(180deg, rgba(139,165,192,.45) 0%, rgba(109,128,150,.2) 20%, rgba(109,128,150,.16) 80%, rgba(139,165,192,.35) 100%); }
-        .timeline-event { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 118px minmax(0, 1fr); align-items:start; column-gap:.9rem; }
+        .timeline-event { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 122px minmax(0, 1fr); align-items:start; column-gap:1rem; }
         .timeline-anchor { position:relative; grid-column:2; justify-self:center; display:flex; flex-direction:column; align-items:center; gap:.32rem; z-index:2; }
+        .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
         .timeline-node { width:18px; height:18px; border-radius:50%; border:2px solid #9bb7d4; background:radial-gradient(circle, rgba(222,238,255,.95) 0%, rgba(134,170,205,.95) 44%, rgba(21,34,48,.98) 100%); box-shadow:0 0 0 4px rgba(112,146,179,.12), 0 0 14px rgba(112,146,179,.25); }
         .timeline-node-date { color:#b7cee4; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; background:rgba(13,24,35,.86); border:1px solid rgba(95,124,151,.43); border-radius:999px; padding:.16rem .42rem; white-space:nowrap; }
         .timeline-card-wrap { position:relative; }
@@ -616,11 +618,13 @@ def render(data: dict):
         .timeline-event.right .timeline-card-wrap::after { content:""; position:absolute; top:1.22rem; width:26px; border-top:1px dashed rgba(132,157,181,.45); }
         .timeline-event.left .timeline-card-wrap::after { right:-26px; }
         .timeline-event.right .timeline-card-wrap::after { left:-26px; }
-        .timeline-event.featured .timeline-card-wrap { grid-column:1 / 4; justify-self:center; width:min(840px, calc(100% - 28px)); margin-top:.26rem; }
+        .timeline-event.featured .timeline-card-wrap { grid-column:1 / 4; justify-self:center; width:min(900px, calc(100% - 28px)); margin-top:.22rem; }
         .timeline-event.featured .timeline-node { width:22px; height:22px; border-width:3px; box-shadow:0 0 0 5px rgba(189,153,75,.14), 0 0 16px rgba(189,153,75,.34); }
         .timeline-event.featured .timeline-node-date { color:#f4dfb8; border-color:rgba(184,146,72,.55); }
-        .timeline-item { border:1px solid #2a3848; border-radius:12px; padding:.78rem .88rem .72rem .88rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 7px 18px rgba(0, 0, 0, .18); border-left-width:3px; }
-        .timeline-item.featured { padding:.92rem 1rem .82rem 1rem; border-width:1px; border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
+        .timeline-item { border:1px solid #2a3848; border-radius:14px; padding:.85rem .95rem .78rem .95rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 7px 18px rgba(0, 0, 0, .18); border-left-width:3px; overflow:hidden; }
+        .timeline-item::before { content:""; display:block; height:2px; margin:-.85rem -.95rem .62rem -.95rem; background:linear-gradient(90deg, rgba(160,190,220,.02), rgba(160,190,220,.35), rgba(160,190,220,.02)); }
+        .timeline-item.featured { padding:1rem 1.08rem .94rem 1.08rem; border-width:1px; border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
+        .timeline-item.featured::before { margin:-1rem -1.08rem .72rem -1.08rem; height:3px; }
         .timeline-content { display:grid; grid-template-columns: minmax(0, 1fr) auto; gap:.85rem; align-items:start; }
         .timeline-head { display:flex; flex-wrap:wrap; align-items:center; gap:.38rem .58rem; justify-content:space-between; }
         .timeline-date { color:#e8f4ff; font-size:.75rem; letter-spacing:.1em; text-transform:uppercase; font-weight:770; padding:.15rem .42rem; border:1px solid rgba(160,185,210,.32); border-radius:999px; background:rgba(16,27,39,.65); }
@@ -632,24 +636,30 @@ def render(data: dict):
         .timeline-details { color:#c9d8e8; font-size:.83rem; line-height:1.44; margin:0 0 .45rem 0; }
         .timeline-footer { border-top:1px solid rgba(85,108,130,.22); margin-top:.38rem; padding-top:.38rem; }
         .timeline-chips { display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.1rem; }
-        .timeline-chip { border-radius:4px; font-size:.6rem; letter-spacing:.09em; text-transform:uppercase; color:#d0e2f5; padding:.2rem .42rem; background:#132131; border:1px solid #36516b; }
+        .timeline-chip { border-radius:5px; font-size:.6rem; letter-spacing:.09em; text-transform:uppercase; color:#d0e2f5; padding:.2rem .42rem; background:#132131; border:1px solid #36516b; }
         .timeline-notes { margin-top:.32rem; color:#8ea9c1; font-size:.72rem; }
-        .timeline-media { display:grid; grid-template-columns:repeat(2, minmax(0, 96px)); gap:.34rem; min-width:96px; justify-content:end; }
-        .timeline-media-card { width:96px; border:1px solid #2f4255; border-radius:9px; overflow:hidden; background:#0c1420; }
+        .timeline-media { display:grid; grid-template-columns:repeat(2, minmax(0, 100px)); gap:.34rem; min-width:100px; justify-content:end; align-content:start; }
+        .timeline-media-card { width:100px; border:1px solid #2f4255; border-radius:9px; overflow:hidden; background:#0c1420; }
         .timeline-media-card img { width:100%; height:74px; object-fit:contain; object-position:center; display:block; background:#0a121b; }
         .timeline-media-card .label { color:#8ea8be; font-size:.56rem; letter-spacing:.11em; text-transform:uppercase; text-align:center; padding:.16rem .2rem; border-top:1px solid #23384e; }
-        .tone-competition { border-left-color:#b89248; background:linear-gradient(165deg, rgba(184,146,72,.14), rgba(13,20,29,.95) 45%); }
-        .tone-transfer { border-left-color:#3f9b99; background:linear-gradient(165deg, rgba(63,155,153,.14), rgba(13,20,29,.95) 46%); }
-        .tone-ranking { border-left-color:#7f63b8; background:linear-gradient(165deg, rgba(127,99,184,.14), rgba(13,20,29,.95) 46%); }
-        .tone-organisation { border-left-color:#4d79bd; background:linear-gradient(165deg, rgba(77,121,189,.14), rgba(13,20,29,.95) 46%); }
-        .tone-milestone { border-left-color:#5c9d62; background:linear-gradient(165deg, rgba(92,157,98,.14), rgba(13,20,29,.95) 46%); }
-        .tone-general { border-left-color:#5f738a; background:linear-gradient(165deg, rgba(95,115,138,.14), rgba(13,20,29,.95) 46%); }
+        .tone-competition { border-left-color:#b89248; background:linear-gradient(162deg, rgba(184,146,72,.16), rgba(13,20,29,.95) 42%); }
+        .tone-transfer { border-left-color:#3f9b99; background:linear-gradient(162deg, rgba(63,155,153,.16), rgba(13,20,29,.95) 42%); }
+        .tone-ranking { border-left-color:#7f63b8; background:linear-gradient(162deg, rgba(127,99,184,.16), rgba(13,20,29,.95) 42%); }
+        .tone-organisation { border-left-color:#4d79bd; background:linear-gradient(162deg, rgba(77,121,189,.16), rgba(13,20,29,.95) 42%); }
+        .tone-milestone { border-left-color:#5c9d62; background:linear-gradient(162deg, rgba(92,157,98,.16), rgba(13,20,29,.95) 42%); }
+        .tone-general { border-left-color:#5f738a; background:linear-gradient(162deg, rgba(95,115,138,.16), rgba(13,20,29,.95) 42%); }
         .tone-competition .timeline-tag { color:#f1deb8; border-color:rgba(184,146,72,.45); background:rgba(184,146,72,.12); }
         .tone-transfer .timeline-tag { color:#b9ece9; border-color:rgba(63,155,153,.45); background:rgba(63,155,153,.14); }
         .tone-ranking .timeline-tag { color:#d8c8ff; border-color:rgba(127,99,184,.44); background:rgba(127,99,184,.15); }
         .tone-organisation .timeline-tag { color:#cce0ff; border-color:rgba(77,121,189,.45); background:rgba(77,121,189,.14); }
         .tone-milestone .timeline-tag { color:#d5f0d8; border-color:rgba(92,157,98,.42); background:rgba(92,157,98,.15); }
         .tone-general .timeline-tag { color:#d2deea; border-color:rgba(95,115,138,.42); background:rgba(95,115,138,.13); }
+        .tone-competition .timeline-item::before { background:linear-gradient(90deg, rgba(184,146,72,.08), rgba(184,146,72,.55), rgba(184,146,72,.08)); }
+        .tone-transfer .timeline-item::before { background:linear-gradient(90deg, rgba(63,155,153,.08), rgba(63,155,153,.55), rgba(63,155,153,.08)); }
+        .tone-ranking .timeline-item::before { background:linear-gradient(90deg, rgba(127,99,184,.08), rgba(127,99,184,.55), rgba(127,99,184,.08)); }
+        .tone-organisation .timeline-item::before { background:linear-gradient(90deg, rgba(77,121,189,.08), rgba(77,121,189,.55), rgba(77,121,189,.08)); }
+        .tone-milestone .timeline-item::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
+        .tone-general .timeline-item::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
         @media (max-width: 960px) {
             .timeline-axis::before { left:15px; transform:none; }
             .timeline-event { grid-template-columns:34px minmax(0, 1fr); column-gap:.52rem; }
@@ -662,6 +672,8 @@ def render(data: dict):
             .timeline-event.right .timeline-card-wrap::after { left:-19px; right:auto; width:19px; }
             .timeline-content { grid-template-columns:minmax(0, 1fr); gap:.62rem; }
             .timeline-media { justify-content:start; }
+            .timeline-anchor-index { font-size:.49rem; padding:.11rem .28rem; }
+            .timeline-node-date { font-size:.52rem; }
         }
         </style>
         """,
@@ -731,7 +743,9 @@ def render(data: dict):
             )
 
             side_cursor = 0
+            event_index = 0
             for _, row in period_events.iterrows():
+                event_index += 1
                 date_value = row.get("date")
                 date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
                 title = _display_value(row.get("title")) or "Untitled event"
@@ -786,6 +800,7 @@ def render(data: dict):
                     (
                         f"<div class='timeline-event {_safe_html(side)} {_safe_html(priority)} tone-{_safe_html(tone)}'>"
                         "<div class='timeline-anchor'>"
+                        f"<div class='timeline-anchor-index'>#{event_index}</div>"
                         "<div class='timeline-node'></div>"
                         f"<div class='timeline-node-date'>{_safe_html(date_text)}</div>"
                         "</div>"
