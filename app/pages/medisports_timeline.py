@@ -604,20 +604,24 @@ def render(data: dict):
         .timeline-period-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.62rem; padding-bottom:.46rem; border-bottom:1px dashed rgba(120,142,166,.26); }
         .timeline-period-title { color:#c6daef; font-size:.68rem; letter-spacing:.11em; text-transform:uppercase; font-weight:760; }
         .timeline-period-count { color:#7390ac; font-size:.55rem; letter-spacing:.11em; text-transform:uppercase; }
-        .timeline-lane { position:relative; display:grid; grid-template-columns:repeat(12, minmax(0, 1fr)); gap:1rem .85rem; padding:.62rem .2rem .15rem .2rem; }
-        .timeline-lane::before { content:""; position:absolute; left:.2rem; right:.2rem; top:1.75rem; height:2px; border-radius:999px; background:linear-gradient(90deg, rgba(141,170,199,.45) 0%, rgba(98,118,140,.18) 22%, rgba(98,118,140,.18) 78%, rgba(141,170,199,.45) 100%); }
-        .timeline-event { position:relative; grid-column:span 3; display:flex; flex-direction:column; min-width:0; }
-        .timeline-event.featured { grid-column:span 6; }
-        .timeline-anchor { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:.32rem; z-index:2; padding-bottom:.46rem; margin-bottom:.38rem; }
-        .timeline-anchor::after { content:""; position:absolute; left:8px; top:26px; bottom:-7px; width:1px; background:linear-gradient(180deg, rgba(134,162,190,.56), rgba(108,130,154,.16)); }
+        .timeline-axis { position:relative; display:flex; flex-direction:column; gap:1.05rem; padding:.18rem .1rem .1rem .1rem; }
+        .timeline-axis::before { content:""; position:absolute; left:50%; top:.2rem; bottom:.4rem; width:2px; border-radius:999px; transform:translateX(-50%); background:linear-gradient(180deg, rgba(139,165,192,.45) 0%, rgba(109,128,150,.2) 20%, rgba(109,128,150,.16) 80%, rgba(139,165,192,.35) 100%); }
+        .timeline-event { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 122px minmax(0, 1fr); align-items:start; column-gap:1rem; }
+        .timeline-anchor { position:relative; grid-column:2; justify-self:center; display:flex; flex-direction:column; align-items:center; gap:.32rem; z-index:2; }
         .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
         .timeline-node { width:18px; height:18px; border-radius:50%; border:2px solid #9bb7d4; background:radial-gradient(circle, rgba(222,238,255,.95) 0%, rgba(134,170,205,.95) 44%, rgba(21,34,48,.98) 100%); box-shadow:0 0 0 4px rgba(112,146,179,.12), 0 0 14px rgba(112,146,179,.25); }
-        .timeline-node-date { color:#b7cee4; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; background:rgba(13,24,35,.86); border:1px solid rgba(95,124,151,.43); border-radius:999px; padding:.16rem .42rem; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+        .timeline-node-date { color:#b7cee4; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; background:rgba(13,24,35,.86); border:1px solid rgba(95,124,151,.43); border-radius:999px; padding:.16rem .42rem; white-space:nowrap; }
         .timeline-card-wrap { position:relative; }
-        .timeline-card-wrap::before { content:""; position:absolute; left:8px; top:-8px; width:14px; border-top:1px dashed rgba(132,157,181,.45); }
+        .timeline-event.left .timeline-card-wrap { grid-column:1; }
+        .timeline-event.right .timeline-card-wrap { grid-column:3; }
+        .timeline-event.left .timeline-card-wrap::after,
+        .timeline-event.right .timeline-card-wrap::after { content:""; position:absolute; top:1.22rem; width:26px; border-top:1px dashed rgba(132,157,181,.45); }
+        .timeline-event.left .timeline-card-wrap::after { right:-26px; }
+        .timeline-event.right .timeline-card-wrap::after { left:-26px; }
+        .timeline-event.featured .timeline-card-wrap { grid-column:1 / 4; justify-self:center; width:min(900px, calc(100% - 28px)); margin-top:.22rem; }
         .timeline-event.featured .timeline-node { width:22px; height:22px; border-width:3px; box-shadow:0 0 0 5px rgba(189,153,75,.14), 0 0 16px rgba(189,153,75,.34); }
         .timeline-event.featured .timeline-node-date { color:#f4dfb8; border-color:rgba(184,146,72,.55); }
-        .timeline-item { border:1px solid #2a3848; border-radius:14px; padding:.9rem 1rem .8rem 1rem; min-height:100%; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 7px 18px rgba(0, 0, 0, .18); border-left-width:3px; overflow:hidden; }
+        .timeline-item { border:1px solid #2a3848; border-radius:14px; padding:.85rem .95rem .78rem .95rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 7px 18px rgba(0, 0, 0, .18); border-left-width:3px; overflow:hidden; }
         .timeline-item::before { content:""; display:block; height:2px; margin:-.85rem -.95rem .62rem -.95rem; background:linear-gradient(90deg, rgba(160,190,220,.02), rgba(160,190,220,.35), rgba(160,190,220,.02)); }
         .timeline-item.featured { padding:1rem 1.08rem .94rem 1.08rem; border-width:1px; border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
         .timeline-item.featured::before { margin:-1rem -1.08rem .72rem -1.08rem; height:3px; }
@@ -656,18 +660,16 @@ def render(data: dict):
         .tone-organisation .timeline-item::before { background:linear-gradient(90deg, rgba(77,121,189,.08), rgba(77,121,189,.55), rgba(77,121,189,.08)); }
         .tone-milestone .timeline-item::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
         .tone-general .timeline-item::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
-        @media (max-width: 1200px) {
-            .timeline-event { grid-column:span 6; }
-            .timeline-event.featured { grid-column:span 12; }
-        }
         @media (max-width: 960px) {
-            .timeline-lane { display:flex; flex-direction:column; gap:1rem; padding:.2rem .1rem .1rem .1rem; }
-            .timeline-lane::before { left:14px; right:auto; top:0; bottom:0; width:2px; height:auto; }
-            .timeline-event,
-            .timeline-event.featured { width:100%; }
-            .timeline-anchor { padding-left:0; margin-bottom:.2rem; }
-            .timeline-anchor::after { left:9px; top:22px; bottom:-4px; }
-            .timeline-card-wrap::before { left:-15px; top:14px; width:15px; }
+            .timeline-axis::before { left:15px; transform:none; }
+            .timeline-event { grid-template-columns:34px minmax(0, 1fr); column-gap:.52rem; }
+            .timeline-anchor { grid-column:1; }
+            .timeline-card-wrap,
+            .timeline-event.left .timeline-card-wrap,
+            .timeline-event.right .timeline-card-wrap,
+            .timeline-event.featured .timeline-card-wrap { grid-column:2; width:100%; justify-self:stretch; margin-top:0; }
+            .timeline-event.left .timeline-card-wrap::after,
+            .timeline-event.right .timeline-card-wrap::after { left:-19px; right:auto; width:19px; }
             .timeline-content { grid-template-columns:minmax(0, 1fr); gap:.62rem; }
             .timeline-media { justify-content:start; }
             .timeline-anchor-index { font-size:.49rem; padding:.11rem .28rem; }
@@ -735,11 +737,12 @@ def render(data: dict):
                     f"<div class='timeline-period-title'>{_safe_html(period_label)}</div>"
                     f"<div class='timeline-period-count'>{len(period_events)} events</div>"
                     "</div>"
-                    "<div class='timeline-lane'>"
+                    "<div class='timeline-axis'>"
                 ),
                 unsafe_allow_html=True,
             )
 
+            side_cursor = 0
             event_index = 0
             for _, row in period_events.iterrows():
                 event_index += 1
@@ -752,6 +755,9 @@ def render(data: dict):
                 highlights = _timeline_highlights(row)
                 tone, tone_label = _event_tone(row)
                 priority = _event_priority(row)
+                side = "featured" if priority == "featured" else ("left" if side_cursor % 2 == 0 else "right")
+                if priority != "featured":
+                    side_cursor += 1
 
                 _, player_path = _resolve_player_visual(row, player_photo_index)
                 _, competition_logo_path, trophy_path = _resolve_tournament_visual(
@@ -792,7 +798,7 @@ def render(data: dict):
                 title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
                 st.markdown(
                     (
-                        f"<div class='timeline-event {_safe_html(priority)} tone-{_safe_html(tone)}'>"
+                        f"<div class='timeline-event {_safe_html(side)} {_safe_html(priority)} tone-{_safe_html(tone)}'>"
                         "<div class='timeline-anchor'>"
                         f"<div class='timeline-anchor-index'>#{event_index}</div>"
                         "<div class='timeline-node'></div>"
