@@ -679,7 +679,7 @@ def render(data: dict):
     if filtered["season"].isna().any():
         season_order.append("N/A")
 
-    st.markdown("<div class='timeline-wrap'>", unsafe_allow_html=True)
+    timeline_html_parts: list[str] = ["<div class='timeline-wrap'>"]
     for season_key in season_order:
         if season_key == "N/A":
             season_events = filtered[filtered["season"].isna()]
@@ -688,17 +688,14 @@ def render(data: dict):
         if season_events.empty:
             continue
 
-        st.markdown(
-            (
-                "<div class='timeline-season-block'>"
-                "<div class='timeline-season-header'>"
-                f"<div class='timeline-season-title'>Season {_safe_html(season_key)}</div>"
-                f"<div class='timeline-season-count'>{len(season_events)} events</div>"
-                "</div>"
-                "<div class='timeline-season-lanes'>"
-            ),
-            unsafe_allow_html=True,
-        )
+        season_html_parts: list[str] = [
+            "<div class='timeline-season-block'>",
+            "<div class='timeline-season-header'>",
+            f"<div class='timeline-season-title'>Season {_safe_html(season_key)}</div>",
+            f"<div class='timeline-season-count'>{len(season_events)} events</div>",
+            "</div>",
+            "<div class='timeline-season-lanes'>",
+        ]
 
         event_index = 0
         season_rows = list(season_events.iterrows())
@@ -707,7 +704,7 @@ def render(data: dict):
             chunk = season_rows[chunk_index : chunk_index + row_size]
             lane_reverse = (chunk_index // row_size) % 2 == 1
             lane_class = "timeline-lane-row reverse" if lane_reverse else "timeline-lane-row"
-            st.markdown(f"<div class='{lane_class}'>", unsafe_allow_html=True)
+            row_html_parts: list[str] = [f"<div class='{lane_class}'>"]
             for _, row in chunk:
                 event_index += 1
                 date_value = row.get("date")
@@ -757,7 +754,7 @@ def render(data: dict):
                 footer_html = f"<div class='timeline-footer'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
 
                 title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
-                st.markdown(
+                row_html_parts.append(
                     (
                         f"<div class='timeline-event {_safe_html(priority)} tone-{_safe_html(tone)}'>"
                         "<div class='timeline-track'>"
@@ -782,12 +779,14 @@ def render(data: dict):
                         "</div>"
                         "</div>"
                         "</div>"
-                    ),
-                    unsafe_allow_html=True,
+                    )
                 )
-            st.markdown("</div>", unsafe_allow_html=True)
+            row_html_parts.append("</div>")
+            season_html_parts.append("".join(row_html_parts))
             if chunk_index + row_size < len(season_rows):
-                st.markdown("<div class='timeline-row-drop'><span class='down-arrow'>↓</span></div>", unsafe_allow_html=True)
+                season_html_parts.append("<div class='timeline-row-drop'><span class='down-arrow'>↓</span></div>")
 
-        st.markdown("</div></div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        season_html_parts.extend(["</div>", "</div>"])
+        timeline_html_parts.append("".join(season_html_parts))
+    timeline_html_parts.append("</div>")
+    st.markdown("".join(timeline_html_parts), unsafe_allow_html=True)
