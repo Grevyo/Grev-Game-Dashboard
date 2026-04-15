@@ -96,8 +96,8 @@ def _timeline_meta_line(row: pd.Series) -> str:
     return " • ".join(tokens)
 
 
-def _timeline_highlights(row: pd.Series) -> list[str]:
-    chips: list[str] = []
+def _timeline_highlights(row: pd.Series) -> list[tuple[str, str]]:
+    chips: list[tuple[str, str]] = []
 
     competition = _display_value(row.get("competition"))
     placement = _display_value(row.get("placement"))
@@ -110,23 +110,23 @@ def _timeline_highlights(row: pd.Series) -> list[str]:
     rank_to = _to_int_text(row.get("ranking_to"))
 
     if competition:
-        chips.append(f"Competition: {competition}")
+        chips.append(("competition", f"Competition: {competition}"))
     if placement:
-        chips.append(f"Placement: {placement}")
+        chips.append(("placement", f"Placement: {placement}"))
     if record:
-        chips.append(f"Record: {record}")
+        chips.append(("result", f"Record: {record}"))
     if opponent:
-        chips.append(f"Org/Opponent: {opponent}")
+        chips.append(("opponent", f"Org/Opponent: {opponent}"))
     if from_entity or to_entity:
         flow = " → ".join([part for part in [from_entity, to_entity] if part])
         if flow:
-            chips.append(f"Movement: {flow}")
+            chips.append(("movement", f"Movement: {flow}"))
     if fee_text:
-        chips.append(f"Fee: {fee_text} CPL")
+        chips.append(("fee", f"Fee: {fee_text} CPL"))
     if rank_from or rank_to:
         rank_flow = " → ".join([part for part in [rank_from, rank_to] if part])
         if rank_flow:
-            chips.append(f"Ranking: {rank_flow}")
+            chips.append(("ranking", f"Ranking: {rank_flow}"))
     return chips
 
 
@@ -833,24 +833,35 @@ def render(data: dict):
         .timeline-event-shell.stagger-md { margin-top:3.1rem; }
         .timeline-event-shell.stagger-lg { margin-top:4.6rem; }
         .timeline-event { border:1px solid #31485f; border-left-width:4px; border-radius:14px; background:linear-gradient(165deg, rgba(20,31,45,.93) 0%, rgba(11,18,28,.99) 58%); box-shadow:0 10px 20px rgba(0,0,0,.28), inset 0 1px 0 rgba(207,231,255,.05); overflow:hidden; }
-        .timeline-event.featured { border-left-width:5px; box-shadow:0 14px 28px rgba(0,0,0,.34), 0 0 0 1px rgba(178,204,233,.1); }
-        .timeline-event-grid { display:grid; grid-template-columns:clamp(56px, 6.2vw, 72px) minmax(0, 1fr); gap:.42rem; padding:.5rem .48rem; }
-        .timeline-rail { min-width:0; max-width:72px; border-right:1px solid rgba(95,121,146,.3); padding-right:.1rem; display:flex; flex-direction:column; gap:.14rem; }
+        .timeline-event.featured { border-left-width:5px; box-shadow:0 14px 28px rgba(0,0,0,.34), 0 0 0 1px rgba(178,204,233,.1), inset 0 0 0 1px rgba(237,211,142,.1); }
+        .timeline-event-grid { display:grid; grid-template-columns:clamp(56px, 6.2vw, 72px) minmax(0, 1fr); gap:.42rem; padding:.5rem .48rem; align-items:start; }
+        .timeline-rail { min-width:0; max-width:72px; border-right:1px solid rgba(95,121,146,.34); padding:.1rem .16rem .08rem 0; display:flex; flex-direction:column; gap:.14rem; position:relative; }
+        .timeline-rail::after { content:""; position:absolute; left:-.24rem; top:.06rem; bottom:.06rem; width:2px; border-radius:2px; background:linear-gradient(180deg, rgba(166,197,227,.66), rgba(97,127,155,.08)); }
         .timeline-date { color:#e8f4ff; font-size:.6rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; line-height:1.2; }
-        .timeline-meta { color:#88a2ba; font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; line-height:1.25; }
+        .timeline-meta { color:#a7c0d8; font-size:.52rem; letter-spacing:.08em; text-transform:uppercase; line-height:1.25; border:1px solid rgba(91,122,150,.55); background:linear-gradient(180deg, rgba(31,46,64,.78), rgba(18,30,44,.82)); border-radius:999px; padding:.1rem .3rem; width:max-content; max-width:100%; }
         .timeline-main { min-width:0; width:100%; display:grid; grid-template-columns:minmax(0, 1fr) auto; column-gap:.26rem; align-items:flex-start; }
         .timeline-main.without-media { grid-template-columns:minmax(0, 1fr); }
         .timeline-copy { min-width:0; width:100%; max-width:none; margin:0; padding:0; flex:1 1 auto; align-self:start; }
+        .timeline-head { margin:0 0 .12rem 0; padding-bottom:.14rem; border-bottom:1px solid rgba(109,137,164,.22); }
         .timeline-title { color:#f5faff; font-size:.9rem; font-weight:770; line-height:1.26; margin:0 0 .12rem 0; max-width:none; text-shadow:0 1px 0 rgba(0,0,0,.35); }
         .timeline-title.featured { font-size:.97rem; }
-        .timeline-details { color:#d2deeb; font-size:.74rem; line-height:1.37; margin:0 0 .14rem 0; max-width:none; }
-        .timeline-chips { display:flex; flex-wrap:wrap; gap:.24rem; margin:.06rem 0 0 0; width:100%; }
-        .timeline-chip { border-radius:999px; font-size:.52rem; letter-spacing:.082em; text-transform:uppercase; color:#e3eefb; padding:.16rem .44rem; background:linear-gradient(180deg, rgba(32,49,68,.95), rgba(18,31,45,.95)); border:1px solid #4a6584; box-shadow:inset 0 1px 0 rgba(214,231,249,.12), 0 0 0 1px rgba(8,16,24,.42); }
+        .timeline-body { background:linear-gradient(180deg, rgba(15,25,38,.42), rgba(13,23,35,.08)); border:1px solid rgba(70,98,124,.2); border-radius:10px; padding:.2rem .28rem; margin:0 0 .12rem 0; }
+        .timeline-details { color:#d2deeb; font-size:.74rem; line-height:1.37; margin:0; max-width:none; }
+        .timeline-meta-zone { margin-top:.08rem; display:flex; flex-direction:column; gap:.12rem; }
+        .timeline-chips { display:flex; flex-wrap:wrap; gap:.24rem; margin:.04rem 0 0 0; width:100%; }
+        .timeline-chip { border-radius:999px; font-size:.52rem; letter-spacing:.082em; text-transform:uppercase; color:#e3eefb; padding:.17rem .48rem; background:linear-gradient(180deg, rgba(44,66,91,.95), rgba(24,39,56,.95)); border:1px solid #5a7799; box-shadow:inset 0 1px 0 rgba(214,231,249,.13), 0 1px 0 rgba(7,13,21,.8), 0 0 0 1px rgba(8,16,24,.42); white-space:nowrap; }
         .timeline-chip.chip-identity { border-color:rgba(173,203,235,.74); color:#f0f8ff; background:linear-gradient(180deg, rgba(58,84,112,.88), rgba(32,53,75,.94)); }
         .timeline-chip.chip-identity-soft { border-color:rgba(113,147,182,.64); color:#dbeaf9; background:linear-gradient(180deg, rgba(42,64,86,.86), rgba(24,41,60,.92)); }
         .timeline-chip.chip-priority { border-color:rgba(247,208,130,.88); color:#fff3d0; background:linear-gradient(180deg, rgba(97,72,24,.95), rgba(64,46,14,.98)); }
         .timeline-chip.chip-tone { border-color:rgba(151,185,224,.78); color:#eaf5ff; background:linear-gradient(180deg, rgba(44,69,96,.88), rgba(22,42,64,.95)); }
-        .timeline-notes { margin-top:.14rem; color:#9ab4cc; font-size:.64rem; line-height:1.33; max-width:none; padding-top:.1rem; border-top:1px dashed rgba(96,123,151,.36); }
+        .timeline-chip.chip-competition { border-color:rgba(144,187,255,.78); color:#e6f1ff; }
+        .timeline-chip.chip-placement { border-color:rgba(251,215,131,.9); color:#fff3d4; background:linear-gradient(180deg, rgba(102,76,26,.93), rgba(72,52,18,.97)); }
+        .timeline-chip.chip-result { border-color:rgba(157,231,171,.85); color:#e7ffeb; background:linear-gradient(180deg, rgba(32,91,44,.9), rgba(21,63,30,.95)); }
+        .timeline-chip.chip-opponent { border-color:rgba(172,186,208,.75); color:#ecf3fc; }
+        .timeline-chip.chip-movement { border-color:rgba(115,238,224,.85); color:#d9fffa; background:linear-gradient(180deg, rgba(18,81,77,.9), rgba(12,58,55,.95)); }
+        .timeline-chip.chip-fee { border-color:rgba(245,196,134,.86); color:#ffeace; background:linear-gradient(180deg, rgba(108,62,24,.93), rgba(74,42,16,.97)); }
+        .timeline-chip.chip-ranking { border-color:rgba(194,162,255,.88); color:#f0e5ff; background:linear-gradient(180deg, rgba(63,43,103,.92), rgba(47,34,79,.95)); }
+        .timeline-notes { margin-top:.04rem; color:#9ab4cc; font-size:.64rem; line-height:1.33; max-width:none; padding:.12rem .18rem 0 .18rem; border-top:1px dashed rgba(96,123,151,.36); }
         .timeline-media { display:flex; flex-direction:column; gap:.16rem; width:clamp(34px, 2.6vw, 50px); max-width:50px; flex:0 0 auto; }
         .timeline-main.layout-roster .timeline-media,
         .timeline-main.layout-story .timeline-media { width:clamp(36px, 2.9vw, 56px); max-width:56px; }
@@ -910,6 +921,7 @@ def render(data: dict):
             .timeline-event-shell.lane-left.width-expanded .timeline-main { display:block; }
             .timeline-event-shell.lane-left .timeline-copy,
             .timeline-event-shell.lane-left .timeline-media { order:initial; }
+            .timeline-rail::after { left:-.18rem; }
             .timeline-media { display:grid; grid-template-columns:repeat(2, minmax(0, 120px)); gap:.3rem; }
             .timeline-event-row,
             .timeline-event-row.has-event-photo { grid-template-columns:1fr; }
@@ -1005,7 +1017,7 @@ def render(data: dict):
                 media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}</div>"
 
             chips = _timeline_identity_chips(row, tone_label=tone_label, priority=priority)
-            chips.extend([("detail", chip) for chip in highlights])
+            chips.extend(highlights)
 
             chips_html = ""
             if chips:
@@ -1015,7 +1027,8 @@ def render(data: dict):
                 )
                 chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
             notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
-            footer_html = f"{chips_html}{notes_html}" if (chips_html or notes_html) else ""
+            meta_zone_html = f"<div class='timeline-meta-zone'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
+            details_block_html = f"<div class='timeline-body'>{details_html}</div>" if details_html else ""
             width_class = _event_width_class(
                 row,
                 visuals_count=len(visuals),
@@ -1050,11 +1063,12 @@ def render(data: dict):
                     f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
                     f"{meta_html}"
                     "</div>"
-                    "</div>"
                     f"<div class='{main_class}'>"
                     "<div class='timeline-copy'>"
+                    "<div class='timeline-head'>"
                     f"<div class='{title_class}'>{_safe_html(title)}</div>"
-                    f"{details_html}{footer_html}"
+                    "</div>"
+                    f"{details_block_html}{meta_zone_html}"
                     "</div>"
                     f"{media_html}"
                     "</div>"
