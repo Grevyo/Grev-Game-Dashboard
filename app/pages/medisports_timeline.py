@@ -88,7 +88,11 @@ def _to_int_text(value: object, *, fallback: str = "") -> str:
 def _timeline_meta_line(row: pd.Series) -> str:
     event_type = _display_value(row.get("event_type")).replace("_", " ").title()
     category = _display_value(row.get("category")).replace("_", " ").title()
-    tokens = [token for token in [event_type, category] if token]
+    tokens: list[str] = []
+    if event_type:
+        tokens.append(event_type)
+    if category and category.casefold() not in {token.casefold() for token in tokens}:
+        tokens.append(category)
     return " • ".join(tokens)
 
 
@@ -702,14 +706,10 @@ def _image_uri_with_fallback(path: str | None, *, max_width: int, max_height: in
 
 def _visual_priority(
     row: pd.Series,
-    event_photo_visual: tuple[str, str] | None,
     player_image_uri: str | None,
     competition_image_uri: str | None,
     trophy_image_uri: str | None,
 ) -> list[tuple[str, str]]:
-    if event_photo_visual:
-        return [event_photo_visual]
-
     event_type = _normalize_for_match(row.get("event_type"))
     category = _normalize_for_match(row.get("category"))
     player_centric = any(token in event_type for token in ["transfer", "sign", "roster"]) or category == "roster"
@@ -823,8 +823,6 @@ def render(data: dict):
         .timeline-rail { min-width:0; max-width:72px; border-right:1px solid rgba(95,121,146,.3); padding-right:.1rem; display:flex; flex-direction:column; gap:.14rem; }
         .timeline-date { color:#e8f4ff; font-size:.6rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; line-height:1.2; }
         .timeline-meta { color:#88a2ba; font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; line-height:1.25; }
-        .timeline-badges { display:flex; flex-direction:column; align-items:flex-start; gap:.22rem; }
-        .timeline-tag { font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border-radius:999px; padding:.12rem .36rem; border:1px solid rgba(152,176,199,.36); color:#c5dbf1; }
         .timeline-main { min-width:0; width:100%; display:grid; grid-template-columns:minmax(0, 1fr) auto; column-gap:.26rem; align-items:flex-start; }
         .timeline-main.without-media { grid-template-columns:minmax(0, 1fr); }
         .timeline-copy { min-width:0; width:100%; max-width:none; margin:0; padding:0; flex:1 1 auto; align-self:start; }
@@ -841,8 +839,12 @@ def render(data: dict):
         .timeline-media-card { border:1px solid #32465c; border-radius:9px; overflow:hidden; background:#0d1724; }
         .timeline-media-card img { width:100%; height:54px; object-fit:contain; object-position:center; display:block; background:radial-gradient(circle at center, #111f2f 0%, #0b1521 100%); }
         .timeline-media.media-2 .timeline-media-card img { height:46px; }
-        .timeline-media-card .label { color:#90a9c1; font-size:.48rem; letter-spacing:.1em; text-transform:uppercase; text-align:center; padding:.1rem .16rem; border-top:1px solid #293d53; }
         .timeline-media-caption { color:#7f97af; font-size:.52rem; line-height:1.28; margin-top:-.08rem; }
+        .timeline-event-row { display:grid; grid-template-columns:minmax(0, 1fr); gap:.38rem; align-items:stretch; }
+        .timeline-event-row.has-event-photo { grid-template-columns:minmax(0, 1fr) clamp(150px, 22%, 220px); }
+        .timeline-event-photo-block { border:1px solid #32465c; border-radius:12px; overflow:hidden; background:linear-gradient(160deg, rgba(15,26,39,.96), rgba(9,16,26,.98)); display:flex; flex-direction:column; min-width:0; }
+        .timeline-event-photo-block img { width:100%; height:100%; min-height:122px; object-fit:cover; object-position:center; display:block; }
+        .timeline-event-photo-caption { color:#9db3c9; font-size:.56rem; line-height:1.3; padding:.34rem .42rem .38rem .42rem; border-top:1px solid rgba(63,88,112,.5); }
 
         .timeline-event.tone-competition { border-left-color:#b89248; background:linear-gradient(162deg, rgba(184,146,72,.18), rgba(12,19,28,.98) 58%); }
         .timeline-event.tone-transfer { border-left-color:#3f9b99; background:linear-gradient(162deg, rgba(63,155,153,.18), rgba(12,19,28,.98) 58%); }
@@ -855,13 +857,6 @@ def render(data: dict):
         .timeline-event-shell.tone-ranking .timeline-event-node { border-color:#9276ce; }
         .timeline-event-shell.tone-organisation .timeline-event-node { border-color:#6995db; }
         .timeline-event-shell.tone-milestone .timeline-event-node { border-color:#72bb79; }
-
-        .timeline-event.tone-competition .timeline-tag { color:#f1deb8; border-color:rgba(184,146,72,.45); background:rgba(184,146,72,.12); }
-        .timeline-event.tone-transfer .timeline-tag { color:#b9ece9; border-color:rgba(63,155,153,.45); background:rgba(63,155,153,.14); }
-        .timeline-event.tone-ranking .timeline-tag { color:#d8c8ff; border-color:rgba(127,99,184,.44); background:rgba(127,99,184,.15); }
-        .timeline-event.tone-organisation .timeline-tag { color:#cce0ff; border-color:rgba(77,121,189,.45); background:rgba(77,121,189,.14); }
-        .timeline-event.tone-milestone .timeline-tag { color:#d5f0d8; border-color:rgba(92,157,98,.42); background:rgba(92,157,98,.15); }
-        .timeline-event.tone-general .timeline-tag { color:#d2deea; border-color:rgba(95,115,138,.42); background:rgba(95,115,138,.13); }
 
         @media (max-width: 980px) {
             .timeline-wrap { gap:.84rem; }
@@ -884,7 +879,6 @@ def render(data: dict):
             .timeline-event-shell.stagger-lg { margin-top:.42rem !important; }
             .timeline-event-grid { grid-template-columns:1fr; gap:.42rem; padding:.52rem; }
             .timeline-rail { border-right:none; border-bottom:1px solid rgba(95,121,146,.3); padding-right:0; padding-bottom:.34rem; }
-            .timeline-badges { flex-direction:row; flex-wrap:wrap; gap:.24rem; }
             .timeline-main { display:block; }
             .timeline-event-shell.lane-left .timeline-main,
             .timeline-event-shell.lane-left.width-compact .timeline-main,
@@ -892,6 +886,8 @@ def render(data: dict):
             .timeline-event-shell.lane-left .timeline-copy,
             .timeline-event-shell.lane-left .timeline-media { order:initial; }
             .timeline-media { display:grid; grid-template-columns:repeat(2, minmax(0, 120px)); gap:.3rem; }
+            .timeline-event-row,
+            .timeline-event-row.has-event-photo { grid-template-columns:1fr; }
         }
         </style>
         """,
@@ -935,7 +931,7 @@ def render(data: dict):
             meta_line = _timeline_meta_line(row)
             notes = _display_value(row.get("notes"))
             highlights = _timeline_highlights(row)
-            tone, tone_label = _event_tone(row)
+            tone, _ = _event_tone(row)
             priority = _event_priority(row)
 
             _, player_path = _resolve_player_visual(row, player_photo_index)
@@ -954,8 +950,7 @@ def render(data: dict):
             player_uri = _image_uri_with_fallback(player_path, max_width=140, max_height=140)
             competition_uri = _image_uri_with_fallback(competition_logo_path, max_width=140, max_height=140)
             trophy_uri = _image_uri_with_fallback(trophy_path, max_width=140, max_height=140)
-            event_visual = (event_override["label"], event_photo_uri) if event_photo_uri and event_override else None
-            visuals = _visual_priority(row, event_visual, player_uri, competition_uri, trophy_uri)
+            visuals = _visual_priority(row, player_uri, competition_uri, trophy_uri)
             layout_variant = _event_layout_variant(
                 row,
                 visuals_count=len(visuals),
@@ -978,15 +973,11 @@ def render(data: dict):
                     (
                         "<div class='timeline-media-card'>"
                         f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
-                        f"<div class='label'>{label}</div>"
                         "</div>"
                     )
                     for label, uri in visuals
                 )
-                caption_html = ""
-                if event_override and event_photo_uri:
-                    caption_html = f"<div class='timeline-media-caption'>{_safe_html(event_override['caption'])}</div>"
-                media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}{caption_html}</div>"
+                media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}</div>"
 
             chips_html = ""
             if highlights:
@@ -1005,6 +996,15 @@ def render(data: dict):
             stagger_class = stagger_cycle[event_index % len(stagger_cycle)]
             media_presence_class = "with-media" if media_html else "without-media"
             main_class = f"timeline-main {media_presence_class} layout-{layout_variant}"
+            event_photo_html = ""
+            if event_override and event_photo_uri:
+                event_photo_html = (
+                    "<aside class='timeline-event-photo-block'>"
+                    f"<img src='{event_photo_uri}' alt='Event photo for {_safe_html(title)}' loading='lazy' />"
+                    f"<div class='timeline-event-photo-caption'>{_safe_html(event_override['caption'])}</div>"
+                    "</aside>"
+                )
+            event_row_class = "timeline-event-row has-event-photo" if event_photo_html else "timeline-event-row"
 
             title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
             season_html_parts.append(
@@ -1012,14 +1012,12 @@ def render(data: dict):
                     f"<div class='timeline-event-shell {lane_class} {stagger_class} "
                     f"width-{_safe_html(width_class)} tone-{_safe_html(tone)}'>"
                     "<div class='timeline-event-node'></div>"
+                    f"<div class='{event_row_class}'>"
                     f"<div class='timeline-event tone-{_safe_html(tone)} {_safe_html(priority)}'>"
                     "<div class='timeline-event-grid'>"
                     "<div class='timeline-rail'>"
                     f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
                     f"{meta_html}"
-                    "<div class='timeline-badges'>"
-                    f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
-                    f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
                     "</div>"
                     "</div>"
                     f"<div class='{main_class}'>"
@@ -1031,6 +1029,7 @@ def render(data: dict):
                     "</div>"
                     "</div>"
                     "</div>"
+                    f"{event_photo_html}"
                     "</div>"
                 )
             )
