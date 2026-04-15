@@ -136,6 +136,33 @@ def _event_priority(row: pd.Series) -> str:
     return "standard"
 
 
+def _event_width_class(row: pd.Series, *, visuals_count: int, highlights_count: int, priority: str) -> str:
+    details_len = len(_display_value(row.get("details")))
+    notes_len = len(_display_value(row.get("notes")))
+    title_len = len(_display_value(row.get("title")))
+    event_type = _normalize_for_match(row.get("event_type"))
+    category = _normalize_for_match(row.get("category"))
+
+    richness_score = 0
+    if priority == "featured":
+        richness_score += 3
+    richness_score += min(visuals_count, 2)
+    richness_score += min(highlights_count, 3)
+    richness_score += 1 if details_len > 130 else 0
+    richness_score += 1 if notes_len > 90 else 0
+    richness_score += 1 if title_len > 48 else 0
+    if category in {"competition", "ranking"}:
+        richness_score += 1
+    if any(token in event_type for token in ["final", "qualification", "title", "transfer", "milestone"]):
+        richness_score += 1
+
+    if richness_score >= 7:
+        return "expanded"
+    if richness_score <= 2:
+        return "compact"
+    return "regular"
+
+
 def _safe_html(value: object) -> str:
     return html.escape(_display_value(value))
 
@@ -588,7 +615,7 @@ def render(data: dict):
         .timeline-season-title { color:#e1eefc; font-size:.92rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
         .timeline-season-count { color:#89a0b7; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
         .timeline-season-lanes { display:flex; flex-direction:column; gap:.62rem; position:relative; }
-        .timeline-lane-row { position:relative; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.74rem .78rem; align-items:start; padding:0 .16rem; }
+        .timeline-lane-row { position:relative; display:flex; flex-wrap:wrap; gap:.74rem .78rem; align-items:flex-start; align-content:flex-start; padding:0 .16rem; }
         .timeline-lane-row.dir-rtl { direction:rtl; }
         .timeline-lane-row.dir-rtl .timeline-event { direction:ltr; }
         .timeline-lane-row::before { content:""; position:absolute; left:.7rem; right:.7rem; top:24px; border-top:1px dashed rgba(122,152,180,.4); pointer-events:none; }
@@ -599,13 +626,25 @@ def render(data: dict):
         .timeline-bend.to-right::after { right:.28rem; }
         .timeline-bend.to-left::before { left:.45rem; border-right:none; border-bottom-left-radius:18px; }
         .timeline-bend.to-left::after { left:.28rem; }
-        .timeline-event { position:relative; min-width:0; align-self:start; height:auto; display:flex; flex-direction:column; }
+        .timeline-event {
+            position:relative;
+            min-width:min(100%, 210px);
+            max-width:100%;
+            flex:1 1 290px;
+            align-self:start;
+            height:auto;
+            display:flex;
+            flex-direction:column;
+        }
         .timeline-event::after { content:""; position:absolute; top:20px; width:13px; border-top:1px solid rgba(156,186,214,.5); z-index:3; pointer-events:none; }
         .timeline-lane-row.dir-ltr .timeline-event::after { right:-.72rem; }
         .timeline-lane-row.dir-rtl .timeline-event::after { left:-.72rem; }
         .timeline-lane-row.dir-ltr .timeline-event:last-child::after,
         .timeline-lane-row.dir-rtl .timeline-event:last-child::after { display:none; }
-        .timeline-event.featured { grid-column:span 2; }
+        .timeline-event.compact { flex:0.8 1 220px; }
+        .timeline-event.regular { flex:1 1 290px; }
+        .timeline-event.expanded { flex:1.25 1 360px; }
+        .timeline-event.featured { flex:1.45 1 430px; }
         .timeline-event.featured .timeline-item { border-left-width:3px; box-shadow:0 14px 28px rgba(0, 0, 0, .34); }
         .timeline-track { display:flex; align-items:center; gap:.42rem; padding:.01rem .14rem .3rem .14rem; }
         .timeline-track::after { content:""; flex:1; height:1px; border-top:1px solid rgba(122,152,180,.34); }
@@ -618,7 +657,8 @@ def render(data: dict):
         .timeline-item::before { content:""; display:block; height:2px; margin:-.54rem -.62rem .38rem -.62rem; background:linear-gradient(90deg, rgba(160,190,220,.02), rgba(160,190,220,.33), rgba(160,190,220,.02)); }
         .timeline-item.featured { padding:.62rem .72rem .56rem .72rem; border-width:1px; border-left-width:4px; box-shadow:0 12px 26px rgba(0, 0, 0, .3); }
         .timeline-item.featured::before { margin:-.62rem -.72rem .44rem -.72rem; height:3px; }
-        .timeline-content { display:grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 26%); gap:.48rem; align-items:start; grid-auto-rows:max-content; }
+        .timeline-content { display:flex; gap:.48rem; align-items:flex-start; justify-content:space-between; }
+        .timeline-main { flex:1 1 auto; min-width:0; }
         .timeline-head { display:flex; flex-wrap:wrap; align-items:center; gap:.28rem .44rem; justify-content:space-between; }
         .timeline-date { color:#e8f4ff; font-size:.7rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; padding:.14rem .4rem; border:1px solid rgba(160,185,210,.3); border-radius:999px; background:rgba(16,27,39,.58); }
         .timeline-badges { display:flex; flex-wrap:wrap; gap:.3rem; justify-content:flex-end; }
@@ -631,12 +671,29 @@ def render(data: dict):
         .timeline-chips { display:flex; flex-wrap:wrap; gap:.24rem; margin-top:.05rem; }
         .timeline-chip { border-radius:5px; font-size:.57rem; letter-spacing:.09em; text-transform:uppercase; color:#d0e2f5; padding:.16rem .36rem; background:#132131; border:1px solid #36516b; }
         .timeline-notes { margin-top:.18rem; color:#8ea9c1; font-size:.68rem; line-height:1.34; }
-        .timeline-media { display:flex; flex-direction:column; gap:.22rem; min-width:0; justify-content:flex-start; align-content:flex-start; align-self:start; width:100%; }
+        .timeline-media {
+            display:flex;
+            flex-direction:column;
+            gap:.22rem;
+            min-width:78px;
+            max-width:110px;
+            flex:0 1 30%;
+            justify-content:flex-start;
+            align-content:flex-start;
+            align-self:start;
+        }
         .timeline-media-card { width:100%; border:1px solid #2f4255; border-radius:10px; overflow:hidden; background:#0c1420; }
         .timeline-media-card img { width:100%; height:52px; object-fit:contain; object-position:center; display:block; background:radial-gradient(circle at center, #0f1d2b 0%, #09121c 100%); }
         .timeline-media.media-2 .timeline-media-card img { height:48px; }
         .timeline-media.media-3 .timeline-media-card img { height:42px; }
         .timeline-event.featured .timeline-media.media-1 .timeline-media-card img { height:56px; }
+        .timeline-event.compact .timeline-content { gap:.4rem; }
+        .timeline-event.compact .timeline-media { min-width:68px; max-width:88px; }
+        .timeline-event.compact .timeline-media-card img { height:44px; }
+        .timeline-event.expanded .timeline-media { min-width:88px; max-width:124px; }
+        .timeline-event.expanded .timeline-media-card img { height:58px; }
+        .timeline-event.featured .timeline-media { min-width:96px; max-width:132px; }
+        .timeline-event.featured .timeline-media-card img { height:60px; }
         .timeline-media-card .label { color:#8ea8be; font-size:.49rem; letter-spacing:.11em; text-transform:uppercase; text-align:center; padding:.12rem .18rem; border-top:1px solid #23384e; }
         .timeline-item.tone-competition { border-left-color:#b89248; background:linear-gradient(162deg, rgba(184,146,72,.16), rgba(13,20,29,.95) 42%); }
         .timeline-item.tone-transfer { border-left-color:#3f9b99; background:linear-gradient(162deg, rgba(63,155,153,.16), rgba(13,20,29,.95) 42%); }
@@ -657,26 +714,33 @@ def render(data: dict):
         .timeline-item.tone-milestone::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
         .timeline-item.tone-general::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
         @media (max-width: 1280px) {
-            .timeline-lane-row { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+            .timeline-lane-row { gap:.66rem .66rem; }
             .timeline-lane-row::before { left:.6rem; right:.6rem; }
-            .timeline-event.featured { grid-column:span 2; }
+            .timeline-event { flex:1 1 260px; min-width:min(100%, 200px); }
+            .timeline-event.compact { flex:0.9 1 220px; }
+            .timeline-event.expanded { flex:1.2 1 320px; }
+            .timeline-event.featured { flex:1.35 1 360px; }
         }
         @media (max-width: 960px) {
             .timeline-wrap { gap:.86rem; }
             .timeline-season-block { padding:.74rem .68rem .56rem .68rem; border-radius:16px; }
             .timeline-season-header { margin-bottom:.58rem; padding:.08rem .1rem .42rem .1rem; }
             .timeline-season-lanes { gap:.48rem; }
-            .timeline-lane-row { grid-template-columns:minmax(0, 1fr); gap:.54rem; padding:0 .06rem; }
+            .timeline-lane-row { display:flex; flex-direction:column; gap:.54rem; padding:0 .06rem; }
             .timeline-lane-row.dir-rtl { direction:ltr; }
             .timeline-lane-row::before,
             .timeline-bend,
             .timeline-event::after { display:none; }
-            .timeline-event.featured { grid-column:span 1; }
+            .timeline-event,
+            .timeline-event.compact,
+            .timeline-event.regular,
+            .timeline-event.expanded,
+            .timeline-event.featured { flex:1 1 auto; min-width:0; width:100%; }
             .timeline-track { padding-bottom:.22rem; }
             .timeline-item { padding:.54rem .6rem .5rem .6rem; border-radius:14px; }
             .timeline-item::before { margin:-.54rem -.6rem .4rem -.6rem; }
-            .timeline-content { grid-template-columns:minmax(0, 1fr); gap:.46rem; }
-            .timeline-media { justify-content:start; max-width:180px; }
+            .timeline-content { display:flex; flex-direction:column; gap:.46rem; }
+            .timeline-media { justify-content:start; min-width:0; max-width:180px; flex:0 1 auto; }
             .timeline-media-card img { height:52px; }
             .timeline-media.media-2 .timeline-media-card img { height:48px; }
             .timeline-media.media-3 .timeline-media-card img { height:44px; }
@@ -782,9 +846,16 @@ def render(data: dict):
                 footer_html = f"<div class='timeline-footer'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
 
                 title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
+                width_class = _event_width_class(
+                    row,
+                    visuals_count=len(visuals),
+                    highlights_count=len(highlights),
+                    priority=priority,
+                )
+
                 row_html_parts.append(
                     (
-                        f"<div class='timeline-event {_safe_html(priority)} tone-{_safe_html(tone)}'>"
+                        f"<div class='timeline-event {_safe_html(priority)} {_safe_html(width_class)} tone-{_safe_html(tone)}'>"
                         "<div class='timeline-track'>"
                         f"<span class='timeline-anchor-index'>#{event_index}</span>"
                         "<span class='timeline-node'></span>"
@@ -792,7 +863,7 @@ def render(data: dict):
                         "</div>"
                         f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
                         "<div class='timeline-content'>"
-                        "<div>"
+                        "<div class='timeline-main'>"
                         "<div class='timeline-head'>"
                         f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
                         "<div class='timeline-badges'>"
