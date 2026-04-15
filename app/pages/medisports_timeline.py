@@ -607,7 +607,7 @@ def render(data: dict):
     st.markdown(
         """
         <style>
-        .timeline-wrap { display:flex; flex-direction:column; gap:1rem; margin-top:.45rem; max-width:1040px; }
+        .timeline-wrap { display:flex; flex-direction:column; gap:1rem; margin-top:.45rem; max-width:1240px; width:min(100%, 1240px); }
         .timeline-season-block { border:1px solid #223246; border-radius:18px; padding:.8rem .9rem .84rem .9rem; background:linear-gradient(180deg, rgba(10,16,24,.86) 0%, rgba(9,14,22,.98) 100%); }
         .timeline-season-header { display:flex; align-items:baseline; justify-content:space-between; gap:.4rem; border-bottom:1px solid rgba(81,106,132,.35); padding-bottom:.42rem; margin-bottom:.68rem; }
         .timeline-season-title { color:#e5f2ff; font-size:.88rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
@@ -616,17 +616,22 @@ def render(data: dict):
         .timeline-month-header { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.38rem; }
         .timeline-month-title { color:#b6cee6; font-size:.66rem; letter-spacing:.11em; text-transform:uppercase; font-weight:700; }
         .timeline-month-count { color:#7f97af; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; }
-        .timeline-month-events { position:relative; display:flex; flex-direction:column; gap:.46rem; padding:0 .2rem 0 2rem; }
-        .timeline-month-events::before { content:""; position:absolute; left:.9rem; top:.12rem; bottom:.14rem; width:2px; border-radius:4px; background:linear-gradient(180deg, rgba(105,132,158,.55) 0%, rgba(77,103,128,.26) 100%); }
-        .timeline-event-shell { position:relative; max-width:min(100%, 940px); }
-        .timeline-event-shell.lane-right { margin-left:clamp(0rem, 2.8vw, 2rem); }
-        .timeline-event-shell.lane-left { margin-left:0; }
-        .timeline-event-shell.width-expanded { max-width:min(100%, 940px); }
-        .timeline-event-shell.width-regular { max-width:min(100%, 860px); }
-        .timeline-event-shell.width-compact { max-width:min(100%, 760px); }
-        .timeline-event-node { position:absolute; left:-1.45rem; top:1rem; width:.7rem; height:.7rem; border-radius:999px; border:2px solid #6685a5; background:#0e1825; box-shadow:0 0 0 3px rgba(20,33,47,.65); z-index:2; }
-        .timeline-event-node::after { content:""; position:absolute; left:calc(100% + 3px); top:50%; width:.85rem; height:1px; transform:translateY(-50%); background:linear-gradient(90deg, rgba(100,127,152,.72) 0%, rgba(100,127,152,.1) 100%); }
-        .timeline-event-shell.lane-right .timeline-event-node::after { width:1.18rem; }
+        .timeline-month-events { position:relative; display:flex; flex-direction:column; gap:.62rem; padding:0 0; }
+        .timeline-month-events::before { content:""; position:absolute; left:50%; transform:translateX(-50%); top:.15rem; bottom:.16rem; width:2px; border-radius:4px; background:linear-gradient(180deg, rgba(108,138,168,.66) 0%, rgba(77,103,128,.28) 100%); }
+        .timeline-event-shell { position:relative; width:calc(50% - 1.8rem); min-width:260px; }
+        .timeline-event-shell.lane-left { align-self:flex-start; margin-right:auto; }
+        .timeline-event-shell.lane-right { align-self:flex-end; margin-left:auto; }
+        .timeline-event-shell.width-expanded { max-width:610px; }
+        .timeline-event-shell.width-regular { max-width:520px; }
+        .timeline-event-shell.width-compact { max-width:430px; }
+        .timeline-event-shell.lane-left.width-expanded { width:calc(50% - 1.3rem); }
+        .timeline-event-shell.lane-right.width-expanded { width:calc(50% - 1.3rem); }
+        .timeline-event-shell::before { content:""; position:absolute; top:1.14rem; height:1px; z-index:1; }
+        .timeline-event-shell.lane-left::before { right:-1.24rem; width:1.24rem; background:linear-gradient(90deg, rgba(118,145,170,.22) 0%, rgba(118,145,170,.72) 100%); }
+        .timeline-event-shell.lane-right::before { left:-1.24rem; width:1.24rem; background:linear-gradient(90deg, rgba(118,145,170,.72) 0%, rgba(118,145,170,.22) 100%); }
+        .timeline-event-node { position:absolute; top:.81rem; width:.74rem; height:.74rem; border-radius:999px; border:2px solid #6685a5; background:#0e1825; box-shadow:0 0 0 3px rgba(20,33,47,.65); z-index:2; }
+        .timeline-event-shell.lane-left .timeline-event-node { right:-1.62rem; }
+        .timeline-event-shell.lane-right .timeline-event-node { left:-1.62rem; }
         .timeline-event { border:1px solid #2b3b4e; border-left-width:3px; border-radius:14px; background:linear-gradient(165deg, rgba(19,28,40,.9) 0%, rgba(12,19,28,.98) 58%); box-shadow:0 8px 18px rgba(0,0,0,.22); overflow:hidden; }
         .timeline-event.featured { border-left-width:4px; box-shadow:0 12px 24px rgba(0,0,0,.28); }
         .timeline-event-grid { display:grid; grid-template-columns:106px minmax(0, 1fr); gap:.58rem; padding:.52rem .6rem .52rem .6rem; }
@@ -636,8 +641,13 @@ def render(data: dict):
         .timeline-badges { display:flex; flex-direction:column; align-items:flex-start; gap:.22rem; }
         .timeline-tag { font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border-radius:999px; padding:.12rem .36rem; border:1px solid rgba(152,176,199,.36); color:#c5dbf1; }
         .timeline-main { min-width:0; display:grid; grid-template-columns:minmax(0, 1fr) 94px; gap:.48rem; align-items:start; }
+        .timeline-event-shell.lane-left .timeline-main { grid-template-columns:94px minmax(0, 1fr); }
+        .timeline-event-shell.lane-left .timeline-copy { order:2; }
+        .timeline-event-shell.lane-left .timeline-media { order:1; }
         .timeline-event-shell.width-compact .timeline-main { grid-template-columns:minmax(0, 1fr) 82px; }
+        .timeline-event-shell.lane-left.width-compact .timeline-main { grid-template-columns:82px minmax(0, 1fr); }
         .timeline-event-shell.width-expanded .timeline-main { grid-template-columns:minmax(0, 1fr) 108px; }
+        .timeline-event-shell.lane-left.width-expanded .timeline-main { grid-template-columns:108px minmax(0, 1fr); }
         .timeline-copy { min-width:0; }
         .timeline-title { color:#f2f8ff; font-size:.89rem; font-weight:760; line-height:1.26; margin:0 0 .14rem 0; }
         .timeline-title.featured { font-size:.97rem; }
@@ -674,14 +684,24 @@ def render(data: dict):
             .timeline-wrap { gap:.84rem; }
             .timeline-season-block { padding:.72rem .72rem .76rem .72rem; }
             .timeline-month-events { padding-left:1.58rem; }
-            .timeline-month-events::before { left:.62rem; }
-            .timeline-event-shell { max-width:100% !important; margin-left:0 !important; }
-            .timeline-event-node { left:-1.05rem; top:.82rem; width:.62rem; height:.62rem; }
-            .timeline-event-node::after { width:.7rem; }
+            .timeline-month-events::before { left:.62rem; transform:none; }
+            .timeline-event-shell,
+            .timeline-event-shell.width-expanded,
+            .timeline-event-shell.width-regular,
+            .timeline-event-shell.width-compact { width:100% !important; max-width:100% !important; min-width:0 !important; margin-left:0 !important; margin-right:0 !important; align-self:stretch !important; }
+            .timeline-event-shell::before { left:-.92rem !important; right:auto !important; width:.92rem !important; background:linear-gradient(90deg, rgba(118,145,170,.72) 0%, rgba(118,145,170,.2) 100%) !important; }
+            .timeline-event-node,
+            .timeline-event-shell.lane-left .timeline-event-node,
+            .timeline-event-shell.lane-right .timeline-event-node { left:-1.28rem; right:auto; top:.82rem; width:.62rem; height:.62rem; }
             .timeline-event-grid { grid-template-columns:1fr; gap:.42rem; padding:.52rem; }
             .timeline-rail { border-right:none; border-bottom:1px solid rgba(95,121,146,.3); padding-right:0; padding-bottom:.34rem; }
             .timeline-badges { flex-direction:row; flex-wrap:wrap; gap:.24rem; }
             .timeline-main { grid-template-columns:1fr; }
+            .timeline-event-shell.lane-left .timeline-main,
+            .timeline-event-shell.lane-left.width-compact .timeline-main,
+            .timeline-event-shell.lane-left.width-expanded .timeline-main { grid-template-columns:1fr; }
+            .timeline-event-shell.lane-left .timeline-copy,
+            .timeline-event-shell.lane-left .timeline-media { order:initial; }
             .timeline-media { display:grid; grid-template-columns:repeat(2, minmax(0, 120px)); gap:.3rem; }
         }
         </style>
