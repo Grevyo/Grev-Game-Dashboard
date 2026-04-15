@@ -604,19 +604,23 @@ def render(data: dict):
         .timeline-period-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.62rem; padding-bottom:.46rem; border-bottom:1px dashed rgba(120,142,166,.26); }
         .timeline-period-title { color:#c6daef; font-size:.68rem; letter-spacing:.11em; text-transform:uppercase; font-weight:760; }
         .timeline-period-count { color:#7390ac; font-size:.55rem; letter-spacing:.11em; text-transform:uppercase; }
-        .timeline-axis { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.85rem; padding:.08rem .08rem .08rem .08rem; align-items:start; }
-        .timeline-event { position:relative; display:block; }
-        .timeline-event.right { margin-top:1.1rem; }
-        .timeline-event.featured { grid-column:1 / -1; margin-top:.08rem; }
-        .timeline-event-anchor { display:flex; align-items:center; gap:.42rem; margin:0 0 .42rem .1rem; }
+        .timeline-axis { position:relative; display:flex; flex-direction:column; gap:1.05rem; padding:.18rem .1rem .1rem .1rem; }
+        .timeline-axis::before { content:""; position:absolute; left:50%; top:.2rem; bottom:.4rem; width:2px; border-radius:999px; transform:translateX(-50%); background:linear-gradient(180deg, rgba(139,165,192,.45) 0%, rgba(109,128,150,.2) 20%, rgba(109,128,150,.16) 80%, rgba(139,165,192,.35) 100%); }
+        .timeline-event { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 122px minmax(0, 1fr); align-items:start; column-gap:1rem; }
+        .timeline-anchor { position:relative; grid-column:2; justify-self:center; display:flex; flex-direction:column; align-items:center; gap:.32rem; z-index:2; }
         .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
-        .timeline-node { width:16px; height:16px; border-radius:50%; border:2px solid #9bb7d4; background:radial-gradient(circle, rgba(222,238,255,.95) 0%, rgba(134,170,205,.95) 44%, rgba(21,34,48,.98) 100%); box-shadow:0 0 0 3px rgba(112,146,179,.12), 0 0 12px rgba(112,146,179,.25); flex:0 0 auto; }
-        .timeline-branch { flex:1 1 auto; border-top:1px dashed rgba(132,157,181,.4); min-width:18px; opacity:.9; }
+        .timeline-node { width:18px; height:18px; border-radius:50%; border:2px solid #9bb7d4; background:radial-gradient(circle, rgba(222,238,255,.95) 0%, rgba(134,170,205,.95) 44%, rgba(21,34,48,.98) 100%); box-shadow:0 0 0 4px rgba(112,146,179,.12), 0 0 14px rgba(112,146,179,.25); }
         .timeline-node-date { color:#b7cee4; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; background:rgba(13,24,35,.86); border:1px solid rgba(95,124,151,.43); border-radius:999px; padding:.16rem .42rem; white-space:nowrap; }
         .timeline-card-wrap { position:relative; }
-        .timeline-event.featured .timeline-node { width:20px; height:20px; border-width:3px; box-shadow:0 0 0 5px rgba(189,153,75,.14), 0 0 16px rgba(189,153,75,.34); }
+        .timeline-event.left .timeline-card-wrap { grid-column:1; }
+        .timeline-event.right .timeline-card-wrap { grid-column:3; }
+        .timeline-event.left .timeline-card-wrap::after,
+        .timeline-event.right .timeline-card-wrap::after { content:""; position:absolute; top:1.22rem; width:26px; border-top:1px dashed rgba(132,157,181,.45); }
+        .timeline-event.left .timeline-card-wrap::after { right:-26px; }
+        .timeline-event.right .timeline-card-wrap::after { left:-26px; }
+        .timeline-event.featured .timeline-card-wrap { grid-column:1 / 4; justify-self:center; width:min(900px, calc(100% - 28px)); margin-top:.22rem; }
+        .timeline-event.featured .timeline-node { width:22px; height:22px; border-width:3px; box-shadow:0 0 0 5px rgba(189,153,75,.14), 0 0 16px rgba(189,153,75,.34); }
         .timeline-event.featured .timeline-node-date { color:#f4dfb8; border-color:rgba(184,146,72,.55); }
-        .timeline-event.featured .timeline-event-anchor { margin-bottom:.56rem; }
         .timeline-item { border:1px solid #2a3848; border-radius:14px; padding:.85rem .95rem .78rem .95rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 7px 18px rgba(0, 0, 0, .18); border-left-width:3px; overflow:hidden; }
         .timeline-item::before { content:""; display:block; height:2px; margin:-.85rem -.95rem .62rem -.95rem; background:linear-gradient(90deg, rgba(160,190,220,.02), rgba(160,190,220,.35), rgba(160,190,220,.02)); }
         .timeline-item.featured { padding:1rem 1.08rem .94rem 1.08rem; border-width:1px; border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
@@ -657,14 +661,19 @@ def render(data: dict):
         .tone-milestone .timeline-item::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
         .tone-general .timeline-item::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
         @media (max-width: 960px) {
-            .timeline-axis { grid-template-columns:minmax(0, 1fr); gap:.7rem; }
-            .timeline-event.right,
-            .timeline-event.featured { margin-top:0; }
+            .timeline-axis::before { left:15px; transform:none; }
+            .timeline-event { grid-template-columns:34px minmax(0, 1fr); column-gap:.52rem; }
+            .timeline-anchor { grid-column:1; }
+            .timeline-card-wrap,
+            .timeline-event.left .timeline-card-wrap,
+            .timeline-event.right .timeline-card-wrap,
+            .timeline-event.featured .timeline-card-wrap { grid-column:2; width:100%; justify-self:stretch; margin-top:0; }
+            .timeline-event.left .timeline-card-wrap::after,
+            .timeline-event.right .timeline-card-wrap::after { left:-19px; right:auto; width:19px; }
             .timeline-content { grid-template-columns:minmax(0, 1fr); gap:.62rem; }
             .timeline-media { justify-content:start; }
             .timeline-anchor-index { font-size:.49rem; padding:.11rem .28rem; }
             .timeline-node-date { font-size:.52rem; }
-            .timeline-event-anchor { margin-left:.02rem; }
         }
         </style>
         """,
@@ -720,20 +729,13 @@ def render(data: dict):
             period_data = period_map[period_key]
             period_label = str(period_data["label"])
             period_events = pd.DataFrame(period_data["rows"])
-            period_dates = pd.to_datetime(period_events["date"], errors="coerce") if "date" in period_events.columns else pd.Series(dtype="datetime64[ns]")
-            dated = period_dates.dropna()
-            period_span = ""
-            if not dated.empty:
-                start_text = dated.min().strftime("%b %d")
-                end_text = dated.max().strftime("%b %d")
-                period_span = f"{start_text} - {end_text}" if start_text != end_text else start_text
 
             st.markdown(
                 (
                     "<div class='timeline-period-block'>"
                     "<div class='timeline-period-header'>"
                     f"<div class='timeline-period-title'>{_safe_html(period_label)}</div>"
-                    f"<div class='timeline-period-count'>{_safe_html(period_span)} · {len(period_events)} events</div>"
+                    f"<div class='timeline-period-count'>{len(period_events)} events</div>"
                     "</div>"
                     "<div class='timeline-axis'>"
                 ),
@@ -797,10 +799,9 @@ def render(data: dict):
                 st.markdown(
                     (
                         f"<div class='timeline-event {_safe_html(side)} {_safe_html(priority)} tone-{_safe_html(tone)}'>"
-                        "<div class='timeline-event-anchor'>"
+                        "<div class='timeline-anchor'>"
                         f"<div class='timeline-anchor-index'>#{event_index}</div>"
                         "<div class='timeline-node'></div>"
-                        "<div class='timeline-branch'></div>"
                         f"<div class='timeline-node-date'>{_safe_html(date_text)}</div>"
                         "</div>"
                         "<div class='timeline-card-wrap'>"
