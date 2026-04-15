@@ -176,19 +176,6 @@ def _placement_rank_text(value: object) -> str:
     return str(parsed) if parsed else ""
 
 
-def _period_key_and_label(date_value: object) -> tuple[str, str]:
-    if _is_missing(date_value):
-        return "undated", "Date TBD"
-    try:
-        dt = pd.to_datetime(date_value)
-    except (TypeError, ValueError):
-        return "undated", "Date TBD"
-
-    month = int(dt.month)
-    quarter = ((month - 1) // 3) + 1
-    return dt.strftime("%Y-%m"), f"Q{quarter} · {dt.strftime('%B %Y')}"
-
-
 def _text_for_entity_detection(row: pd.Series) -> str:
     fields = [
         _display_value(row.get("title")),
@@ -593,45 +580,46 @@ def render(data: dict):
     st.markdown(
         """
         <style>
-        .timeline-wrap { display:flex; flex-direction:column; gap:1.35rem; margin-top:.55rem; }
-        .timeline-season-block { position:relative; margin-bottom:.4rem; padding:1.05rem .9rem .75rem .9rem; border:1px solid #213042; border-radius:16px; background:linear-gradient(180deg, rgba(10,17,27,.84) 0%, rgba(9,14,22,.95) 100%); }
+        .timeline-wrap { display:flex; flex-direction:column; gap:1.4rem; margin-top:.55rem; }
+        .timeline-season-block { position:relative; margin-bottom:.5rem; padding:1rem .95rem .9rem .95rem; border:1px solid #213042; border-radius:16px; background:linear-gradient(180deg, rgba(10,17,27,.84) 0%, rgba(9,14,22,.95) 100%); }
         .timeline-season-block::before { content:""; position:absolute; left:1.15rem; right:1.15rem; top:0; height:2px; border-radius:999px; background:linear-gradient(90deg, rgba(160,190,220,.06), rgba(160,190,220,.28), rgba(160,190,220,.06)); }
-        .timeline-season-header { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:.95rem; padding:.15rem .2rem .7rem .2rem; border-bottom:1px solid #223446; }
+        .timeline-season-header { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:1.1rem; padding:.15rem .2rem .72rem .2rem; border-bottom:1px solid #223446; }
         .timeline-season-title { color:#e1eefc; font-size:.92rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
         .timeline-season-count { color:#89a0b7; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
-        .timeline-period-stack { display:flex; flex-direction:column; gap:.9rem; }
-        .timeline-period-block { border:1px solid #243548; border-radius:12px; padding:.65rem .62rem .72rem .62rem; background:linear-gradient(180deg, rgba(16,24,35,.82) 0%, rgba(11,17,26,.95) 100%); }
-        .timeline-period-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.62rem; padding-bottom:.46rem; border-bottom:1px dashed rgba(120,142,166,.26); }
-        .timeline-period-title { color:#c6daef; font-size:.68rem; letter-spacing:.11em; text-transform:uppercase; font-weight:760; }
-        .timeline-period-count { color:#7390ac; font-size:.55rem; letter-spacing:.11em; text-transform:uppercase; }
-        .timeline-axis { position:relative; display:flex; flex-direction:column; gap:1.05rem; padding:.18rem .1rem .1rem .1rem; }
-        .timeline-axis::before { content:""; position:absolute; left:50%; top:.2rem; bottom:.4rem; width:2px; border-radius:999px; transform:translateX(-50%); background:linear-gradient(180deg, rgba(139,165,192,.45) 0%, rgba(109,128,150,.2) 20%, rgba(109,128,150,.16) 80%, rgba(139,165,192,.35) 100%); }
-        .timeline-event { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 122px minmax(0, 1fr); align-items:start; column-gap:1rem; }
-        .timeline-anchor { position:relative; grid-column:2; justify-self:center; display:flex; flex-direction:column; align-items:center; gap:.32rem; z-index:2; }
+
+        .timeline-lane { position:relative; display:flex; flex-direction:column; gap:1rem; padding:.15rem .15rem .12rem .15rem; }
+        .timeline-lane::before { content:""; position:absolute; left:50%; top:.15rem; bottom:.15rem; width:3px; border-radius:999px; transform:translateX(-50%); background:linear-gradient(180deg, rgba(139,165,192,.62) 0%, rgba(109,128,150,.22) 18%, rgba(109,128,150,.22) 82%, rgba(139,165,192,.55) 100%); }
+        .timeline-row { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 132px minmax(0, 1fr); align-items:stretch; column-gap:1rem; min-height:156px; }
+        .timeline-row::after { content:""; position:absolute; left:calc(50% - 165px); right:calc(50% - 165px); top:50%; border-top:1px dashed rgba(132,157,181,.32); z-index:0; }
+        .timeline-row.row-odd::after { left:calc(50% - 225px); right:calc(50% - 225px); }
+        .timeline-slot { display:flex; align-items:stretch; }
+        .timeline-slot.empty { visibility:hidden; }
+
+        .timeline-anchor { position:relative; z-index:2; grid-column:2; justify-self:center; align-self:center; display:flex; flex-direction:column; align-items:center; gap:.34rem; }
         .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
         .timeline-node { width:18px; height:18px; border-radius:50%; border:2px solid #9bb7d4; background:radial-gradient(circle, rgba(222,238,255,.95) 0%, rgba(134,170,205,.95) 44%, rgba(21,34,48,.98) 100%); box-shadow:0 0 0 4px rgba(112,146,179,.12), 0 0 14px rgba(112,146,179,.25); }
         .timeline-node-date { color:#b7cee4; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; background:rgba(13,24,35,.86); border:1px solid rgba(95,124,151,.43); border-radius:999px; padding:.16rem .42rem; white-space:nowrap; }
-        .timeline-card-wrap { position:relative; }
-        .timeline-event.left .timeline-card-wrap { grid-column:1; }
-        .timeline-event.right .timeline-card-wrap { grid-column:3; }
-        .timeline-event.left .timeline-card-wrap::after,
-        .timeline-event.right .timeline-card-wrap::after { content:""; position:absolute; top:1.22rem; width:26px; border-top:1px dashed rgba(132,157,181,.45); }
-        .timeline-event.left .timeline-card-wrap::after { right:-26px; }
-        .timeline-event.right .timeline-card-wrap::after { left:-26px; }
-        .timeline-event.featured .timeline-card-wrap { grid-column:1 / 4; justify-self:center; width:min(900px, calc(100% - 28px)); margin-top:.22rem; }
-        .timeline-event.featured .timeline-node { width:22px; height:22px; border-width:3px; box-shadow:0 0 0 5px rgba(189,153,75,.14), 0 0 16px rgba(189,153,75,.34); }
-        .timeline-event.featured .timeline-node-date { color:#f4dfb8; border-color:rgba(184,146,72,.55); }
+
+        .timeline-card-wrap { position:relative; z-index:1; width:100%; }
+        .timeline-card-wrap::after { content:""; position:absolute; top:50%; width:30px; border-top:1px dashed rgba(132,157,181,.45); }
+        .timeline-slot.left .timeline-card-wrap::after { right:-30px; }
+        .timeline-slot.right .timeline-card-wrap::after { left:-30px; }
+
+        .timeline-slot.featured { grid-column:1 / 4; justify-self:center; width:min(940px, calc(100% - 32px)); }
+        .timeline-slot.featured .timeline-card-wrap { min-height:176px; }
+        .timeline-slot.featured .timeline-card-wrap::after { display:none; }
         .timeline-item { border:1px solid #2a3848; border-radius:14px; padding:.85rem .95rem .78rem .95rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 7px 18px rgba(0, 0, 0, .18); border-left-width:3px; overflow:hidden; }
         .timeline-item::before { content:""; display:block; height:2px; margin:-.85rem -.95rem .62rem -.95rem; background:linear-gradient(90deg, rgba(160,190,220,.02), rgba(160,190,220,.35), rgba(160,190,220,.02)); }
-        .timeline-item.featured { padding:1rem 1.08rem .94rem 1.08rem; border-width:1px; border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
+        .timeline-item.featured { padding:1rem 1.08rem .94rem 1.08rem; border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
         .timeline-item.featured::before { margin:-1rem -1.08rem .72rem -1.08rem; height:3px; }
-        .timeline-content { display:grid; grid-template-columns: minmax(0, 1fr) auto; gap:.85rem; align-items:start; }
+
+        .timeline-content { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:.85rem; align-items:start; }
         .timeline-head { display:flex; flex-wrap:wrap; align-items:center; gap:.38rem .58rem; justify-content:space-between; }
         .timeline-date { color:#e8f4ff; font-size:.75rem; letter-spacing:.1em; text-transform:uppercase; font-weight:770; padding:.15rem .42rem; border:1px solid rgba(160,185,210,.32); border-radius:999px; background:rgba(16,27,39,.65); }
         .timeline-badges { display:flex; flex-wrap:wrap; gap:.3rem; justify-content:flex-end; }
         .timeline-tag { font-size:.58rem; letter-spacing:.11em; text-transform:uppercase; border-radius:999px; padding:.16rem .42rem; border:1px solid rgba(152,176,199,.34); color:#bdd4ea; }
         .timeline-title { color:#f2f8ff; font-size:1rem; font-weight:760; margin:.48rem 0 .22rem 0; }
-        .timeline-title.featured { font-size:1.06rem; }
+        .timeline-title.featured { font-size:1.08rem; }
         .timeline-meta { color:#9cb0c5; font-size:.67rem; margin-bottom:.28rem; letter-spacing:.07em; text-transform:uppercase; }
         .timeline-details { color:#c9d8e8; font-size:.83rem; line-height:1.44; margin:0 0 .45rem 0; }
         .timeline-footer { border-top:1px solid rgba(85,108,130,.22); margin-top:.38rem; padding-top:.38rem; }
@@ -642,6 +630,7 @@ def render(data: dict):
         .timeline-media-card { width:100px; border:1px solid #2f4255; border-radius:9px; overflow:hidden; background:#0c1420; }
         .timeline-media-card img { width:100%; height:74px; object-fit:contain; object-position:center; display:block; background:#0a121b; }
         .timeline-media-card .label { color:#8ea8be; font-size:.56rem; letter-spacing:.11em; text-transform:uppercase; text-align:center; padding:.16rem .2rem; border-top:1px solid #23384e; }
+
         .tone-competition { border-left-color:#b89248; background:linear-gradient(162deg, rgba(184,146,72,.16), rgba(13,20,29,.95) 42%); }
         .tone-transfer { border-left-color:#3f9b99; background:linear-gradient(162deg, rgba(63,155,153,.16), rgba(13,20,29,.95) 42%); }
         .tone-ranking { border-left-color:#7f63b8; background:linear-gradient(162deg, rgba(127,99,184,.16), rgba(13,20,29,.95) 42%); }
@@ -660,16 +649,29 @@ def render(data: dict):
         .tone-organisation .timeline-item::before { background:linear-gradient(90deg, rgba(77,121,189,.08), rgba(77,121,189,.55), rgba(77,121,189,.08)); }
         .tone-milestone .timeline-item::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
         .tone-general .timeline-item::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
+
+        @media (max-width: 1140px) {
+            .timeline-row { grid-template-columns:minmax(0, 1fr) 106px minmax(0, 1fr); column-gap:.76rem; }
+            .timeline-row::after { left:calc(50% - 138px); right:calc(50% - 138px); }
+            .timeline-row.row-odd::after { left:calc(50% - 182px); right:calc(50% - 182px); }
+            .timeline-card-wrap::after { width:20px; }
+            .timeline-slot.left .timeline-card-wrap::after { right:-20px; }
+            .timeline-slot.right .timeline-card-wrap::after { left:-20px; }
+        }
+
         @media (max-width: 960px) {
-            .timeline-axis::before { left:15px; transform:none; }
-            .timeline-event { grid-template-columns:34px minmax(0, 1fr); column-gap:.52rem; }
-            .timeline-anchor { grid-column:1; }
-            .timeline-card-wrap,
-            .timeline-event.left .timeline-card-wrap,
-            .timeline-event.right .timeline-card-wrap,
-            .timeline-event.featured .timeline-card-wrap { grid-column:2; width:100%; justify-self:stretch; margin-top:0; }
-            .timeline-event.left .timeline-card-wrap::after,
-            .timeline-event.right .timeline-card-wrap::after { left:-19px; right:auto; width:19px; }
+            .timeline-lane::before { left:15px; transform:none; }
+            .timeline-row,
+            .timeline-row.row-odd { grid-template-columns:34px minmax(0, 1fr); column-gap:.52rem; min-height:auto; }
+            .timeline-row::after,
+            .timeline-row.row-odd::after { display:none; }
+            .timeline-anchor { grid-column:1; justify-self:start; align-self:start; }
+            .timeline-slot,
+            .timeline-slot.left,
+            .timeline-slot.right,
+            .timeline-slot.featured { grid-column:2; }
+            .timeline-slot.empty { display:none; }
+            .timeline-card-wrap::after { left:-19px !important; right:auto !important; width:19px; }
             .timeline-content { grid-template-columns:minmax(0, 1fr); gap:.62rem; }
             .timeline-media { justify-content:start; }
             .timeline-anchor-index { font-size:.49rem; padding:.11rem .28rem; }
@@ -711,124 +713,148 @@ def render(data: dict):
                 f"<div class='timeline-season-title'>Season {_safe_html(season_key)}</div>"
                 f"<div class='timeline-season-count'>{len(season_events)} events</div>"
                 "</div>"
-                "<div class='timeline-period-stack'>"
+                "<div class='timeline-lane'>"
             ),
             unsafe_allow_html=True,
         )
 
-        period_map: dict[str, dict[str, object]] = {}
-        period_order: list[str] = []
-        for _, row in season_events.iterrows():
-            period_key, period_label = _period_key_and_label(row.get("date"))
-            if period_key not in period_map:
-                period_map[period_key] = {"label": period_label, "rows": []}
-                period_order.append(period_key)
-            period_map[period_key]["rows"].append(row)
+        def _build_event_html(row: pd.Series, side: str, slot_class: str) -> str:
+            date_value = row.get("date")
+            date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
+            title = _display_value(row.get("title")) or "Untitled event"
+            details = _display_value(row.get("details"))
+            meta_line = _timeline_meta_line(row)
+            notes = _display_value(row.get("notes"))
+            highlights = _timeline_highlights(row)
+            tone, tone_label = _event_tone(row)
+            priority = _event_priority(row)
 
-        for period_key in period_order:
-            period_data = period_map[period_key]
-            period_label = str(period_data["label"])
-            period_events = pd.DataFrame(period_data["rows"])
+            _, player_path = _resolve_player_visual(row, player_photo_index)
+            _, competition_logo_path, trophy_path = _resolve_tournament_visual(
+                row,
+                known_competitions,
+                competition_logo_index,
+                achievement_reference,
+            )
+            player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
+            competition_uri = image_data_uri_thumbnail(competition_logo_path, max_width=140, max_height=140) if competition_logo_path else None
+            trophy_uri = image_data_uri_thumbnail(trophy_path, max_width=140, max_height=140) if trophy_path else None
+            visuals = _visual_priority(row, player_uri, competition_uri, trophy_uri)
 
-            st.markdown(
-                (
-                    "<div class='timeline-period-block'>"
-                    "<div class='timeline-period-header'>"
-                    f"<div class='timeline-period-title'>{_safe_html(period_label)}</div>"
-                    f"<div class='timeline-period-count'>{len(period_events)} events</div>"
-                    "</div>"
-                    "<div class='timeline-axis'>"
-                ),
-                unsafe_allow_html=True,
+            meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
+            details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
+            media_html = ""
+            if visuals:
+                media_cards = "".join(
+                    (
+                        "<div class='timeline-media-card'>"
+                        f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
+                        f"<div class='label'>{label}</div>"
+                        "</div>"
+                    )
+                    for label, uri in visuals
+                )
+                media_html = f"<div class='timeline-media'>{media_cards}</div>"
+
+            chips_html = ""
+            if highlights:
+                chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
+                chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
+            notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
+            footer_html = f"<div class='timeline-footer'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
+            title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
+            major_label = "Major" if priority == "featured" else "Standard"
+
+            return (
+                f"<div class='timeline-slot {slot_class} {side} tone-{_safe_html(tone)}'>"
+                "<div class='timeline-card-wrap'>"
+                f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
+                "<div class='timeline-content'>"
+                "<div>"
+                "<div class='timeline-head'>"
+                f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
+                "<div class='timeline-badges'>"
+                f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
+                f"<span class='timeline-tag'>{_safe_html(major_label)}</span>"
+                "</div>"
+                "</div>"
+                f"<div class='{title_class}'>{_safe_html(title)}</div>"
+                f"{meta_html}{details_html}{footer_html}"
+                "</div>"
+                f"{media_html}"
+                "</div>"
+                "</div>"
+                "</div>"
             )
 
-            side_cursor = 0
-            event_index = 0
-            for _, row in period_events.iterrows():
-                event_index += 1
-                date_value = row.get("date")
+        season_rows = list(season_events.iterrows())
+        row_index = 0
+        event_index = 0
+        cursor = 0
+        while cursor < len(season_rows):
+            first_row = season_rows[cursor][1]
+            first_priority = _event_priority(first_row)
+            second_row = None
+            cursor += 1
+
+            if first_priority != "featured" and cursor < len(season_rows):
+                candidate_second = season_rows[cursor][1]
+                if _event_priority(candidate_second) != "featured":
+                    second_row = candidate_second
+                    cursor += 1
+
+            row_class = "row-even" if row_index % 2 == 0 else "row-odd"
+            row_index += 1
+
+            if first_priority == "featured":
+                date_value = first_row.get("date")
                 date_text = date_value.strftime("%Y-%m-%d") if pd.notna(date_value) else "Date TBD"
-                title = _display_value(row.get("title")) or "Untitled event"
-                details = _display_value(row.get("details"))
-                meta_line = _timeline_meta_line(row)
-                notes = _display_value(row.get("notes"))
-                highlights = _timeline_highlights(row)
-                tone, tone_label = _event_tone(row)
-                priority = _event_priority(row)
-                side = "featured" if priority == "featured" else ("left" if side_cursor % 2 == 0 else "right")
-                if priority != "featured":
-                    side_cursor += 1
-
-                _, player_path = _resolve_player_visual(row, player_photo_index)
-                _, competition_logo_path, trophy_path = _resolve_tournament_visual(
-                    row,
-                    known_competitions,
-                    competition_logo_index,
-                    achievement_reference,
-                )
-                player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
-                competition_uri = (
-                    image_data_uri_thumbnail(competition_logo_path, max_width=140, max_height=140) if competition_logo_path else None
-                )
-                trophy_uri = image_data_uri_thumbnail(trophy_path, max_width=140, max_height=140) if trophy_path else None
-                visuals = _visual_priority(row, player_uri, competition_uri, trophy_uri)
-
-                meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
-                details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
-                media_html = ""
-                if visuals:
-                    media_cards = "".join(
-                        (
-                            "<div class='timeline-media-card'>"
-                            f"<img src='{uri}' alt='{label} visual' loading='lazy' />"
-                            f"<div class='label'>{label}</div>"
-                            "</div>"
-                        )
-                        for label, uri in visuals
-                    )
-                    media_html = f"<div class='timeline-media'>{media_cards}</div>"
-
-                chips_html = ""
-                if highlights:
-                    chips_html = "".join(f"<span class='timeline-chip'>{_safe_html(chip)}</span>" for chip in highlights)
-                    chips_html = f"<div class='timeline-chips'>{chips_html}</div>"
-                notes_html = f"<div class='timeline-notes'>Notes: {_safe_html(notes)}</div>" if notes else ""
-                footer_html = f"<div class='timeline-footer'>{chips_html}{notes_html}</div>" if (chips_html or notes_html) else ""
-
-                title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
+                event_index += 1
+                solo_html = _build_event_html(first_row, side="left", slot_class="featured")
+                anchor_label = f"#{event_index}"
+                anchor_date = date_text
                 st.markdown(
                     (
-                        f"<div class='timeline-event {_safe_html(side)} {_safe_html(priority)} tone-{_safe_html(tone)}'>"
+                        f"<div class='timeline-row {row_class}'>"
+                        f"{solo_html}"
                         "<div class='timeline-anchor'>"
-                        f"<div class='timeline-anchor-index'>#{event_index}</div>"
+                        f"<div class='timeline-anchor-index'>{_safe_html(anchor_label)}</div>"
                         "<div class='timeline-node'></div>"
-                        f"<div class='timeline-node-date'>{_safe_html(date_text)}</div>"
+                        f"<div class='timeline-node-date'>{_safe_html(anchor_date)}</div>"
                         "</div>"
-                        "<div class='timeline-card-wrap'>"
-                        f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
-                        "<div class='timeline-content'>"
-                        "<div>"
-                        "<div class='timeline-head'>"
-                        f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
-                        "<div class='timeline-badges'>"
-                        f"<span class='timeline-tag'>{_safe_html(tone_label)}</span>"
-                        f"<span class='timeline-tag'>{_safe_html('Major' if priority == 'featured' else 'Standard')}</span>"
-                        "</div>"
-                        "</div>"
-                        f"<div class='{title_class}'>{_safe_html(title)}</div>"
-                        f"{meta_html}{details_html}{footer_html}"
-                        "</div>"
-                        f"{media_html}"
-                        "</div>"
-                        "</div>"
+                        "<div class='timeline-slot right empty'></div>"
                         "</div>"
                     ),
                     unsafe_allow_html=True,
                 )
+                continue
+
+            event_index += 1
+            left_html = _build_event_html(first_row, side="left", slot_class="left")
+            first_date_value = first_row.get("date")
+            first_date_text = first_date_value.strftime("%Y-%m-%d") if pd.notna(first_date_value) else "Date TBD"
+            anchor_label = f"#{event_index}"
+            anchor_date = first_date_text
+
+            right_html = "<div class='timeline-slot right empty'></div>"
+            if second_row is not None:
+                event_index += 1
+                second_date_value = second_row.get("date")
+                second_date_text = second_date_value.strftime("%Y-%m-%d") if pd.notna(second_date_value) else "Date TBD"
+                right_html = _build_event_html(second_row, side="right", slot_class="right")
+                anchor_label = f"#{event_index - 1}–#{event_index}"
+                anchor_date = f"{first_date_text} → {second_date_text}"
 
             st.markdown(
                 (
+                    f"<div class='timeline-row {row_class}'>"
+                    f"{left_html}"
+                    "<div class='timeline-anchor'>"
+                    f"<div class='timeline-anchor-index'>{_safe_html(anchor_label)}</div>"
+                    "<div class='timeline-node'></div>"
+                    f"<div class='timeline-node-date'>{_safe_html(anchor_date)}</div>"
                     "</div>"
+                    f"{right_html}"
                     "</div>"
                 ),
                 unsafe_allow_html=True,
