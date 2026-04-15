@@ -12,11 +12,21 @@ from app.image_helpers import (
     find_achievement_image,
     find_competition_logo,
     image_data_uri_thumbnail,
+    normalize_placement_value,
     resolve_achievement_image,
     resolve_player_photo,
     SUPPORTED_EXTENSIONS,
 )
 from app.page_layout import section_header
+
+
+TIMELINE_TROPHY_EVENT_TYPES = {
+    "result",
+    "league result",
+    "qualification",
+    "invite",
+}
+TIMELINE_TROPHY_CATEGORIES = {"competition"}
 
 
 def _display_value(value: object) -> str:
@@ -161,6 +171,11 @@ def _normalize_player_plain(value: object) -> str:
     return normalize_player_key(text)
 
 
+def _placement_rank_text(value: object) -> str:
+    parsed = normalize_placement_value(value)
+    return str(parsed) if parsed else ""
+
+
 def _period_key_and_label(date_value: object) -> tuple[str, str]:
     if _is_missing(date_value):
         return "undated", "Date TBD"
@@ -280,17 +295,159 @@ def _build_competition_logo_index(known_competitions: list[str]) -> dict[str, st
     return index
 
 
+def _resolve_achievement_path_from_record(row: pd.Series) -> str | None:
+    link_value = _display_value(row.get("achievement_link"))
+    if link_value:
+        file_name = Path(link_value).name
+        candidate = IMAGES["achievements"] / file_name
+        if candidate.exists() and candidate.is_file():
+            return str(candidate)
+
+    resolved = resolve_achievement_image(
+        link_or_name=row.get("achievement_name"),
+        achievement_name=row.get("achievement_name"),
+        placement=row.get("position"),
+    )
+    final_path = resolved.get("final_path")
+    return str(final_path) if final_path else None
+
+
+def _build_achievement_reference_index(data: dict) -> list[dict[str, object]]:
+    achievements_df = data.get("achievements", pd.DataFrame())
+    if achievements_df.empty:
+        return []
+
+    reference: list[dict[str, object]] = []
+    dedupe: set[tuple[str, str, str, str]] = set()
+    for _, ach_row in achievements_df.iterrows():
+        achievement_name = _display_value(ach_row.get("achievement_name"))
+        if not achievement_name:
+            continue
+
+        image_path = _resolve_achievement_path_from_record(ach_row)
+        if not image_path:
+            continue
+
+        name_norm = _normalize_for_match(achievement_name)
+        season_text = _to_int_text(ach_row.get("season_name"))
+        placement_text = _display_value(ach_row.get("position"))
+        placement_rank = _placement_rank_text(placement_text)
+        dedupe_key = (name_norm, season_text, placement_rank, Path(image_path).name.casefold())
+        if dedupe_key in dedupe:
+            continue
+        dedupe.add(dedupe_key)
+
+        reference.append(
+            {
+                "name": achievement_name,
+                "name_norm": name_norm,
+                "season_text": season_text,
+                "placement_text": placement_text,
+                "placement_rank": placement_rank,
+                "image_path": image_path,
+            }
+        )
+    return reference
+
+
+def _is_trophy_relevant_row(row: pd.Series) -> bool:
+    category = _normalize_for_match(row.get("category"))
+    event_type = _normalize_for_match(row.get("event_type"))
+    return category in TIMELINE_TROPHY_CATEGORIES or event_type in TIMELINE_TROPHY_EVENT_TYPES
+
+
+def _keyword_overlap_score(left: str, right: str) -> int:
+    left_tokens = {token for token in left.split() if token and len(token) > 2}
+    right_tokens = {token for token in right.split() if token and len(token) > 2}
+    overlap = len(left_tokens & right_tokens)
+    if overlap >= 3:
+        return 5
+    if overlap == 2:
+        return 4
+    if overlap == 1:
+        return 1
+    return 0
+
+
+def _resolve_trophy_from_achievement_reference(
+    row: pd.Series,
+    competition: str,
+    placement: str,
+    achievement_reference: list[dict[str, object]],
+) -> str | None:
+    if not achievement_reference or not _is_trophy_relevant_row(row):
+        return None
+
+    row_title_blob = _normalize_for_match(
+        " ".join(_display_value(row.get(field)) for field in ["title", "details", "competition", "notes"])
+    )
+    competition_norm = _normalize_for_match(competition)
+    placement_rank = _placement_rank_text(placement)
+    timeline_season = _to_int_text(row.get("season"))
+
+    best: tuple[int, int, str] | None = None
+    for record in achievement_reference:
+        name_norm = str(record.get("name_norm") or "")
+        if not name_norm:
+            continue
+
+        score = 0
+        if competition_norm:
+            if competition_norm == name_norm:
+                score += 9
+            elif competition_norm in name_norm or name_norm in competition_norm:
+                score += 7
+            score += _keyword_overlap_score(competition_norm, name_norm)
+        if row_title_blob and (name_norm in row_title_blob or row_title_blob in name_norm):
+            score += 3
+
+        record_placement = str(record.get("placement_rank") or "")
+        if placement_rank and record_placement:
+            if placement_rank == record_placement:
+                score += 4
+            else:
+                score -= 5
+        elif placement_rank and not record_placement:
+            score -= 2
+
+        record_season = str(record.get("season_text") or "")
+        if timeline_season and record_season and timeline_season == record_season:
+            score += 1
+
+        if score < 8:
+            continue
+
+        image_path = str(record.get("image_path") or "")
+        if not image_path:
+            continue
+
+        specificity = len(name_norm)
+        candidate = (score, specificity, image_path)
+        if best is None or candidate > best:
+            best = candidate
+
+    return best[2] if best else None
+
+
 def _resolve_tournament_visual(
     row: pd.Series,
     known_competitions: list[str],
     competition_logo_index: dict[str, str],
+    achievement_reference: list[dict[str, object]],
 ) -> tuple[str | None, str | None, str | None]:
     competition = _competition_from_row(row, known_competitions, competition_logo_index)
     if not competition:
         return None, None, None
 
     placement = _infer_gold_placement(row)
-    trophy_path = _resolve_truthful_trophy_visual(competition=competition, placement=placement)
+    trophy_path = _resolve_trophy_from_achievement_reference(
+        row=row,
+        competition=competition,
+        placement=placement,
+        achievement_reference=achievement_reference,
+    )
+    if not trophy_path:
+        trophy_path = _resolve_truthful_trophy_visual(competition=competition, placement=placement)
 
     competition_logo = competition_logo_index.get(_normalize_for_match(competition))
     return competition, competition_logo, trophy_path
@@ -316,7 +473,7 @@ def _resolve_truthful_trophy_visual(competition: str, placement: str) -> str | N
 
     # Strict league medal mapping: only use assets when league + placement genuinely match.
     if "league" in competition_text:
-        placement_rank = _to_int_text(placement_text)
+        placement_rank = _placement_rank_text(placement_text)
         league_tier = None
         for tier in ("bronze", "silver", "gold", "emerald", "diamond", "daimond"):
             if tier in competition_text:
@@ -431,6 +588,7 @@ def render(data: dict):
     )
     player_photo_index = _build_player_photo_index(data)
     competition_logo_index = _build_competition_logo_index(known_competitions)
+    achievement_reference = _build_achievement_reference_index(data)
 
     st.markdown(
         """
@@ -592,6 +750,7 @@ def render(data: dict):
                     row,
                     known_competitions,
                     competition_logo_index,
+                    achievement_reference,
                 )
                 player_uri = image_data_uri_thumbnail(player_path, max_width=140, max_height=140) if player_path else None
                 competition_uri = (
