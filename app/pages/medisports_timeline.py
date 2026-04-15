@@ -620,51 +620,56 @@ def render(data: dict):
         .timeline-season-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.74rem; padding:.1rem .16rem .54rem .16rem; border-bottom:1px solid #223446; }
         .timeline-season-title { color:#e1eefc; font-size:.92rem; font-weight:780; letter-spacing:.08em; text-transform:uppercase; }
         .timeline-season-count { color:#89a0b7; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; }
-        .timeline-season-lanes { display:flex; flex-direction:column; gap:.62rem; position:relative; }
+        .timeline-season-lanes { display:flex; flex-direction:column; gap:.7rem; position:relative; }
         .timeline-lane-row { position:relative; display:flex; flex-wrap:wrap; gap:.74rem .78rem; align-items:flex-start; align-content:flex-start; padding:0 .16rem; }
         .timeline-lane-row.dir-rtl { direction:rtl; }
         .timeline-lane-row.dir-rtl .timeline-event { direction:ltr; }
         .timeline-lane-row::before {
             content:"";
             position:absolute;
-            left:.65rem;
-            right:.65rem;
-            top:23px;
-            height:4px;
+            left:.72rem;
+            right:.72rem;
+            top:22px;
+            height:5px;
             border-radius:999px;
-            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .38) 0%, rgba(var(--timeline-spine-rgb), .78) 28%, rgba(var(--timeline-spine-rgb), .78) 72%, rgba(var(--timeline-spine-rgb), .38) 100%);
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .16), 0 0 18px rgba(var(--timeline-spine-rgb), .26);
+            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .22) 0%, rgba(var(--timeline-spine-rgb), .78) 14%, rgba(var(--timeline-spine-rgb), .82) 86%, rgba(var(--timeline-spine-rgb), .22) 100%);
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .15), 0 0 20px rgba(var(--timeline-spine-rgb), .28);
             pointer-events:none;
+            z-index:1;
         }
-        .timeline-bend { position:relative; height:30px; margin:-.08rem 0 .04rem 0; }
+        .timeline-bend {
+            position:relative;
+            height:42px;
+            margin:-.08rem 0 -.02rem 0;
+            z-index:2;
+        }
         .timeline-bend::before {
             content:"";
             position:absolute;
-            top:-1px;
-            bottom:-1px;
-            width:4px;
+            top:0;
+            width:5px;
+            height:100%;
             border-radius:999px;
-            background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .86), rgba(var(--timeline-spine-rgb), .58));
-            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .18), 0 0 14px rgba(var(--timeline-spine-rgb), .3);
+            background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .78) 0%, rgba(var(--timeline-spine-rgb), .52) 100%);
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .15), 0 0 16px rgba(var(--timeline-spine-rgb), .22);
             pointer-events:none;
         }
         .timeline-bend::after {
             content:"";
             position:absolute;
-            bottom:-1px;
-            width:22px;
-            height:18px;
-            border-bottom:4px solid rgba(var(--timeline-spine-rgb), .74);
-            box-shadow:0 0 10px rgba(var(--timeline-spine-rgb), .22);
+            top:-2px;
+            width:40px;
+            height:40px;
+            border:5px solid rgba(var(--timeline-spine-rgb), .72);
+            border-top-color:transparent;
+            background:transparent;
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .14), 0 0 14px rgba(var(--timeline-spine-rgb), .2);
             pointer-events:none;
         }
-        .timeline-bend-marker { position:absolute; top:7px; color:#d9ecff; font-size:.66rem; font-weight:700; width:18px; height:18px; border-radius:999px; border:2px solid rgba(var(--timeline-spine-rgb), .72); background:rgba(10,20,33,.98); box-shadow:0 0 0 2px rgba(var(--timeline-spine-rgb), .22), 0 0 12px rgba(var(--timeline-spine-rgb), .26); display:flex; align-items:center; justify-content:center; }
         .timeline-bend.to-right::before { right:.65rem; }
-        .timeline-bend.to-right::after { right:.65rem; border-bottom-left-radius:16px; border-left:4px solid rgba(var(--timeline-spine-rgb), .74); }
-        .timeline-bend.to-right .timeline-bend-marker { right:.44rem; }
+        .timeline-bend.to-right::after { right:.65rem; border-radius:0 0 0 34px; border-right-color:transparent; }
         .timeline-bend.to-left::before { left:.65rem; }
-        .timeline-bend.to-left::after { left:.65rem; border-bottom-right-radius:16px; border-right:4px solid rgba(var(--timeline-spine-rgb), .74); }
-        .timeline-bend.to-left .timeline-bend-marker { left:.44rem; }
+        .timeline-bend.to-left::after { left:.65rem; border-radius:0 0 34px 0; border-left-color:transparent; }
         .timeline-event {
             position:relative;
             min-width:min(100%, 210px);
@@ -679,9 +684,11 @@ def render(data: dict):
             content:"";
             position:absolute;
             top:21px;
-            width:14px;
-            border-top:3px solid rgba(var(--timeline-spine-rgb), .74);
-            box-shadow:0 0 8px rgba(var(--timeline-spine-rgb), .26);
+            width:16px;
+            height:5px;
+            border-radius:999px;
+            background:linear-gradient(90deg, rgba(var(--timeline-spine-rgb), .5), rgba(var(--timeline-spine-rgb), .82));
+            box-shadow:0 0 8px rgba(var(--timeline-spine-rgb), .22);
             z-index:3;
             pointer-events:none;
         }
@@ -689,8 +696,8 @@ def render(data: dict):
         .timeline-lane-row.dir-rtl .timeline-event::after { left:-.72rem; }
         .timeline-lane-row.dir-ltr .timeline-event:last-child::after,
         .timeline-lane-row.dir-rtl .timeline-event:last-child::after { display:none; }
-        .timeline-lane-row.has-next.dir-ltr .timeline-event:last-child::after { display:block; width:22px; right:-1.2rem; }
-        .timeline-lane-row.has-next.dir-rtl .timeline-event:last-child::after { display:block; width:22px; left:-1.2rem; }
+        .timeline-lane-row.has-next.dir-ltr .timeline-event:last-child::after { display:block; width:24px; right:-1.22rem; }
+        .timeline-lane-row.has-next.dir-rtl .timeline-event:last-child::after { display:block; width:24px; left:-1.22rem; }
         .timeline-event.compact { flex:0.8 1 220px; }
         .timeline-event.regular { flex:1 1 290px; }
         .timeline-event.expanded { flex:1.25 1 360px; }
@@ -780,6 +787,8 @@ def render(data: dict):
         @media (max-width: 1280px) {
             .timeline-lane-row { gap:.66rem .66rem; }
             .timeline-lane-row::before { left:.6rem; right:.6rem; top:22px; height:3px; }
+            .timeline-bend { height:34px; }
+            .timeline-bend::after { width:32px; height:32px; border-width:4px; }
             .timeline-event { flex:1 1 260px; min-width:min(100%, 200px); }
             .timeline-event.compact { flex:0.9 1 220px; }
             .timeline-event.expanded { flex:1.2 1 320px; }
@@ -814,8 +823,7 @@ def render(data: dict):
                 top:22px;
                 left:-.12rem;
                 width:12px;
-                border-top-width:3px;
-                border-top-color:rgba(var(--timeline-spine-rgb), .74);
+                height:4px;
             }
             .timeline-lane-row.dir-ltr .timeline-event::after,
             .timeline-lane-row.dir-rtl .timeline-event::after { left:-.12rem; right:auto; }
@@ -979,7 +987,7 @@ def render(data: dict):
             season_html_parts.append("".join(row_html_parts))
             if chunk_index + row_size < len(season_rows):
                 bend_class = "timeline-bend to-left" if lane_reverse else "timeline-bend to-right"
-                season_html_parts.append(f"<div class='{bend_class}'><span class='timeline-bend-marker'>↓</span></div>")
+                season_html_parts.append(f"<div class='{bend_class}'></div>")
 
         season_html_parts.extend(["</div>", "</div>"])
         timeline_html_parts.append("".join(season_html_parts))
