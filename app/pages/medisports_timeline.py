@@ -184,9 +184,7 @@ def _period_key_and_label(date_value: object) -> tuple[str, str]:
     except (TypeError, ValueError):
         return "undated", "Date TBD"
 
-    month = int(dt.month)
-    quarter = ((month - 1) // 3) + 1
-    return dt.strftime("%Y-%m"), f"Q{quarter} · {dt.strftime('%B %Y')}"
+    return dt.strftime("%Y-%m"), dt.strftime("%B %Y")
 
 
 def _text_for_entity_detection(row: pd.Series) -> str:
@@ -604,24 +602,21 @@ def render(data: dict):
         .timeline-period-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:.62rem; padding-bottom:.46rem; border-bottom:1px dashed rgba(120,142,166,.26); }
         .timeline-period-title { color:#c6daef; font-size:.68rem; letter-spacing:.11em; text-transform:uppercase; font-weight:760; }
         .timeline-period-count { color:#7390ac; font-size:.55rem; letter-spacing:.11em; text-transform:uppercase; }
-        .timeline-axis { position:relative; display:flex; flex-direction:column; gap:1.05rem; padding:.18rem .1rem .1rem .1rem; }
-        .timeline-axis::before { content:""; position:absolute; left:50%; top:.2rem; bottom:.4rem; width:2px; border-radius:999px; transform:translateX(-50%); background:linear-gradient(180deg, rgba(139,165,192,.45) 0%, rgba(109,128,150,.2) 20%, rgba(109,128,150,.16) 80%, rgba(139,165,192,.35) 100%); }
-        .timeline-event { position:relative; display:grid; grid-template-columns:minmax(0, 1fr) 122px minmax(0, 1fr); align-items:start; column-gap:1rem; }
-        .timeline-anchor { position:relative; grid-column:2; justify-self:center; display:flex; flex-direction:column; align-items:center; gap:.32rem; z-index:2; }
+        .timeline-lane-grid { display:grid; grid-template-columns:repeat(12, minmax(0, 1fr)); gap:.95rem; align-items:stretch; }
+        .timeline-event { position:relative; grid-column:span 4; min-width:0; }
+        .timeline-event.span-4 { grid-column:span 4; }
+        .timeline-event.span-6 { grid-column:span 6; }
+        .timeline-event.span-8 { grid-column:span 8; }
+        .timeline-event.span-12 { grid-column:1 / -1; }
+        .timeline-event.featured .timeline-item { border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
+        .timeline-track { display:flex; align-items:center; gap:.46rem; padding:.08rem .12rem .45rem .12rem; }
+        .timeline-track::after { content:""; flex:1; height:1px; border-top:1px dashed rgba(122,152,180,.46); }
         .timeline-anchor-index { color:#90a8c1; font-size:.52rem; letter-spacing:.09em; text-transform:uppercase; border:1px solid rgba(104,130,156,.32); border-radius:999px; padding:.13rem .35rem; background:rgba(11,20,30,.92); }
-        .timeline-node { width:18px; height:18px; border-radius:50%; border:2px solid #9bb7d4; background:radial-gradient(circle, rgba(222,238,255,.95) 0%, rgba(134,170,205,.95) 44%, rgba(21,34,48,.98) 100%); box-shadow:0 0 0 4px rgba(112,146,179,.12), 0 0 14px rgba(112,146,179,.25); }
+        .timeline-node { width:15px; height:15px; border-radius:50%; border:2px solid #9bb7d4; background:radial-gradient(circle, rgba(222,238,255,.95) 0%, rgba(134,170,205,.95) 44%, rgba(21,34,48,.98) 100%); box-shadow:0 0 0 3px rgba(112,146,179,.1), 0 0 10px rgba(112,146,179,.2); }
         .timeline-node-date { color:#b7cee4; font-size:.56rem; letter-spacing:.09em; text-transform:uppercase; background:rgba(13,24,35,.86); border:1px solid rgba(95,124,151,.43); border-radius:999px; padding:.16rem .42rem; white-space:nowrap; }
-        .timeline-card-wrap { position:relative; }
-        .timeline-event.left .timeline-card-wrap { grid-column:1; }
-        .timeline-event.right .timeline-card-wrap { grid-column:3; }
-        .timeline-event.left .timeline-card-wrap::after,
-        .timeline-event.right .timeline-card-wrap::after { content:""; position:absolute; top:1.22rem; width:26px; border-top:1px dashed rgba(132,157,181,.45); }
-        .timeline-event.left .timeline-card-wrap::after { right:-26px; }
-        .timeline-event.right .timeline-card-wrap::after { left:-26px; }
-        .timeline-event.featured .timeline-card-wrap { grid-column:1 / 4; justify-self:center; width:min(900px, calc(100% - 28px)); margin-top:.22rem; }
-        .timeline-event.featured .timeline-node { width:22px; height:22px; border-width:3px; box-shadow:0 0 0 5px rgba(189,153,75,.14), 0 0 16px rgba(189,153,75,.34); }
+        .timeline-event.featured .timeline-node { width:18px; height:18px; border-width:3px; box-shadow:0 0 0 4px rgba(189,153,75,.14), 0 0 14px rgba(189,153,75,.34); }
         .timeline-event.featured .timeline-node-date { color:#f4dfb8; border-color:rgba(184,146,72,.55); }
-        .timeline-item { border:1px solid #2a3848; border-radius:14px; padding:.85rem .95rem .78rem .95rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 7px 18px rgba(0, 0, 0, .18); border-left-width:3px; overflow:hidden; }
+        .timeline-item { border:1px solid #2a3848; border-radius:14px; padding:.85rem .95rem .78rem .95rem; background:linear-gradient(180deg, #111a26 0%, #0d141d 100%); box-shadow:0 7px 18px rgba(0, 0, 0, .18); border-left-width:3px; overflow:hidden; height:100%; }
         .timeline-item::before { content:""; display:block; height:2px; margin:-.85rem -.95rem .62rem -.95rem; background:linear-gradient(90deg, rgba(160,190,220,.02), rgba(160,190,220,.35), rgba(160,190,220,.02)); }
         .timeline-item.featured { padding:1rem 1.08rem .94rem 1.08rem; border-width:1px; border-left-width:4px; box-shadow:0 10px 24px rgba(0, 0, 0, .28); }
         .timeline-item.featured::before { margin:-1rem -1.08rem .72rem -1.08rem; height:3px; }
@@ -661,15 +656,13 @@ def render(data: dict):
         .tone-milestone .timeline-item::before { background:linear-gradient(90deg, rgba(92,157,98,.08), rgba(92,157,98,.55), rgba(92,157,98,.08)); }
         .tone-general .timeline-item::before { background:linear-gradient(90deg, rgba(95,115,138,.08), rgba(95,115,138,.55), rgba(95,115,138,.08)); }
         @media (max-width: 960px) {
-            .timeline-axis::before { left:15px; transform:none; }
-            .timeline-event { grid-template-columns:34px minmax(0, 1fr); column-gap:.52rem; }
-            .timeline-anchor { grid-column:1; }
-            .timeline-card-wrap,
-            .timeline-event.left .timeline-card-wrap,
-            .timeline-event.right .timeline-card-wrap,
-            .timeline-event.featured .timeline-card-wrap { grid-column:2; width:100%; justify-self:stretch; margin-top:0; }
-            .timeline-event.left .timeline-card-wrap::after,
-            .timeline-event.right .timeline-card-wrap::after { left:-19px; right:auto; width:19px; }
+            .timeline-lane-grid { grid-template-columns:minmax(0, 1fr); gap:.72rem; }
+            .timeline-event,
+            .timeline-event.span-4,
+            .timeline-event.span-6,
+            .timeline-event.span-8,
+            .timeline-event.span-12 { grid-column:1 / -1; }
+            .timeline-track { padding-bottom:.32rem; }
             .timeline-content { grid-template-columns:minmax(0, 1fr); gap:.62rem; }
             .timeline-media { justify-content:start; }
             .timeline-anchor-index { font-size:.49rem; padding:.11rem .28rem; }
@@ -737,12 +730,11 @@ def render(data: dict):
                     f"<div class='timeline-period-title'>{_safe_html(period_label)}</div>"
                     f"<div class='timeline-period-count'>{len(period_events)} events</div>"
                     "</div>"
-                    "<div class='timeline-axis'>"
+                    "<div class='timeline-lane-grid'>"
                 ),
                 unsafe_allow_html=True,
             )
 
-            side_cursor = 0
             event_index = 0
             for _, row in period_events.iterrows():
                 event_index += 1
@@ -755,9 +747,12 @@ def render(data: dict):
                 highlights = _timeline_highlights(row)
                 tone, tone_label = _event_tone(row)
                 priority = _event_priority(row)
-                side = "featured" if priority == "featured" else ("left" if side_cursor % 2 == 0 else "right")
-                if priority != "featured":
-                    side_cursor += 1
+                if priority == "featured":
+                    span_class = "span-12" if event_index % 2 == 0 else "span-8"
+                elif event_index % 5 == 0:
+                    span_class = "span-6"
+                else:
+                    span_class = "span-4"
 
                 _, player_path = _resolve_player_visual(row, player_photo_index)
                 _, competition_logo_path, trophy_path = _resolve_tournament_visual(
@@ -798,13 +793,12 @@ def render(data: dict):
                 title_class = "timeline-title featured" if priority == "featured" else "timeline-title"
                 st.markdown(
                     (
-                        f"<div class='timeline-event {_safe_html(side)} {_safe_html(priority)} tone-{_safe_html(tone)}'>"
-                        "<div class='timeline-anchor'>"
-                        f"<div class='timeline-anchor-index'>#{event_index}</div>"
-                        "<div class='timeline-node'></div>"
-                        f"<div class='timeline-node-date'>{_safe_html(date_text)}</div>"
+                        f"<div class='timeline-event {_safe_html(priority)} {_safe_html(span_class)} tone-{_safe_html(tone)}'>"
+                        "<div class='timeline-track'>"
+                        f"<span class='timeline-anchor-index'>#{event_index}</span>"
+                        "<span class='timeline-node'></span>"
+                        f"<span class='timeline-node-date'>{_safe_html(date_text)}</span>"
                         "</div>"
-                        "<div class='timeline-card-wrap'>"
                         f"<div class='timeline-item tone-{_safe_html(tone)} {_safe_html(priority)}'>"
                         "<div class='timeline-content'>"
                         "<div>"
@@ -819,7 +813,6 @@ def render(data: dict):
                         f"{meta_html}{details_html}{footer_html}"
                         "</div>"
                         f"{media_html}"
-                        "</div>"
                         "</div>"
                         "</div>"
                     ),
