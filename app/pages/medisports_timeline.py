@@ -636,22 +636,35 @@ def render(data: dict):
             box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .16), 0 0 18px rgba(var(--timeline-spine-rgb), .26);
             pointer-events:none;
         }
-        .timeline-bend { position:relative; height:24px; margin:-.12rem 0 .06rem 0; }
+        .timeline-bend { position:relative; height:30px; margin:-.08rem 0 .04rem 0; }
         .timeline-bend::before {
             content:"";
             position:absolute;
-            top:0;
-            bottom:0;
-            width:30px;
-            border:3px solid rgba(var(--timeline-spine-rgb), .7);
-            border-top:none;
-            filter:drop-shadow(0 0 8px rgba(var(--timeline-spine-rgb), .34));
+            top:-1px;
+            bottom:-1px;
+            width:4px;
+            border-radius:999px;
+            background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .86), rgba(var(--timeline-spine-rgb), .58));
+            box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .18), 0 0 14px rgba(var(--timeline-spine-rgb), .3);
+            pointer-events:none;
         }
-        .timeline-bend::after { content:"↓"; position:absolute; top:6px; color:#d9ecff; font-size:.68rem; font-weight:700; width:18px; height:18px; border-radius:999px; border:2px solid rgba(var(--timeline-spine-rgb), .72); background:rgba(10,20,33,.98); box-shadow:0 0 0 2px rgba(var(--timeline-spine-rgb), .22), 0 0 14px rgba(var(--timeline-spine-rgb), .28); display:flex; align-items:center; justify-content:center; }
-        .timeline-bend.to-right::before { right:.45rem; border-left:none; border-bottom-right-radius:18px; }
-        .timeline-bend.to-right::after { right:.28rem; }
-        .timeline-bend.to-left::before { left:.45rem; border-right:none; border-bottom-left-radius:18px; }
-        .timeline-bend.to-left::after { left:.28rem; }
+        .timeline-bend::after {
+            content:"";
+            position:absolute;
+            bottom:-1px;
+            width:22px;
+            height:18px;
+            border-bottom:4px solid rgba(var(--timeline-spine-rgb), .74);
+            box-shadow:0 0 10px rgba(var(--timeline-spine-rgb), .22);
+            pointer-events:none;
+        }
+        .timeline-bend-marker { position:absolute; top:7px; color:#d9ecff; font-size:.66rem; font-weight:700; width:18px; height:18px; border-radius:999px; border:2px solid rgba(var(--timeline-spine-rgb), .72); background:rgba(10,20,33,.98); box-shadow:0 0 0 2px rgba(var(--timeline-spine-rgb), .22), 0 0 12px rgba(var(--timeline-spine-rgb), .26); display:flex; align-items:center; justify-content:center; }
+        .timeline-bend.to-right::before { right:.65rem; }
+        .timeline-bend.to-right::after { right:.65rem; border-bottom-left-radius:16px; border-left:4px solid rgba(var(--timeline-spine-rgb), .74); }
+        .timeline-bend.to-right .timeline-bend-marker { right:.44rem; }
+        .timeline-bend.to-left::before { left:.65rem; }
+        .timeline-bend.to-left::after { left:.65rem; border-bottom-right-radius:16px; border-right:4px solid rgba(var(--timeline-spine-rgb), .74); }
+        .timeline-bend.to-left .timeline-bend-marker { left:.44rem; }
         .timeline-event {
             position:relative;
             min-width:min(100%, 210px);
@@ -676,6 +689,8 @@ def render(data: dict):
         .timeline-lane-row.dir-rtl .timeline-event::after { left:-.72rem; }
         .timeline-lane-row.dir-ltr .timeline-event:last-child::after,
         .timeline-lane-row.dir-rtl .timeline-event:last-child::after { display:none; }
+        .timeline-lane-row.has-next.dir-ltr .timeline-event:last-child::after { display:block; width:22px; right:-1.2rem; }
+        .timeline-lane-row.has-next.dir-rtl .timeline-event:last-child::after { display:block; width:22px; left:-1.2rem; }
         .timeline-event.compact { flex:0.8 1 220px; }
         .timeline-event.regular { flex:1 1 290px; }
         .timeline-event.expanded { flex:1.25 1 360px; }
@@ -775,6 +790,17 @@ def render(data: dict):
             .timeline-season-block { padding:.74rem .68rem .56rem .68rem; border-radius:16px; }
             .timeline-season-header { margin-bottom:.58rem; padding:.08rem .1rem .42rem .1rem; }
             .timeline-season-lanes { gap:.48rem; padding-left:.3rem; }
+            .timeline-season-lanes::before {
+                content:"";
+                position:absolute;
+                left:9px;
+                top:0;
+                bottom:0;
+                width:4px;
+                border-radius:999px;
+                background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .84), rgba(var(--timeline-spine-rgb), .5));
+                box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .2), 0 0 14px rgba(var(--timeline-spine-rgb), .24);
+            }
             .timeline-lane-row {
                 display:flex;
                 flex-direction:column;
@@ -782,17 +808,7 @@ def render(data: dict):
                 padding:0 .06rem 0 .38rem;
             }
             .timeline-lane-row.dir-rtl { direction:ltr; }
-            .timeline-lane-row::before {
-                left:9px;
-                right:auto;
-                top:0;
-                bottom:0;
-                width:4px;
-                height:auto;
-                border-radius:999px;
-                background:linear-gradient(180deg, rgba(var(--timeline-spine-rgb), .82), rgba(var(--timeline-spine-rgb), .46));
-                box-shadow:0 0 0 1px rgba(var(--timeline-spine-rgb), .2), 0 0 14px rgba(var(--timeline-spine-rgb), .26);
-            }
+            .timeline-lane-row::before { display:none; }
             .timeline-bend { display:none; }
             .timeline-event::after {
                 top:22px;
@@ -866,10 +882,15 @@ def render(data: dict):
         event_index = 0
         season_rows = list(season_events.iterrows())
         row_size = 3
+        total_chunks = (len(season_rows) + row_size - 1) // row_size
         for chunk_index in range(0, len(season_rows), row_size):
             chunk = season_rows[chunk_index : chunk_index + row_size]
+            row_position = chunk_index // row_size
             lane_reverse = (chunk_index // row_size) % 2 == 1
-            lane_class = "timeline-lane-row dir-rtl" if lane_reverse else "timeline-lane-row dir-ltr"
+            lane_parts = ["timeline-lane-row", "dir-rtl" if lane_reverse else "dir-ltr"]
+            if row_position < total_chunks - 1:
+                lane_parts.append("has-next")
+            lane_class = " ".join(lane_parts)
             row_html_parts: list[str] = [f"<div class='{lane_class}'>"]
             for _, row in chunk:
                 event_index += 1
@@ -958,7 +979,7 @@ def render(data: dict):
             season_html_parts.append("".join(row_html_parts))
             if chunk_index + row_size < len(season_rows):
                 bend_class = "timeline-bend to-left" if lane_reverse else "timeline-bend to-right"
-                season_html_parts.append(f"<div class='{bend_class}'></div>")
+                season_html_parts.append(f"<div class='{bend_class}'><span class='timeline-bend-marker'>↓</span></div>")
 
         season_html_parts.extend(["</div>", "</div>"])
         timeline_html_parts.append("".join(season_html_parts))
