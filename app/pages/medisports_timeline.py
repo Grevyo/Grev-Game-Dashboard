@@ -35,9 +35,10 @@ EVENT_PHOTO_OVERRIDES = (
         "label": "Event Photo",
         "caption": "Taken by Barry Snail back in Season 8 before PAX Disbanded",
         "match": {
-            "tokens_any": ("bonk",),
-            "event_types": ("transfer_in", "transfer_out"),
+            "tokens_all": ("leon replaces bonk as igl",),
+            "event_types": ("lineup_change",),
             "categories": ("roster",),
+            "season": "11",
         },
     },
     {
