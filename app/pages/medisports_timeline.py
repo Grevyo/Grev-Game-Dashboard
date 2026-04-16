@@ -285,52 +285,61 @@ def _event_media_limit(layout_variant: str) -> int:
     return 1
 
 
+def _redundancy_tokens(value: object) -> set[str]:
+    text = _normalize_for_match(value)
+    if not text:
+        return set()
+    stop_words = {
+        "a", "an", "the", "was", "were", "is", "are",
+        "to", "into", "in", "on", "at", "of", "for", "from", "as", "during",
+        "season", "team", "main", "lineup",
+        "move", "moved", "change", "changed",
+        "started", "improved", "retained", "received",
+        "direct", "invite", "result", "finish",
+    }
+    return {token for token in text.split() if token and token not in stop_words}
+
+
+def _token_overlap(left: set[str], right: set[str]) -> float:
+    if not left:
+        return 0.0
+    return len(left & right) / max(1, len(left))
+
+
 def _should_render_timeline_details(
-    row: pd.Series,
     *,
-    layout_variant: str,
+    row: pd.Series,
+    title: str,
     details: str,
     notes: str,
-    highlight_labels: list[str],
+    chips: list[tuple[str, str]],
+    layout_variant: str,
+    priority: str,
 ) -> bool:
-    """Hide redundant body text on simple cards while preserving rich storytelling cards."""
-    if not details:
+    details_text = _display_value(details)
+    if not details_text:
         return False
 
-    priority = _event_priority(row)
-    if priority == "featured" or layout_variant in {"story", "competition"}:
+    # Keep richer/story cards unchanged.
+    if priority == "featured" or layout_variant in {"competition", "story", "milestone"}:
         return True
 
-    details_norm = _normalize_for_match(details)
-    title_norm = _normalize_for_match(row.get("title"))
-    notes_norm = _normalize_for_match(notes)
-    meta_norm = _normalize_for_match(_timeline_meta_line(row))
-    event_type_norm = _normalize_for_match(row.get("event_type"))
-    category_norm = _normalize_for_match(row.get("category"))
-    highlight_norm = _normalize_for_match(" ".join(highlight_labels))
-    detail_tokens = [token for token in details_norm.split() if len(token) > 2]
-    is_short_detail = len(detail_tokens) <= 8 or len(details_norm) <= 65
+    detail_tokens = _redundancy_tokens(details_text)
+    title_tokens = _redundancy_tokens(title)
+    chip_tokens = _redundancy_tokens(" ".join(chip for _, chip in chips))
 
-    if notes_norm and notes_norm not in details_norm:
-        return True
+    duplicate_of_title = bool(detail_tokens) and _token_overlap(detail_tokens, title_tokens) >= 0.74
+    duplicate_of_chips = bool(detail_tokens) and _token_overlap(detail_tokens, chip_tokens) >= 0.60
+    has_notes = bool(_display_value(notes))
 
-    compact_like_layout = layout_variant in {"compact", "result-compact"}
-    simple_signal_layout = layout_variant in {"ranking", "roster", "org"}
-    if not (compact_like_layout or simple_signal_layout):
-        return True
+    # Kill the repeated middle sentence on small/simple cards.
+    if layout_variant in {"compact", "result-compact", "ranking", "org"}:
+        if duplicate_of_title or duplicate_of_chips or len(details_text) <= 90:
+            return False
 
-    duplicate_title = details_norm == title_norm or details_norm in title_norm or title_norm in details_norm
-    duplicate_meta = bool(meta_norm) and (details_norm == meta_norm or details_norm in meta_norm)
-    duplicate_type = bool(event_type_norm) and (details_norm == event_type_norm or details_norm in event_type_norm)
-    duplicate_category = bool(category_norm) and (details_norm == category_norm or details_norm in category_norm)
-    duplicate_highlights = bool(highlight_norm) and (
-        details_norm in highlight_norm or _keyword_overlap_score(details_norm, highlight_norm) >= 4
-    )
-
-    if is_short_detail and any(
-        [duplicate_title, duplicate_meta, duplicate_type, duplicate_category, duplicate_highlights]
-    ):
-        return False
+    if layout_variant == "roster":
+        if len(details_text) <= 100 and (duplicate_of_title or duplicate_of_chips or has_notes):
+            return False
 
     return True
 
@@ -1112,14 +1121,14 @@ def render(data: dict):
             chips.extend(highlights)
             # Keep chip rows focused and avoid visual clutter from excessive bubbles.
             chips = chips[:6]
-            chip_labels = [chip for _, chip in chips]
-
             should_render_details = _should_render_timeline_details(
-                row,
+                row=row,
+                title=title,
                 layout_variant=layout_variant,
                 details=details,
                 notes=notes,
-                highlight_labels=chip_labels,
+                chips=chips,
+                priority=priority,
             )
 
             meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
