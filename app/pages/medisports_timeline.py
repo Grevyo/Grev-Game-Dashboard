@@ -88,12 +88,8 @@ def _to_int_text(value: object, *, fallback: str = "") -> str:
 def _timeline_meta_line(row: pd.Series) -> str:
     event_type = _display_value(row.get("event_type")).replace("_", " ").title()
     category = _display_value(row.get("category")).replace("_", " ").title()
-    tokens: list[str] = []
-    if event_type:
-        tokens.append(event_type)
-    if category and category.casefold() not in {token.casefold() for token in tokens}:
-        tokens.append(category)
-    return " • ".join(tokens)
+    compact_label = event_type or category
+    return compact_label
 
 
 def _timeline_highlights(row: pd.Series) -> list[tuple[str, str]]:
@@ -846,7 +842,7 @@ def render(data: dict):
         .timeline-rail { min-width:0; max-width:72px; border-right:1px solid rgba(95,121,146,.34); padding:.1rem .16rem .08rem 0; display:flex; flex-direction:column; gap:.14rem; position:relative; }
         .timeline-rail::after { content:""; position:absolute; left:-.24rem; top:.06rem; bottom:.06rem; width:2px; border-radius:2px; background:linear-gradient(180deg, rgba(166,197,227,.66), rgba(97,127,155,.08)); }
         .timeline-date { color:#e8f4ff; font-size:.6rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; line-height:1.2; }
-        .timeline-meta { color:#a7c0d8; font-size:.52rem; letter-spacing:.08em; text-transform:uppercase; line-height:1.25; border:1px solid rgba(91,122,150,.55); background:linear-gradient(180deg, rgba(31,46,64,.78), rgba(18,30,44,.82)); border-radius:999px; padding:.1rem .3rem; width:max-content; max-width:100%; }
+        .timeline-meta { color:#a7c0d8; font-size:.54rem; letter-spacing:.045em; text-transform:uppercase; line-height:1.15; border:1px solid rgba(91,122,150,.55); background:linear-gradient(180deg, rgba(31,46,64,.78), rgba(18,30,44,.82)); border-radius:999px; padding:.12rem .34rem; width:max-content; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .timeline-main { min-width:0; width:100%; display:grid; grid-template-columns:minmax(0, 1fr) auto; column-gap:.32rem; align-items:flex-start; border:1px solid rgba(86,116,145,.28); border-radius:11px; padding:.24rem .26rem; background:linear-gradient(180deg, rgba(20,32,47,.46), rgba(12,21,33,.26)); box-shadow:inset 0 1px 0 rgba(193,217,241,.06); }
         .timeline-main.without-media { grid-template-columns:minmax(0, 1fr); }
         .timeline-copy { min-width:0; width:100%; max-width:none; margin:0; padding:0; flex:1 1 auto; align-self:start; }
@@ -1086,6 +1082,7 @@ def render(data: dict):
                     "</div>"
                     "</div>"
                     f"{event_photo_html}"
+                    "</div>"
                     "</div>"
                 )
             )
