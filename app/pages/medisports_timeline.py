@@ -285,6 +285,56 @@ def _event_media_limit(layout_variant: str) -> int:
     return 1
 
 
+def _should_render_timeline_details(
+    row: pd.Series,
+    *,
+    layout_variant: str,
+    details: str,
+    notes: str,
+    highlight_labels: list[str],
+) -> bool:
+    """Hide redundant body text on simple cards while preserving rich storytelling cards."""
+    if not details:
+        return False
+
+    priority = _event_priority(row)
+    if priority == "featured" or layout_variant in {"story", "competition"}:
+        return True
+
+    details_norm = _normalize_for_match(details)
+    title_norm = _normalize_for_match(row.get("title"))
+    notes_norm = _normalize_for_match(notes)
+    meta_norm = _normalize_for_match(_timeline_meta_line(row))
+    event_type_norm = _normalize_for_match(row.get("event_type"))
+    category_norm = _normalize_for_match(row.get("category"))
+    highlight_norm = _normalize_for_match(" ".join(highlight_labels))
+    detail_tokens = [token for token in details_norm.split() if len(token) > 2]
+    is_short_detail = len(detail_tokens) <= 8 or len(details_norm) <= 65
+
+    if notes_norm and notes_norm not in details_norm:
+        return True
+
+    compact_like_layout = layout_variant in {"compact", "result-compact"}
+    simple_signal_layout = layout_variant in {"ranking", "roster", "org"}
+    if not (compact_like_layout or simple_signal_layout):
+        return True
+
+    duplicate_title = details_norm == title_norm or details_norm in title_norm or title_norm in details_norm
+    duplicate_meta = bool(meta_norm) and (details_norm == meta_norm or details_norm in meta_norm)
+    duplicate_type = bool(event_type_norm) and (details_norm == event_type_norm or details_norm in event_type_norm)
+    duplicate_category = bool(category_norm) and (details_norm == category_norm or details_norm in category_norm)
+    duplicate_highlights = bool(highlight_norm) and (
+        details_norm in highlight_norm or _keyword_overlap_score(details_norm, highlight_norm) >= 4
+    )
+
+    if is_short_detail and any(
+        [duplicate_title, duplicate_meta, duplicate_type, duplicate_category, duplicate_highlights]
+    ):
+        return False
+
+    return True
+
+
 def _safe_html(value: object) -> str:
     return html.escape(_display_value(value))
 
@@ -1058,8 +1108,22 @@ def render(data: dict):
             elif len(visuals) > media_limit:
                 visuals = visuals[:media_limit]
 
+            chips = _timeline_identity_chips(row, tone_label=tone_label, priority=priority)
+            chips.extend(highlights)
+            # Keep chip rows focused and avoid visual clutter from excessive bubbles.
+            chips = chips[:6]
+            chip_labels = [chip for _, chip in chips]
+
+            should_render_details = _should_render_timeline_details(
+                row,
+                layout_variant=layout_variant,
+                details=details,
+                notes=notes,
+                highlight_labels=chip_labels,
+            )
+
             meta_html = f"<div class='timeline-meta'>{_safe_html(meta_line)}</div>" if meta_line else ""
-            details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if details else ""
+            details_html = f"<p class='timeline-details'>{_safe_html(details)}</p>" if should_render_details else ""
             media_html = ""
             if visuals:
                 media_cards = "".join(
@@ -1071,11 +1135,6 @@ def render(data: dict):
                     for label, uri in visuals
                 )
                 media_html = f"<div class='timeline-media media-{len(visuals)}'>{media_cards}</div>"
-
-            chips = _timeline_identity_chips(row, tone_label=tone_label, priority=priority)
-            chips.extend(highlights)
-            # Keep chip rows focused and avoid visual clutter from excessive bubbles.
-            chips = chips[:6]
 
             chips_html = ""
             if chips:
