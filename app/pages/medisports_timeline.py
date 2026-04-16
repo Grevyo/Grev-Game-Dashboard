@@ -130,13 +130,13 @@ def _timeline_identity_chips(row: pd.Series, *, tone_label: str, priority: str) 
     chips: list[tuple[str, str]] = []
     event_type = _display_value(row.get("event_type")).replace("_", " ").title()
     category = _display_value(row.get("category")).replace("_", " ").title()
-    if event_type:
-        chips.append(("identity", event_type))
+    # Keep identity chips intentionally sparse to avoid repeating
+    # information already shown in the integrated event header.
     if category and category.casefold() != event_type.casefold():
         chips.append(("identity-soft", category))
-    if tone_label:
+    elif tone_label and tone_label.casefold() != event_type.casefold():
         chips.append(("tone", tone_label))
-    if priority == "featured":
+    if priority == "featured" and not any(kind in {"identity-soft", "tone"} for kind, _ in chips):
         chips.append(("priority", "Featured"))
     return chips
 
@@ -838,9 +838,8 @@ def render(data: dict):
             radial-gradient(140% 90% at 10% -24%, rgba(250, 220, 155, .22) 0%, rgba(250, 220, 155, 0) 48%),
             linear-gradient(167deg, rgba(32,47,66,.98) 0%, rgba(16,26,40,.98) 40%, rgba(9,16,26,.99) 100%);
             box-shadow:0 18px 36px rgba(0,0,0,.46), 0 0 0 1px rgba(191,214,236,.22), 0 0 26px rgba(152,184,218,.22), inset 0 1px 0 rgba(247,233,199,.16); }
-        .timeline-event-grid { display:grid; grid-template-columns:clamp(56px, 6.2vw, 72px) minmax(0, 1fr); gap:.5rem; padding:.58rem .56rem; align-items:start; }
-        .timeline-rail { min-width:0; max-width:72px; border-right:1px solid rgba(95,121,146,.34); padding:.1rem .16rem .08rem 0; display:flex; flex-direction:column; gap:.14rem; position:relative; }
-        .timeline-rail::after { content:""; position:absolute; left:-.24rem; top:.06rem; bottom:.06rem; width:2px; border-radius:2px; background:linear-gradient(180deg, rgba(166,197,227,.66), rgba(97,127,155,.08)); }
+        .timeline-event-grid { display:grid; grid-template-columns:minmax(0, 1fr); gap:.5rem; padding:.58rem .56rem; align-items:start; }
+        .timeline-head-top { display:flex; flex-wrap:wrap; gap:.24rem; align-items:center; margin:0 0 .16rem 0; }
         .timeline-date { color:#e8f4ff; font-size:.6rem; letter-spacing:.11em; text-transform:uppercase; font-weight:780; line-height:1.2; }
         .timeline-meta { color:#a7c0d8; font-size:.54rem; letter-spacing:.045em; text-transform:uppercase; line-height:1.15; border:1px solid rgba(91,122,150,.55); background:linear-gradient(180deg, rgba(31,46,64,.78), rgba(18,30,44,.82)); border-radius:999px; padding:.12rem .34rem; width:max-content; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .timeline-main { min-width:0; width:100%; display:grid; grid-template-columns:minmax(0, 1fr) auto; column-gap:.32rem; align-items:flex-start; border:1px solid rgba(86,116,145,.28); border-radius:11px; padding:.24rem .26rem; background:linear-gradient(180deg, rgba(20,32,47,.46), rgba(12,21,33,.26)); box-shadow:inset 0 1px 0 rgba(193,217,241,.06); }
@@ -921,7 +920,6 @@ def render(data: dict):
             .timeline-event-shell.stagger-md,
             .timeline-event-shell.stagger-lg { margin-top:.42rem !important; }
             .timeline-event-grid { grid-template-columns:1fr; gap:.42rem; padding:.52rem; }
-            .timeline-rail { border-right:none; border-bottom:1px solid rgba(95,121,146,.3); padding-right:0; padding-bottom:.34rem; }
             .timeline-main { display:block; }
             .timeline-event-shell.lane-left .timeline-main,
             .timeline-event-shell.lane-left.width-compact .timeline-main,
@@ -1025,6 +1023,8 @@ def render(data: dict):
 
             chips = _timeline_identity_chips(row, tone_label=tone_label, priority=priority)
             chips.extend(highlights)
+            # Keep chip rows focused and avoid visual clutter from excessive bubbles.
+            chips = chips[:4]
 
             chips_html = ""
             if chips:
@@ -1066,13 +1066,13 @@ def render(data: dict):
                     f"<div class='{event_row_class}'>"
                     f"<div class='timeline-event tone-{_safe_html(tone)} {_safe_html(priority)}'>"
                     "<div class='timeline-event-grid'>"
-                    "<div class='timeline-rail'>"
-                    f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
-                    f"{meta_html}"
-                    "</div>"
                     f"<div class='{main_class}'>"
                     "<div class='timeline-copy'>"
                     "<div class='timeline-head'>"
+                    "<div class='timeline-head-top'>"
+                    f"<div class='timeline-date'>{_safe_html(date_text)}</div>"
+                    f"{meta_html}"
+                    "</div>"
                     f"<div class='{title_class}'>{_safe_html(title)}</div>"
                     "</div>"
                     f"{details_block_html}{meta_zone_html}"
