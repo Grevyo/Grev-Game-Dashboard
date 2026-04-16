@@ -97,21 +97,30 @@ def _timeline_highlights(row: pd.Series) -> list[tuple[str, str]]:
     chips: list[tuple[str, str]] = []
 
     competition = _display_value(row.get("competition"))
+    stage_or_group = _display_value(row.get("stage_or_group"))
     placement = _display_value(row.get("placement"))
     record = _display_value(row.get("record"))
     opponent = _display_value(row.get("opponent_or_org"))
+    player_name = _display_value(row.get("player_name"))
     from_entity = _display_value(row.get("from_entity"))
     to_entity = _display_value(row.get("to_entity"))
     fee_text = _to_int_text(row.get("fee_cpl"))
+    ranking_system = _display_value(row.get("ranking_system"))
     rank_from = _to_int_text(row.get("ranking_from"))
     rank_to = _to_int_text(row.get("ranking_to"))
+    tier_after_event = _display_value(row.get("tier_after_event"))
+    public_visibility = _display_value(row.get("public_visibility"))
 
     if competition:
         chips.append(("competition", f"Competition: {competition}"))
+    if stage_or_group:
+        chips.append(("stage", f"Stage: {stage_or_group}"))
     if placement:
         chips.append(("placement", f"Placement: {placement}"))
     if record:
         chips.append(("result", f"Record: {record}"))
+    if player_name:
+        chips.append(("player", f"Player: {player_name}"))
     if opponent:
         chips.append(("opponent", f"Org/Opponent: {opponent}"))
     if from_entity or to_entity:
@@ -123,7 +132,12 @@ def _timeline_highlights(row: pd.Series) -> list[tuple[str, str]]:
     if rank_from or rank_to:
         rank_flow = " → ".join([part for part in [rank_from, rank_to] if part])
         if rank_flow:
-            chips.append(("ranking", f"Ranking: {rank_flow}"))
+            rank_label = f"{ranking_system} Ranking" if ranking_system else "Ranking"
+            chips.append(("ranking", f"{rank_label}: {rank_flow}"))
+    if tier_after_event:
+        chips.append(("tier", f"Tier: {tier_after_event}"))
+    if public_visibility:
+        chips.append(("visibility", f"Visibility: {public_visibility}"))
     return chips
 
 
@@ -320,6 +334,7 @@ def _text_for_entity_detection(row: pd.Series) -> str:
         _display_value(row.get("from_entity")),
         _display_value(row.get("to_entity")),
         _display_value(row.get("competition")),
+        _display_value(row.get("player_name")),
     ]
     return f" {_normalize_for_match(' '.join(fields))} "
 
@@ -384,6 +399,13 @@ def _build_player_photo_index(data: dict) -> dict[str, str]:
 def _resolve_player_visual(row: pd.Series, player_photo_index: dict[str, str]) -> tuple[str | None, str | None]:
     if not player_photo_index:
         return None, None
+
+    player_name = _display_value(row.get("player_name"))
+    if player_name:
+        player_key = _normalize_player_plain(player_name)
+        path = player_photo_index.get(player_key)
+        if path:
+            return player_key, path
 
     haystack = _text_for_entity_detection(row)
 
@@ -642,6 +664,11 @@ def _timeline_text_blob(row: pd.Series) -> str:
                 "opponent_or_org",
                 "from_entity",
                 "to_entity",
+                "player_name",
+                "stage_or_group",
+                "ranking_system",
+                "tier_after_event",
+                "public_visibility",
             ]
         )
     )
@@ -763,11 +790,27 @@ def render(data: dict):
     event_types = sorted([str(v).replace("_", " ").title() for v in timeline_df["event_type"].dropna().unique()])
     categories = sorted([str(v).replace("_", " ").title() for v in timeline_df["category"].dropna().unique()])
 
-    filter_cols = st.columns(4, gap="small")
+    visibility_values = (
+        sorted(
+            {
+                value
+                for value in timeline_df.get("public_visibility", pd.Series(dtype=str))
+                .dropna()
+                .astype(str)
+                .map(str.strip)
+                if value
+            }
+        )
+        if "public_visibility" in timeline_df.columns
+        else []
+    )
+
+    filter_cols = st.columns(5, gap="small")
     selected_seasons = filter_cols[0].multiselect("Season", options=seasons, default=[])
     selected_event_types = filter_cols[1].multiselect("Event Type", options=event_types, default=[])
     selected_categories = filter_cols[2].multiselect("Category", options=categories, default=[])
     sort_order = filter_cols[3].segmented_control("Order", ["Newest first", "Oldest first"], default="Newest first")
+    selected_visibility = filter_cols[4].multiselect("Visibility", options=visibility_values, default=[])
 
     filtered = timeline_df.copy()
     if selected_seasons:
@@ -785,6 +828,13 @@ def render(data: dict):
             .fillna("")
             .map(lambda v: str(v).replace("_", " ").title())
             .isin(selected_categories)
+        ]
+    if selected_visibility:
+        filtered = filtered[
+            filtered["public_visibility"]
+            .fillna("")
+            .map(lambda v: str(v).strip())
+            .isin(selected_visibility)
         ]
 
     ascending = sort_order == "Oldest first"
@@ -1025,7 +1075,7 @@ def render(data: dict):
             chips = _timeline_identity_chips(row, tone_label=tone_label, priority=priority)
             chips.extend(highlights)
             # Keep chip rows focused and avoid visual clutter from excessive bubbles.
-            chips = chips[:4]
+            chips = chips[:6]
 
             chips_html = ""
             if chips:
