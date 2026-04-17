@@ -417,14 +417,10 @@ def _competition_from_row(row: pd.Series, known_competitions: list[str], competi
 
 
 def _infer_gold_placement(row: pd.Series) -> str:
-    placement = _display_value(row.get("placement"))
-    if placement:
-        return placement
-
-    row_text = _normalize_for_match(" ".join(_display_value(row.get(field)) for field in ["title", "details", "notes"]))
-    if any(token in row_text for token in [" champion", " won ", " 1st", " first place", " gold "]):
-        return "1st"
-    return ""
+    # Strict: only trust explicit structured placement value from the row.
+    # We intentionally avoid inferring placement from generic text so trophies
+    # never appear unless the row carries a concrete result signal.
+    return _display_value(row.get("placement"))
 
 
 def _build_player_photo_index(data: dict) -> dict[str, str]:
@@ -590,10 +586,87 @@ def _is_trophy_relevant_row(row: pd.Series) -> bool:
 def _is_strong_achievement_signal(row: pd.Series, placement: str) -> bool:
     if not _is_trophy_relevant_row(row):
         return False
-    # Do not attach trophy visuals for generic competition mentions.
-    if not _placement_rank_text(placement):
+
+    placement_rank = _placement_rank_text(placement)
+    if not placement_rank:
         return False
-    return True
+
+    event_type = _normalize_for_match(row.get("event_type"))
+    category = _normalize_for_match(row.get("category"))
+    title_blob = _normalize_for_match(row.get("title"))
+    details_blob = _normalize_for_match(row.get("details"))
+    notes_blob = _normalize_for_match(row.get("notes"))
+    text_blob = " ".join(part for part in [title_blob, details_blob, notes_blob] if part)
+    record_blob = _normalize_for_match(row.get("record"))
+
+    # Hard-block non-achievement row types unless they explicitly state an
+    # earned result outcome (covered below).
+    blocked_event_tokens = (
+        "qualification",
+        "qualifier",
+        "invite",
+        "joined",
+        "join",
+        "community",
+        "rumor",
+        "rumour",
+        "roster",
+        "transfer",
+        "lineup",
+        "sign",
+    )
+    has_blocked_event_context = (
+        category in {"roster", "community", "organisation"}
+        or any(token in event_type for token in blocked_event_tokens)
+    )
+
+    explicit_earned_tokens = (
+        "won",
+        "winner",
+        "champion",
+        "champions",
+        "placed",
+        "finished",
+        "finish",
+        "runner up",
+        "runners up",
+        "1st",
+        "2nd",
+        "3rd",
+        "first place",
+        "second place",
+        "third place",
+    )
+    has_explicit_earned_text = any(token in text_blob for token in explicit_earned_tokens)
+
+    # Generic competition words alone must not be enough.
+    generic_competition_words = ("ladder", "league", "championship", "cup", "open", "competition")
+    text_without_generic_competition_words = text_blob
+    for token in generic_competition_words:
+        text_without_generic_competition_words = text_without_generic_competition_words.replace(token, " ")
+    only_generic_competition_wording = not text_without_generic_competition_words.strip()
+    if only_generic_competition_wording and not has_explicit_earned_text:
+        return False
+
+    # Placement/result columns are trusted only when we are in competition-result context.
+    has_structured_result_signal = bool(placement_rank) or bool(record_blob.strip())
+    is_result_like_row = (
+        category == "competition"
+        and (
+            event_type in {"result", "league result"}
+            or "result" in event_type
+            or "finish" in event_type
+            or "final" in event_type
+        )
+    )
+
+    if has_blocked_event_context and not has_explicit_earned_text:
+        return False
+
+    if has_explicit_earned_text:
+        return True
+
+    return is_result_like_row and has_structured_result_signal
 
 
 def _resolve_trophy_from_achievement_reference(
@@ -612,17 +685,12 @@ def _resolve_trophy_from_achievement_reference(
         return None
 
     exact_matches: list[dict[str, object]] = []
-    loose_matches: list[dict[str, object]] = []
     for record in achievement_reference:
         name_norm = str(record.get("name_norm") or "")
         if not name_norm:
             continue
 
-        if competition_norm == name_norm:
-            competition_match_kind = "exact"
-        elif competition_norm in name_norm and len(competition_norm) >= 8:
-            competition_match_kind = "contains"
-        else:
+        if competition_norm != name_norm:
             continue
 
         record_placement = str(record.get("placement_rank") or "")
@@ -637,12 +705,9 @@ def _resolve_trophy_from_achievement_reference(
         if not image_path:
             continue
 
-        if competition_match_kind == "exact":
-            exact_matches.append(record)
-        else:
-            loose_matches.append(record)
+        exact_matches.append(record)
 
-    candidates = exact_matches or loose_matches
+    candidates = exact_matches
     if not candidates:
         return None
 
