@@ -39,6 +39,7 @@ EVENT_PHOTO_OVERRIDES = (
             "event_types": ("lineup_change",),
             "categories": ("roster",),
             "season": "11",
+            "player_name": "leon",
         },
     },
     {
@@ -49,6 +50,7 @@ EVENT_PHOTO_OVERRIDES = (
             "tokens_any": ("stroky",),
             "event_types": ("transfer_in", "transfer_out"),
             "categories": ("roster",),
+            "player_name": "stroky",
         },
     },
     {
@@ -459,12 +461,12 @@ def _resolve_player_visual(row: pd.Series, player_photo_index: dict[str, str]) -
     if not player_photo_index:
         return None, None
 
-    player_name = _display_value(row.get("player_name"))
-    if player_name:
-        player_key = _normalize_player_plain(player_name)
-        path = player_photo_index.get(player_key)
-        if path:
-            return player_key, path
+    structured_match = _resolve_structured_player_visual(row, player_photo_index)
+    if structured_match[0]:
+        return structured_match
+
+    if _is_roster_like_event(row):
+        return None, None
 
     haystack = _text_for_entity_detection(row)
 
@@ -474,6 +476,32 @@ def _resolve_player_visual(row: pd.Series, player_photo_index: dict[str, str]) -
         normalized_key = _normalize_for_match(key)
         if normalized_key and f" {normalized_key} " in haystack:
             return key, path
+    return None, None
+
+
+def _is_roster_like_event(row: pd.Series) -> bool:
+    category = _normalize_for_match(row.get("category"))
+    event_type = _normalize_for_match(row.get("event_type"))
+    if category == "roster":
+        return True
+    return any(token in event_type for token in ["transfer", "lineup", "bench", "sign"])
+
+
+def _resolve_structured_player_visual(
+    row: pd.Series,
+    player_photo_index: dict[str, str],
+) -> tuple[str | None, str | None]:
+    candidate_fields = ("player_name", "to_entity", "from_entity")
+    for field in candidate_fields:
+        candidate_name = _display_value(row.get(field))
+        if not candidate_name:
+            continue
+        candidate_key = _normalize_player_plain(candidate_name)
+        if not candidate_key:
+            continue
+        path = player_photo_index.get(candidate_key)
+        if path:
+            return candidate_key, path
     return None, None
 
 
@@ -765,6 +793,30 @@ def _resolve_event_photo_override(row: pd.Series) -> dict[str, str] | None:
         expected_season = matcher.get("season")
         if expected_season and season != expected_season:
             continue
+
+        expected_player = _normalize_player_plain(matcher.get("player_name"))
+        if expected_player:
+            row_player = _normalize_player_plain(row.get("player_name"))
+            if row_player != expected_player:
+                continue
+
+        expected_from = _normalize_for_match(matcher.get("from_entity"))
+        if expected_from:
+            row_from = _normalize_for_match(row.get("from_entity"))
+            if row_from != expected_from:
+                continue
+
+        expected_to = _normalize_for_match(matcher.get("to_entity"))
+        if expected_to:
+            row_to = _normalize_for_match(row.get("to_entity"))
+            if row_to != expected_to:
+                continue
+
+        expected_title = _normalize_for_match(matcher.get("title"))
+        if expected_title:
+            row_title = _normalize_for_match(row.get("title"))
+            if row_title != expected_title:
+                continue
 
         path = photos_dir / override["asset"]
         if not path.exists() or not path.is_file():
