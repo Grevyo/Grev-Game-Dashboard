@@ -136,6 +136,7 @@ TIMELINE_COLUMNS = [
     "ranking_to",
     "tier_after_event",
     "public_visibility",
+    "photo_asset",
     "notes",
 ]
 

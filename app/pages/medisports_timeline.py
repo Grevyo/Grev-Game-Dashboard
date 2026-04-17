@@ -830,6 +830,43 @@ def _resolve_event_photo_override(row: pd.Series) -> dict[str, str] | None:
     return None
 
 
+def _resolve_photo_asset_event_image(row: pd.Series) -> dict[str, str] | None:
+    photos_dir = IMAGES.get("news_photos")
+    if not photos_dir or not photos_dir.exists():
+        return None
+
+    asset_value = _display_value(row.get("photo_asset"))
+    if not asset_value:
+        return None
+
+    asset_name = Path(asset_value).name
+    if not asset_name:
+        return None
+
+    candidate = photos_dir / asset_name
+    if candidate.exists() and candidate.is_file():
+        return {"label": "Event Photo", "caption": "", "path": str(candidate)}
+
+    stem = Path(asset_name).stem
+    if not stem:
+        return None
+
+    for extension in SUPPORTED_EXTENSIONS:
+        variant = photos_dir / f"{stem}{extension}"
+        if variant.exists() and variant.is_file():
+            return {"label": "Event Photo", "caption": "", "path": str(variant)}
+    return None
+
+
+def _resolve_event_photo(row: pd.Series) -> dict[str, str] | None:
+    photo_asset_image = _resolve_photo_asset_event_image(row)
+    if photo_asset_image:
+        return photo_asset_image
+
+    # Legacy fallback while older rows are still being migrated.
+    return _resolve_event_photo_override(row)
+
+
 
 
 def _image_uri_with_fallback(path: str | None, *, max_width: int, max_height: int) -> str | None:
@@ -1145,9 +1182,9 @@ def render(data: dict):
                 competition_logo_index,
                 achievement_reference,
             )
-            event_override = _resolve_event_photo_override(row)
+            event_photo = _resolve_event_photo(row)
             event_photo_uri = _image_uri_with_fallback(
-                event_override["path"] if event_override else None,
+                event_photo["path"] if event_photo else None,
                 max_width=220,
                 max_height=220,
             )
@@ -1219,11 +1256,17 @@ def render(data: dict):
             media_presence_class = "with-media" if media_html else "without-media"
             main_class = f"timeline-main {media_presence_class} layout-{layout_variant}"
             event_photo_html = ""
-            if event_override and event_photo_uri:
+            if event_photo and event_photo_uri:
+                caption = _display_value(event_photo.get("caption"))
+                caption_html = (
+                    f"<div class='timeline-event-photo-caption'>{_safe_html(caption)}</div>"
+                    if caption
+                    else ""
+                )
                 event_photo_html = (
                     "<aside class='timeline-event-photo-block'>"
                     f"<img src='{event_photo_uri}' alt='Event photo for {_safe_html(title)}' loading='lazy' />"
-                    f"<div class='timeline-event-photo-caption'>{_safe_html(event_override['caption'])}</div>"
+                    f"{caption_html}"
                     "</aside>"
                 )
             event_row_class = "timeline-event-row has-event-photo" if event_photo_html else "timeline-event-row"
