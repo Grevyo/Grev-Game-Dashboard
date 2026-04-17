@@ -587,17 +587,13 @@ def _is_trophy_relevant_row(row: pd.Series) -> bool:
     return category in TIMELINE_TROPHY_CATEGORIES or event_type in TIMELINE_TROPHY_EVENT_TYPES
 
 
-def _keyword_overlap_score(left: str, right: str) -> int:
-    left_tokens = {token for token in left.split() if token and len(token) > 2}
-    right_tokens = {token for token in right.split() if token and len(token) > 2}
-    overlap = len(left_tokens & right_tokens)
-    if overlap >= 3:
-        return 5
-    if overlap == 2:
-        return 4
-    if overlap == 1:
-        return 1
-    return 0
+def _is_strong_achievement_signal(row: pd.Series, placement: str) -> bool:
+    if not _is_trophy_relevant_row(row):
+        return False
+    # Do not attach trophy visuals for generic competition mentions.
+    if not _placement_rank_text(placement):
+        return False
+    return True
 
 
 def _resolve_trophy_from_achievement_reference(
@@ -606,58 +602,62 @@ def _resolve_trophy_from_achievement_reference(
     placement: str,
     achievement_reference: list[dict[str, object]],
 ) -> str | None:
-    if not achievement_reference or not _is_trophy_relevant_row(row):
+    if not achievement_reference or not _is_strong_achievement_signal(row, placement):
         return None
 
-    row_title_blob = _normalize_for_match(
-        " ".join(_display_value(row.get(field)) for field in ["title", "details", "competition", "notes"])
-    )
     competition_norm = _normalize_for_match(competition)
     placement_rank = _placement_rank_text(placement)
     timeline_season = _to_int_text(row.get("season"))
+    if not competition_norm or not placement_rank:
+        return None
 
-    best: tuple[int, int, str] | None = None
+    exact_matches: list[dict[str, object]] = []
+    loose_matches: list[dict[str, object]] = []
     for record in achievement_reference:
         name_norm = str(record.get("name_norm") or "")
         if not name_norm:
             continue
 
-        score = 0
-        if competition_norm:
-            if competition_norm == name_norm:
-                score += 9
-            elif competition_norm in name_norm or name_norm in competition_norm:
-                score += 7
-            score += _keyword_overlap_score(competition_norm, name_norm)
-        if row_title_blob and (name_norm in row_title_blob or row_title_blob in name_norm):
-            score += 3
+        if competition_norm == name_norm:
+            competition_match_kind = "exact"
+        elif competition_norm in name_norm and len(competition_norm) >= 8:
+            competition_match_kind = "contains"
+        else:
+            continue
 
         record_placement = str(record.get("placement_rank") or "")
-        if placement_rank and record_placement:
-            if placement_rank == record_placement:
-                score += 4
-            else:
-                score -= 5
-        elif placement_rank and not record_placement:
-            score -= 2
+        if not record_placement or placement_rank != record_placement:
+            continue
 
         record_season = str(record.get("season_text") or "")
-        if timeline_season and record_season and timeline_season == record_season:
-            score += 1
-
-        if score < 8:
+        if timeline_season and record_season and timeline_season != record_season:
             continue
 
         image_path = str(record.get("image_path") or "")
         if not image_path:
             continue
 
-        specificity = len(name_norm)
-        candidate = (score, specificity, image_path)
-        if best is None or candidate > best:
-            best = candidate
+        if competition_match_kind == "exact":
+            exact_matches.append(record)
+        else:
+            loose_matches.append(record)
 
-    return best[2] if best else None
+    candidates = exact_matches or loose_matches
+    if not candidates:
+        return None
+
+    if timeline_season:
+        season_matched = [
+            record for record in candidates if str(record.get("season_text") or "") == timeline_season
+        ]
+        if season_matched:
+            candidates = season_matched
+
+    if len(candidates) != 1:
+        return None
+
+    image_path = str(candidates[0].get("image_path") or "")
+    return image_path or None
 
 
 def _resolve_tournament_visual(
@@ -688,8 +688,9 @@ def _resolve_truthful_trophy_visual(competition: str, placement: str) -> str | N
     """Resolve a trophy/achievement image only when we have a confident, truthful match."""
     competition_text = _normalize_for_match(competition)
     placement_text = _display_value(placement)
+    placement_rank = _placement_rank_text(placement_text)
 
-    if not competition_text:
+    if not competition_text or not placement_rank:
         return None
 
     # Use known explicit mapping logic (e.g. CPLOpen1..4) but reject fuzzy fallbacks.
@@ -704,7 +705,6 @@ def _resolve_truthful_trophy_visual(competition: str, placement: str) -> str | N
 
     # Strict league medal mapping: only use assets when league + placement genuinely match.
     if "league" in competition_text:
-        placement_rank = _placement_rank_text(placement_text)
         league_tier = None
         for tier in ("bronze", "silver", "gold", "emerald", "diamond", "daimond"):
             if tier in competition_text:
