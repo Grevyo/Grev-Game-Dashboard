@@ -1,4 +1,3 @@
-import html
 import math
 import re
 
@@ -667,27 +666,33 @@ def _render_season_stat_cards(summary: dict) -> None:
             stat_card(title, value, note, tone)
 
 
-def _win_rate_tone(value) -> str:
-    if value is None or pd.isna(value):
-        return "neutral"
-    value = float(value)
-    if value >= 75:
-        return "good"
-    if value >= 55:
-        return "mid"
-    if value >= 45:
-        return "neutral"
-    return "poor"
-
-
-def _html_text(value) -> str:
-    if value is None or pd.isna(value):
-        return NOT_AVAILABLE
-    return html.escape(str(value))
-
-
 def _fmt_win_rate(value) -> str:
     return _fmt(value, 1, "%") if value is not None and pd.notna(value) else NOT_AVAILABLE
+
+
+def _format_tactics_table(rows: pd.DataFrame) -> pd.DataFrame:
+    """Return Streamlit-ready tactic rows with only user-facing columns."""
+    visible_columns = [
+        "Rank",
+        "Tactic name",
+        "Usage rounds",
+        "Matches used",
+        "Wins",
+        "Losses",
+        "Win rate %",
+        "Tier spread",
+        "Last used date",
+    ]
+    display = rows.loc[:, [col for col in visible_columns if col in rows.columns]].copy()
+    for col in ("Rank", "Usage rounds", "Matches used", "Wins", "Losses"):
+        if col in display.columns:
+            display[col] = display[col].map(_fmt_int)
+    if "Win rate %" in display.columns:
+        display["Win rate %"] = display["Win rate %"].map(_fmt_win_rate)
+    for col in ("Tactic name", "Tier spread", "Last used date"):
+        if col in display.columns:
+            display[col] = display[col].fillna(NOT_AVAILABLE).astype(str)
+    return display
 
 
 def _side_sort_key(side: str) -> tuple[int, str]:
@@ -697,104 +702,58 @@ def _side_sort_key(side: str) -> tuple[int, str]:
 
 
 def _render_tactics_by_map(top_tactics: pd.DataFrame, season: int, min_rounds: int) -> None:
-    season_tactics = top_tactics[top_tactics["resolved_season"] == int(season)].copy() if not top_tactics.empty else pd.DataFrame()
+    if top_tactics.empty or "resolved_season" not in top_tactics.columns:
+        season_tactics = pd.DataFrame()
+    else:
+        season_tactics = top_tactics[top_tactics["resolved_season"] == int(season)].copy()
+
+    if not season_tactics.empty and "Usage rounds" in season_tactics.columns:
+        usage_rounds = pd.to_numeric(season_tactics["Usage rounds"], errors="coerce").fillna(0)
+        season_tactics = season_tactics[usage_rounds >= int(min_rounds)].copy()
+
     if season_tactics.empty:
         st.info("No official tactics rows meet the selected usage threshold for this season.")
         return
 
-    css = """
-    <style>
-    .sp-map-panel {background: linear-gradient(135deg, rgba(12,18,32,.96), rgba(7,10,18,.98)); border: 1px solid rgba(148,163,184,.22); border-radius: 14px; margin: .75rem 0 1rem; overflow: hidden; box-shadow: 0 10px 28px rgba(0,0,0,.24);}
-    .sp-map-head {display:flex; justify-content:space-between; gap:1rem; align-items:flex-end; padding: .8rem 1rem; border-bottom: 1px solid rgba(148,163,184,.18); background: rgba(15,23,42,.72);}
-    .sp-map-title {font-size:1.05rem; font-weight:800; letter-spacing:.04em; color:#f8fafc; text-transform:uppercase;}
-    .sp-map-meta {display:flex; gap:.5rem; flex-wrap:wrap; justify-content:flex-end;}
-    .sp-pill {border:1px solid rgba(148,163,184,.28); background:rgba(30,41,59,.82); color:#cbd5e1; border-radius:999px; padding:.18rem .55rem; font-size:.72rem; font-weight:700; white-space:nowrap;}
-    .sp-side-section {padding: .75rem 1rem 1rem;}
-    .sp-side-section + .sp-side-section {border-top: 1px solid rgba(148,163,184,.12);}
-    .sp-side-title {display:flex; align-items:center; gap:.45rem; margin:0 0 .55rem; color:#f8fafc; font-size:.9rem; font-weight:900; letter-spacing:.04em; text-transform:uppercase;}
-    .sp-side-chip {display:inline-flex; align-items:center; border-radius:999px; padding:.14rem .5rem; font-size:.68rem; font-weight:900; border:1px solid rgba(148,163,184,.28); background:rgba(30,41,59,.72); color:#cbd5e1;}
-    .sp-side-chip.red {background:rgba(239,68,68,.16); color:#fecaca; border-color:rgba(239,68,68,.34);}
-    .sp-side-chip.blue {background:rgba(59,130,246,.16); color:#bfdbfe; border-color:rgba(59,130,246,.34);}
-    .sp-side-chip.unknown {background:rgba(148,163,184,.14); color:#cbd5e1; border-color:rgba(148,163,184,.28);}
-    .sp-table {width:100%; border-collapse: collapse; font-size:.78rem;}
-    .sp-table th {text-align:left; color:#94a3b8; font-size:.68rem; letter-spacing:.06em; text-transform:uppercase; padding:.5rem .65rem; border-bottom:1px solid rgba(148,163,184,.16);}
-    .sp-table td {padding:.48rem .65rem; border-bottom:1px solid rgba(148,163,184,.08); color:#dbeafe; vertical-align:middle;}
-    .sp-table tr:last-child td {border-bottom:0;}
-    .sp-rank {display:inline-flex; width:1.65rem; height:1.65rem; align-items:center; justify-content:center; border-radius:.45rem; background:#f97316; color:#111827; font-weight:900;}
-    .sp-tactic {font-weight:800; color:#f8fafc;}
-    .sp-usage {font-weight:900; color:#fdba74;}
-    .sp-muted {color:#94a3b8; font-size:.72rem;}
-    .sp-wr {display:inline-block; border-radius:.35rem; padding:.12rem .4rem; font-weight:900;}
-    .sp-wr.good {background:rgba(34,197,94,.18); color:#86efac; border:1px solid rgba(34,197,94,.34);}
-    .sp-wr.mid {background:rgba(234,179,8,.18); color:#fde68a; border:1px solid rgba(234,179,8,.34);}
-    .sp-wr.neutral {background:rgba(148,163,184,.14); color:#cbd5e1; border:1px solid rgba(148,163,184,.28);}
-    .sp-wr.poor {background:rgba(239,68,68,.16); color:#fca5a5; border:1px solid rgba(239,68,68,.34);}
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
+    sort_columns = [col for col in ("Map", "Side", "Rank") if col in season_tactics.columns]
+    if sort_columns:
+        season_tactics = season_tactics.sort_values(sort_columns)
 
-    for map_name, map_rows in season_tactics.sort_values(["Map", "Side", "Rank"]).groupby("Map", dropna=False):
-        map_rows = map_rows.sort_values(["Side", "Rank"])
+    for map_name, map_rows in season_tactics.groupby("Map", dropna=False):
         if map_rows.empty:
             continue
-        usage_total = map_rows["Usage rounds"].sum()
-        red_count = int((map_rows["Side"] == "Red").sum()) if "Side" in map_rows.columns else 0
-        blue_count = int((map_rows["Side"] == "Blue").sum()) if "Side" in map_rows.columns else 0
-        unknown_count = int((map_rows["Side"] == "Unknown side").sum()) if "Side" in map_rows.columns else 0
-        meta_pills = [
-            f'<span class="sp-pill">{red_count} Red tactics shown</span>',
-            f'<span class="sp-pill">{blue_count} Blue tactics shown</span>',
-            f'<span class="sp-pill">{_fmt_int(usage_total)} usage rounds</span>',
-        ]
-        if unknown_count:
-            meta_pills.append(f'<span class="sp-pill">{unknown_count} Unknown side tactics shown</span>')
 
-        side_sections = []
-        side_labels = sorted(map_rows["Side"].dropna().unique().tolist(), key=_side_sort_key)
-        for side in side_labels:
-            side_rows = map_rows[map_rows["Side"] == side].sort_values("Rank")
-            if side_rows.empty:
-                continue
-            side_class = "red" if side == "Red" else "blue" if side == "Blue" else "unknown"
-            rows_html = []
-            for _, row in side_rows.iterrows():
-                wr = row.get("Win rate %")
-                rows_html.append(
-                    "<tr>"
-                    f"<td><span class='sp-rank'>{int(row.get('Rank', 0))}</span></td>"
-                    f"<td><span class='sp-tactic'>{_html_text(row.get('Tactic name'))}</span></td>"
-                    f"<td><span class='sp-usage'>{_fmt_int(row.get('Usage rounds'))}</span></td>"
-                    f"<td>{_fmt_int(row.get('Matches used'))}</td>"
-                    f"<td>{_fmt_int(row.get('Wins'))}</td>"
-                    f"<td>{_fmt_int(row.get('Losses'))}</td>"
-                    f"<td><span class='sp-wr {_win_rate_tone(wr)}'>{_fmt_win_rate(wr)}</span></td>"
-                    f"<td><span class='sp-muted'>{_html_text(row.get('Tier spread'))}</span></td>"
-                    f"<td><span class='sp-muted'>{_html_text(row.get('Last used date'))}</span></td>"
-                    "</tr>"
-                )
-            side_sections.append(
-                f"""
-                <div class="sp-side-section">
-                  <div class="sp-side-title">{_html_text(side)} <span class="sp-side-chip {side_class}">{len(side_rows)} shown</span></div>
-                  <table class="sp-table">
-                    <thead><tr><th>Rank</th><th>Tactic</th><th>Usage rounds</th><th>Matches used</th><th>Wins</th><th>Losses</th><th>Win rate</th><th>Tier spread</th><th>Last used</th></tr></thead>
-                    <tbody>{''.join(rows_html)}</tbody>
-                  </table>
-                </div>
-                """
+        with st.container():
+            st.markdown(f"### {map_name}")
+            usage_values = pd.to_numeric(
+                map_rows.get("Usage rounds", pd.Series(dtype=float)),
+                errors="coerce",
             )
-        if not side_sections:
-            continue
-        table_html = f"""
-        <div class="sp-map-panel">
-          <div class="sp-map-head">
-            <div class="sp-map-title">{_html_text(map_name)}</div>
-            <div class="sp-map-meta">{''.join(meta_pills)}</div>
-          </div>
-          {''.join(side_sections)}
-        </div>
-        """
-        st.markdown(table_html, unsafe_allow_html=True)
+            usage_total = usage_values.fillna(0).sum()
+            red_count = int((map_rows["Side"] == "Red").sum()) if "Side" in map_rows.columns else 0
+            blue_count = int((map_rows["Side"] == "Blue").sum()) if "Side" in map_rows.columns else 0
+            unknown_count = int((map_rows["Side"] == "Unknown side").sum()) if "Side" in map_rows.columns else 0
+
+            summary_cols = st.columns(3 if unknown_count == 0 else 4, gap="small")
+            summary_cols[0].metric("Red tactics shown", red_count)
+            summary_cols[1].metric("Blue tactics shown", blue_count)
+            summary_cols[2].metric("Total usage rounds", _fmt_int(usage_total))
+            if unknown_count:
+                summary_cols[3].metric("Unknown side tactics shown", unknown_count)
+
+            side_labels = sorted(map_rows["Side"].dropna().unique().tolist(), key=_side_sort_key)
+            for side in side_labels:
+                side_sort_col = "Rank" if "Rank" in map_rows.columns else "Usage rounds"
+                side_rows = map_rows[map_rows["Side"] == side].sort_values(side_sort_col)
+                if side_rows.empty:
+                    continue
+                side_rows = side_rows.head(TACTIC_TOP_N)
+                st.markdown(f"#### {side} side" if side in {"Red", "Blue"} else f"#### {side}")
+                st.dataframe(
+                    _format_tactics_table(side_rows),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
 
 def _render_tactics_table(top_tactics: pd.DataFrame, season: int) -> None:
