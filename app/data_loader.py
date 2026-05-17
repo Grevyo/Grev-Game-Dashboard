@@ -10,7 +10,7 @@ import streamlit as st
 
 from app.config import FILES, REQUIRED_FILES
 from app.datetime_utils import coerce_date_columns, normalize_time_series
-from app.grouping import normalize_competitions
+from app.grouping import build_timeline_season_windows, normalize_competitions
 from app.map_utils import normalize_map_series
 
 SYNONYMS = {
@@ -450,7 +450,7 @@ def _build_file_signature() -> tuple[tuple[str, str, int, int], ...]:
 
 
 
-def _derive_core(df: pd.DataFrame, *, dataset_name: str) -> pd.DataFrame:
+def _derive_core(df: pd.DataFrame, *, dataset_name: str, season_windows: pd.DataFrame | None = None) -> pd.DataFrame:
     if df.empty:
         return df
     df = _rename_known_columns(df)
@@ -485,7 +485,7 @@ def _derive_core(df: pd.DataFrame, *, dataset_name: str) -> pd.DataFrame:
         df["competition"] = df["raw_competition_name"]
 
     if "raw_competition_name" in df.columns:
-        df = normalize_competitions(df, name_col="raw_competition_name", date_col="date")
+        df = normalize_competitions(df, name_col="raw_competition_name", date_col="date", season_windows=season_windows)
 
     if "raw_competition_name" in df.columns and "grouped_competition_name" not in df.columns:
         # Failsafe for any unexpected input shape.
@@ -568,11 +568,13 @@ def _normalize_timeline(df: pd.DataFrame) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) -> dict[str, pd.DataFrame]:
-    player_matches = _derive_core(_read_flexible_csv(FILES["player_matches"]), dataset_name="player_matches")
-    tactics = _derive_core(_read_flexible_csv(FILES["tactics"]), dataset_name="tactics")
-    achievements = _derive_core(_read_flexible_csv(FILES["achievements"]), dataset_name="achievements")
-    players = _derive_core(_read_players_csv_safe(FILES["players"]), dataset_name="players")
     medisports_timeline = _normalize_timeline(_read_timeline_csv(FILES["medisports_timeline"]))
+    season_windows = build_timeline_season_windows(medisports_timeline)
+
+    player_matches = _derive_core(_read_flexible_csv(FILES["player_matches"]), dataset_name="player_matches", season_windows=season_windows)
+    tactics = _derive_core(_read_flexible_csv(FILES["tactics"]), dataset_name="tactics", season_windows=season_windows)
+    achievements = _derive_core(_read_flexible_csv(FILES["achievements"]), dataset_name="achievements", season_windows=season_windows)
+    players = _derive_core(_read_players_csv_safe(FILES["players"]), dataset_name="players", season_windows=season_windows)
 
     if "" in tactics.columns and "tier" not in tactics.columns:
         tactics = tactics.rename(columns={"": "tier"})
@@ -605,6 +607,7 @@ def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) ->
         "achievements": achievements,
         "players": players,
         "medisports_timeline": medisports_timeline,
+        "season_windows": season_windows,
     }
 
 
