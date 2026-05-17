@@ -463,29 +463,114 @@ def render_player_card_grid(payloads: list[dict]) -> None:
                 player_card(payload)
 
 
+def _numeric_series(group: pd.DataFrame, col: str) -> pd.Series:
+    if col not in group.columns:
+        return pd.Series(pd.NA, index=group.index, dtype="Float64")
+    return pd.to_numeric(group[col], errors="coerce")
+
+
+def _sum_if_present(group: pd.DataFrame, col: str) -> float:
+    values = _numeric_series(group, col).dropna()
+    return float(values.sum()) if not values.empty else math.nan
+
+
+def _win_pct_from_sums(wins, losses) -> float | None:
+    if wins is None or losses is None or pd.isna(wins) or pd.isna(losses):
+        return None
+    denominator = float(wins) + float(losses)
+    if denominator <= 0:
+        return None
+    return float(wins) / denominator * 100
+
+
 def _weighted_pct_from_rows(group: pd.DataFrame) -> float | None:
-    wins = pd.to_numeric(group.get("wins"), errors="coerce") if "wins" in group.columns else pd.Series(dtype=float)
-    losses = pd.to_numeric(group.get("losses"), errors="coerce") if "losses" in group.columns else pd.Series(dtype=float)
-    if not wins.dropna().empty or not losses.dropna().empty:
-        wins_sum = float(wins.fillna(0).sum())
-        losses_sum = float(losses.fillna(0).sum())
-        denom = wins_sum + losses_sum
-        if denom > 0:
-            return wins_sum / denom * 100
+    """Prefer summed wins/losses; only fall back to weighted row win-rate when counts are unavailable."""
+    wins = _numeric_series(group, "wins")
+    losses = _numeric_series(group, "losses")
+    if wins.notna().any() or losses.notna().any():
+        pct = _win_pct_from_sums(wins.fillna(0).sum(), losses.fillna(0).sum())
+        if pct is not None:
+            return pct
     if {"win_rate_pct", "total_rounds"}.issubset(group.columns):
         rates = pd.to_numeric(group["win_rate_pct"], errors="coerce")
         weights = pd.to_numeric(group["total_rounds"], errors="coerce")
         valid = rates.notna() & weights.notna() & (weights > 0)
         if valid.any():
             return float((rates[valid] * weights[valid]).sum() / weights[valid].sum())
-    if "win_rate_pct" in group.columns:
-        rates = pd.to_numeric(group["win_rate_pct"], errors="coerce").dropna()
-        if not rates.empty:
-            return float(rates.mean())
     return None
 
 
-def aggregate_top_tactics_by_map(tactics: pd.DataFrame, min_rounds: int = 1, top_n: int = TACTIC_TOP_N) -> pd.DataFrame:
+def _normalize_tier_value(value) -> str:
+    text = str(value or "").strip()
+    if not text or text.casefold() in {"nan", "none", "null", "<na>", "unknown"}:
+        return "Unknown"
+    key = re.sub(r"[^a-z0-9]+", "", text.casefold())
+    if key.startswith("stier") or key == "s":
+        return "S"
+    if key.startswith("atier") or key == "a":
+        return "A"
+    if key.startswith("btier") or key == "b":
+        return "B"
+    if key.startswith("ctier") or key == "c":
+        return "C"
+    return "Unknown"
+
+
+def _tier_series(group: pd.DataFrame) -> pd.Series:
+    tier_col = _first_existing_col(group, ("tier", "Tier"))
+    if not tier_col:
+        return pd.Series("Unknown", index=group.index, dtype="object")
+    return group[tier_col].map(_normalize_tier_value).astype("object")
+
+
+def _tier_round_counts(group: pd.DataFrame, tiers: pd.Series) -> dict[str, float]:
+    working = pd.DataFrame({"tier": tiers})
+    if "total_rounds" in group.columns:
+        rounds = pd.to_numeric(group["total_rounds"], errors="coerce")
+        if rounds.notna().any():
+            working["usage"] = rounds.fillna(0)
+            return {str(k): float(v) for k, v in working.groupby("tier", dropna=False)["usage"].sum().items() if float(v) > 0}
+    working["usage"] = 1
+    return {str(k): float(v) for k, v in working.groupby("tier", dropna=False)["usage"].sum().items() if float(v) > 0}
+
+
+def _tier_spread_label(counts: dict[str, float]) -> str:
+    parts = []
+    for tier in ["S", "A", "B", "C", "Unknown"]:
+        value = counts.get(tier)
+        if value is not None and value > 0:
+            suffix = "r" if float(value).is_integer() else "r"
+            parts.append(f"{tier}: {_fmt_int(value)}{suffix}")
+    return " · ".join(parts) if parts else NOT_AVAILABLE
+
+
+def _tier_win_rates(group: pd.DataFrame, tiers: pd.Series) -> dict[str, float | None]:
+    rates: dict[str, float | None] = {tier: None for tier in ["S", "A", "B", "C"]}
+    if not ({"wins", "losses"}.issubset(group.columns)):
+        return rates
+    working = group.copy()
+    working["_tier_norm"] = tiers
+    working["wins"] = pd.to_numeric(working["wins"], errors="coerce")
+    working["losses"] = pd.to_numeric(working["losses"], errors="coerce")
+    for tier, tier_rows in working.groupby("_tier_norm", dropna=False):
+        tier_key = str(tier)
+        if tier_key not in rates:
+            continue
+        if not (tier_rows["wins"].notna().any() or tier_rows["losses"].notna().any()):
+            continue
+        rates[tier_key] = _win_pct_from_sums(tier_rows["wins"].fillna(0).sum(), tier_rows["losses"].fillna(0).sum())
+    return rates
+
+
+def _tier_extreme_label(rates: dict[str, float | None], best: bool = True) -> str:
+    valid = [(tier, rate) for tier, rate in rates.items() if rate is not None and pd.notna(rate)]
+    if not valid:
+        return NOT_AVAILABLE
+    tier, rate = sorted(valid, key=lambda item: (item[1], item[0]), reverse=best)[0]
+    return f"{tier} ({rate:.1f}%)"
+
+
+def aggregate_top_tactics_by_map(tactics: pd.DataFrame, min_rounds: int = 1, top_n: int | None = TACTIC_TOP_N) -> pd.DataFrame:
     if tactics.empty or "tactic_name" not in tactics.columns:
         return pd.DataFrame()
     working = tactics.copy()
@@ -500,52 +585,79 @@ def aggregate_top_tactics_by_map(tactics: pd.DataFrame, min_rounds: int = 1, top
     for col in ["wins", "losses", "total_rounds", "win_rate_pct"]:
         if col in working.columns:
             working[col] = pd.to_numeric(working[col], errors="coerce")
-    tier_col = _first_existing_col(working, ("tier", "Tier"))
 
     rows = []
     group_cols = ["resolved_season", "map", "side", "tactic_name"]
     for (season, map_name, side, tactic_name), group in working.groupby(group_cols, dropna=False):
         row_count = int(len(group))
-        round_values = pd.to_numeric(group["total_rounds"], errors="coerce") if "total_rounds" in group.columns else pd.Series(dtype=float)
-        usage_rounds = float(round_values.sum()) if not round_values.dropna().empty else float(row_count)
-        matches_used = int(group["match_id"].nunique()) if "match_id" in group.columns else row_count
-        wins = float(group["wins"].sum()) if "wins" in group.columns and group["wins"].notna().any() else math.nan
-        losses = float(group["losses"].sum()) if "losses" in group.columns and group["losses"].notna().any() else math.nan
+        round_values = _numeric_series(group, "total_rounds")
+        has_rounds = round_values.notna().any()
+        total_rounds = float(round_values.sum()) if has_rounds else float(row_count)
+        total_matches = int(group["match_id"].nunique()) if "match_id" in group.columns else row_count
+        wins = _sum_if_present(group, "wins")
+        losses = _sum_if_present(group, "losses")
+        total_win_pct = _win_pct_from_sums(wins, losses)
+        if total_win_pct is None:
+            total_win_pct = _weighted_pct_from_rows(group)
+
+        tiers = _tier_series(group)
+        tier_counts = _tier_round_counts(group, tiers)
+        tier_rates = _tier_win_rates(group, tiers)
+        last_used_sort = pd.NaT
         last_used = NOT_AVAILABLE
         if "date" in group.columns:
-            max_date = pd.to_datetime(group["date"], errors="coerce").max()
-            if pd.notna(max_date):
-                last_used = max_date.strftime("%Y-%m-%d")
-        rows.append(
+            last_used_sort = pd.to_datetime(group["date"], errors="coerce").max()
+            if pd.notna(last_used_sort):
+                last_used = last_used_sort.strftime("%Y-%m-%d")
+        avg_rounds = total_rounds / total_matches if total_matches else math.nan
+        row = {
+            "resolved_season": int(season),
+            "map": str(map_name or "Unknown Map"),
+            "side": _normalize_tactic_side(side),
+            "tactic_name": tactic_name,
+            "total_rounds": total_rounds,
+            "total_matches": total_matches,
+            "wins": wins,
+            "losses": losses,
+            "total_win_pct": total_win_pct,
+            "s_tier_win_pct": tier_rates["S"],
+            "a_tier_win_pct": tier_rates["A"],
+            "b_tier_win_pct": tier_rates["B"],
+            "c_tier_win_pct": tier_rates["C"],
+            "tier_spread": _tier_spread_label(tier_counts),
+            "last_used": last_used,
+            "last_used_sort": last_used_sort,
+            "avg_rounds_per_match": avg_rounds,
+            "best_tier": _tier_extreme_label(tier_rates, best=True),
+            "worst_tier": _tier_extreme_label(tier_rates, best=False),
+            "_usage_sort": total_rounds,
+            "_row_count": row_count,
+        }
+        # Backward-compatible labels used by summary code elsewhere on this page.
+        row.update(
             {
-                "resolved_season": int(season),
-                "Map": str(map_name or "Unknown Map"),
-                "Side": _normalize_tactic_side(side),
-                "Tactic name": tactic_name,
-                "Usage rounds": usage_rounds,
-                "Matches used": matches_used,
-                "Wins": wins,
-                "Losses": losses,
-                "Win rate %": _weighted_pct_from_rows(group),
-                "Tier spread": _value_counts_label(group, tier_col, limit=4) if tier_col else NOT_AVAILABLE,
-                "Last used date": last_used,
-                "_usage_sort": usage_rounds,
-                "_row_count": row_count,
+                "Map": row["map"],
+                "Side": row["side"],
+                "Tactic name": row["tactic_name"],
+                "Usage rounds": row["total_rounds"],
+                "Matches used": row["total_matches"],
+                "Wins": row["wins"],
+                "Losses": row["losses"],
+                "Win rate %": row["total_win_pct"],
+                "Tier spread": row["tier_spread"],
+                "Last used date": row["last_used"],
             }
         )
+        rows.append(row)
+
     out = pd.DataFrame(rows)
     if out.empty:
         return out
-    out = out[out["Usage rounds"].fillna(0) >= int(min_rounds)].copy()
+    out = out[out["total_rounds"].fillna(0) >= int(min_rounds)].copy()
     if out.empty:
         return out
-    out = out.sort_values(
-        ["resolved_season", "Map", "Side", "_usage_sort", "Matches used", "Win rate %"],
-        ascending=[True, True, True, False, False, False],
-        na_position="last",
-    )
-    out["Rank"] = out.groupby(["resolved_season", "Map", "Side"], dropna=False).cumcount() + 1
-    return out[out["Rank"] <= int(top_n)].copy()
+    out = _sort_tactic_rows(out, "Usage rounds", "Descending", top_n=top_n)
+    return out
 
 
 def aggregate_top_tactics(tactics: pd.DataFrame, min_rounds: int = 1, top_n: int = TACTIC_TOP_N) -> pd.DataFrame:
@@ -666,35 +778,127 @@ def _render_season_stat_cards(summary: dict) -> None:
             stat_card(title, value, note, tone)
 
 
+TACTIC_SORT_OPTIONS = [
+    "Usage rounds",
+    "Total matches",
+    "Total win %",
+    "S-tier win %",
+    "A-tier win %",
+    "B-tier win %",
+    "C-tier win %",
+    "Tactic name",
+    "Last used",
+]
+
+TACTIC_SORT_COLUMNS = {
+    "Usage rounds": "total_rounds",
+    "Total matches": "total_matches",
+    "Total win %": "total_win_pct",
+    "S-tier win %": "s_tier_win_pct",
+    "A-tier win %": "a_tier_win_pct",
+    "B-tier win %": "b_tier_win_pct",
+    "C-tier win %": "c_tier_win_pct",
+    "Tactic name": "tactic_name",
+    "Last used": "last_used_sort",
+}
+
+
 def _fmt_win_rate(value) -> str:
     return _fmt(value, 1, "%") if value is not None and pd.notna(value) else NOT_AVAILABLE
 
 
+def _sort_tactic_rows(top_tactics: pd.DataFrame, sort_by: str, direction: str, top_n: int | None = TACTIC_TOP_N) -> pd.DataFrame:
+    if top_tactics.empty:
+        return top_tactics.copy()
+    sort_col = TACTIC_SORT_COLUMNS.get(sort_by, "total_rounds")
+    if sort_col not in top_tactics.columns:
+        sort_col = "total_rounds" if "total_rounds" in top_tactics.columns else "Usage rounds"
+    ascending = direction == "Ascending"
+    sorted_frames = []
+    group_cols = [col for col in ["resolved_season", "map", "side"] if col in top_tactics.columns]
+    if not group_cols:
+        group_cols = [col for col in ["resolved_season", "Map", "Side"] if col in top_tactics.columns]
+
+    for _, group in top_tactics.groupby(group_cols, dropna=False, sort=True) if group_cols else [(None, top_tactics)]:
+        working = group.copy()
+        if sort_col == "tactic_name":
+            working["_sort_value"] = working[sort_col].fillna("").astype(str).str.casefold()
+            working = working.sort_values(["_sort_value"], ascending=[ascending], kind="mergesort")
+        else:
+            working["_sort_value"] = pd.to_datetime(working[sort_col], errors="coerce") if sort_col == "last_used_sort" else pd.to_numeric(working[sort_col], errors="coerce")
+            # N/A values always go last, regardless of requested direction.
+            working["_sort_missing"] = working["_sort_value"].isna()
+            tie_cols = []
+            ascending_flags = [True, ascending]
+            if sort_col != "total_rounds" and "total_rounds" in working.columns:
+                tie_cols.append("total_rounds")
+                ascending_flags.append(False)
+            if sort_col != "total_matches" and "total_matches" in working.columns:
+                tie_cols.append("total_matches")
+                ascending_flags.append(False)
+            if "tactic_name" in working.columns:
+                working["_tactic_name_sort"] = working["tactic_name"].fillna("").astype(str).str.casefold()
+                tie_cols.append("_tactic_name_sort")
+                ascending_flags.append(True)
+            working = working.sort_values(["_sort_missing", "_sort_value", *tie_cols], ascending=ascending_flags, kind="mergesort")
+        if top_n is not None:
+            working = working.head(int(top_n)).copy()
+        working["Rank"] = range(1, len(working) + 1)
+        sorted_frames.append(working.drop(columns=[c for c in ["_sort_value", "_sort_missing", "_tactic_name_sort"] if c in working.columns]))
+    if not sorted_frames:
+        return top_tactics.iloc[0:0].copy()
+    return pd.concat(sorted_frames, ignore_index=True)
+
+
 def _format_tactics_display_df(rows: pd.DataFrame) -> pd.DataFrame:
     """Return tactic rows with only Streamlit-facing columns and safe display names."""
+    rename_map = {
+        "tactic_name": "Tactic",
+        "total_rounds": "Total rounds",
+        "total_matches": "Total matches",
+        "wins": "Wins",
+        "losses": "Losses",
+        "total_win_pct": "Total win %",
+        "s_tier_win_pct": "S-tier win %",
+        "a_tier_win_pct": "A-tier win %",
+        "b_tier_win_pct": "B-tier win %",
+        "c_tier_win_pct": "C-tier win %",
+        "tier_spread": "Tier spread",
+        "last_used": "Last used",
+        "avg_rounds_per_match": "Avg rounds per match",
+        "best_tier": "Best tier",
+        "worst_tier": "Worst tier",
+    }
     visible_columns = [
         "Rank",
-        "Tactic name",
-        "Usage rounds",
-        "Matches used",
-        "Wins",
-        "Losses",
-        "Win rate %",
-        "Tier spread",
-        "Last used date",
+        "tactic_name",
+        "total_rounds",
+        "total_matches",
+        "wins",
+        "losses",
+        "total_win_pct",
+        "s_tier_win_pct",
+        "a_tier_win_pct",
+        "b_tier_win_pct",
+        "c_tier_win_pct",
+        "tier_spread",
+        "last_used",
+        "avg_rounds_per_match",
+        "best_tier",
+        "worst_tier",
     ]
-    display = rows.loc[:, [col for col in visible_columns if col in rows.columns]].copy()
-    display = display.rename(columns={"Tactic name": "Tactic", "Last used date": "Last used"})
+    display = rows.loc[:, [col for col in visible_columns if col in rows.columns]].copy().rename(columns=rename_map)
 
-    for col in ("Rank", "Usage rounds", "Matches used", "Wins", "Losses"):
+    for col in ("Rank", "Total rounds", "Total matches", "Wins", "Losses"):
         if col in display.columns:
             display[col] = pd.to_numeric(display[col], errors="coerce")
-    if "Win rate %" in display.columns:
-        display["Win rate %"] = pd.to_numeric(display["Win rate %"], errors="coerce")
+    for col in ("Total win %", "S-tier win %", "A-tier win %", "B-tier win %", "C-tier win %", "Avg rounds per match"):
+        if col in display.columns:
+            display[col] = pd.to_numeric(display[col], errors="coerce")
     if "Last used" in display.columns:
         dates = pd.to_datetime(display["Last used"], errors="coerce")
         display["Last used"] = dates.dt.strftime("%Y-%m-%d").fillna(NOT_AVAILABLE)
-    for col in ("Tactic", "Tier spread"):
+    for col in ("Tactic", "Tier spread", "Best tier", "Worst tier"):
         if col in display.columns:
             display[col] = display[col].fillna(NOT_AVAILABLE).astype(str)
     return display
@@ -702,40 +906,64 @@ def _format_tactics_display_df(rows: pd.DataFrame) -> pd.DataFrame:
 
 def _win_rate_cell_style(value) -> str:
     if value is None or pd.isna(value):
-        return ""
+        return "background-color: rgba(100, 116, 139, 0.22); color: #cbd5e1;"
     rate = float(value)
     if rate >= 75:
-        return "background-color: rgba(34, 197, 94, 0.32); color: #dcfce7; font-weight: 700;"
-    if rate >= 55:
-        return "background-color: rgba(59, 130, 246, 0.22); color: #dbeafe; font-weight: 600;"
-    if rate >= 45:
-        return "background-color: rgba(148, 163, 184, 0.16); color: #e5e7eb;"
-    return "background-color: rgba(239, 68, 68, 0.22); color: #fee2e2; font-weight: 600;"
+        return "background-color: rgba(22, 101, 52, 0.70); color: #dcfce7; font-weight: 700;"
+    if rate >= 60:
+        return "background-color: rgba(21, 128, 61, 0.45); color: #dcfce7; font-weight: 650;"
+    if rate >= 50:
+        return "background-color: rgba(51, 65, 85, 0.72); color: #e2e8f0; font-weight: 600;"
+    if rate >= 40:
+        return "background-color: rgba(146, 64, 14, 0.55); color: #ffedd5; font-weight: 600;"
+    return "background-color: rgba(127, 29, 29, 0.62); color: #fee2e2; font-weight: 700;"
+
+
+def _prominent_cell_style(value) -> str:
+    return "font-weight: 700; color: #f8fafc;"
+
+
+def _rank_cell_style(value) -> str:
+    return "font-weight: 700; color: #e2e8f0;"
 
 
 def _style_tactics_df(display_df: pd.DataFrame):
     """Style tactics rows for st.dataframe while supporting multiple pandas versions."""
-    int_cols = [col for col in ("Rank", "Usage rounds", "Matches used", "Wins", "Losses") if col in display_df.columns]
+    int_cols = [col for col in ("Rank", "Total rounds", "Total matches", "Wins", "Losses") if col in display_df.columns]
+    pct_cols = [col for col in ("Total win %", "S-tier win %", "A-tier win %", "B-tier win %", "C-tier win %") if col in display_df.columns]
     formatters = {col: "{:.0f}" for col in int_cols}
-    if "Win rate %" in display_df.columns:
-        formatters["Win rate %"] = "{:.1f}%"
+    formatters.update({col: "{:.1f}%" for col in pct_cols})
+    if "Avg rounds per match" in display_df.columns:
+        formatters["Avg rounds per match"] = "{:.1f}"
 
     styled = display_df.style.format(formatters, na_rep=NOT_AVAILABLE)
-    if "Win rate %" in display_df.columns:
+    if pct_cols:
         if hasattr(styled, "map"):
-            styled = styled.map(_win_rate_cell_style, subset=["Win rate %"])
+            styled = styled.map(_win_rate_cell_style, subset=pct_cols)
         else:
-            styled = styled.applymap(_win_rate_cell_style, subset=["Win rate %"])
+            styled = styled.applymap(_win_rate_cell_style, subset=pct_cols)
+    if "Rank" in display_df.columns:
+        if hasattr(styled, "map"):
+            styled = styled.map(_rank_cell_style, subset=["Rank"])
+        else:
+            styled = styled.applymap(_rank_cell_style, subset=["Rank"])
+    if "Tactic" in display_df.columns:
+        if hasattr(styled, "map"):
+            styled = styled.map(_prominent_cell_style, subset=["Tactic"])
+        else:
+            styled = styled.applymap(_prominent_cell_style, subset=["Tactic"])
     return styled
 
 
 def _side_summary(side_df: pd.DataFrame) -> dict:
-    usage = pd.to_numeric(side_df.get("Usage rounds", pd.Series(dtype=float)), errors="coerce").fillna(0)
-    rates = pd.to_numeric(side_df.get("Win rate %", pd.Series(dtype=float)), errors="coerce").dropna()
-    tactic_col = "Tactic name" if "Tactic name" in side_df.columns else "Tactic"
+    usage_col = "total_rounds" if "total_rounds" in side_df.columns else "Usage rounds"
+    win_col = "total_win_pct" if "total_win_pct" in side_df.columns else "Win rate %"
+    usage = pd.to_numeric(side_df.get(usage_col, pd.Series(dtype=float)), errors="coerce").fillna(0)
+    rates = pd.to_numeric(side_df.get(win_col, pd.Series(dtype=float)), errors="coerce").dropna()
+    tactic_col = "tactic_name" if "tactic_name" in side_df.columns else "Tactic name" if "Tactic name" in side_df.columns else "Tactic"
     most_used_tactic = NOT_AVAILABLE
     if tactic_col in side_df.columns and not side_df.empty:
-        sort_cols = [col for col in ("Usage rounds", "Matches used", "Win rate %") if col in side_df.columns]
+        sort_cols = [col for col in (usage_col, "total_matches", win_col) if col in side_df.columns]
         sorted_rows = side_df.sort_values(sort_cols, ascending=[False] * len(sort_cols), na_position="last") if sort_cols else side_df
         most_used_tactic = _first_text(sorted_rows[tactic_col])
     return {
@@ -760,15 +988,8 @@ def _render_side_tactics(side_name: str, side_df: pd.DataFrame) -> None:
     heading = {"Red": "🔴 Red side", "Blue": "🔵 Blue side"}.get(side_name, str(side_name or "Unknown side"))
     st.markdown(f"#### {heading}")
 
-    summary = _side_summary(side_df)
-    metric_cols = st.columns([1, 1, 1, 2], gap="small")
-    metric_cols[0].metric("Tactics shown", _fmt_int(summary["tactics_shown"]))
-    metric_cols[1].metric("Usage rounds", _fmt_int(summary["usage_rounds"]))
-    metric_cols[2].metric("Best win rate", _fmt_win_rate(summary["best_win_rate"]))
-    metric_cols[3].metric("Most used tactic", summary["most_used_tactic"])
-
     display_df = _format_tactics_display_df(side_df)
-    table_height = min(420, 38 + (len(display_df) + 1) * 35)
+    table_height = min(520, 38 + (len(display_df) + 1) * 35)
     st.dataframe(
         _style_tactics_df(display_df),
         use_container_width=True,
@@ -783,61 +1004,64 @@ def _side_sort_key(side: str) -> tuple[int, str]:
     return (order.get(label, 3), label)
 
 
-def _render_tactics_by_map(top_tactics: pd.DataFrame, season: int, min_rounds: int) -> None:
+def _render_tactics_by_map(top_tactics: pd.DataFrame, season: int, min_rounds: int, sort_by: str, sort_direction: str, tactics_per_side: int) -> None:
     if top_tactics.empty or "resolved_season" not in top_tactics.columns:
         season_tactics = pd.DataFrame()
     else:
         season_tactics = top_tactics[top_tactics["resolved_season"] == int(season)].copy()
 
-    if not season_tactics.empty and "Usage rounds" in season_tactics.columns:
-        usage_rounds = pd.to_numeric(season_tactics["Usage rounds"], errors="coerce").fillna(0)
+    if not season_tactics.empty and "total_rounds" in season_tactics.columns:
+        usage_rounds = pd.to_numeric(season_tactics["total_rounds"], errors="coerce").fillna(0)
         season_tactics = season_tactics[usage_rounds >= int(min_rounds)].copy()
 
     if season_tactics.empty:
         st.info("No official tactics rows meet the selected usage threshold for this season.")
         return
 
-    sort_columns = [col for col in ("Map", "Side", "Rank") if col in season_tactics.columns]
+    season_tactics = _sort_tactic_rows(season_tactics, sort_by, sort_direction, top_n=tactics_per_side)
+    map_col = "map" if "map" in season_tactics.columns else "Map"
+    side_col = "side" if "side" in season_tactics.columns else "Side"
+    sort_columns = [col for col in (map_col, side_col, "Rank") if col in season_tactics.columns]
     if sort_columns:
         season_tactics = season_tactics.sort_values(sort_columns)
 
-    for map_name, map_rows in season_tactics.groupby("Map", dropna=False):
+    for map_name, map_rows in season_tactics.groupby(map_col, dropna=False):
         if map_rows.empty:
+            continue
+
+        red_rows = map_rows[map_rows[side_col] == "Red"] if side_col in map_rows.columns else pd.DataFrame()
+        blue_rows = map_rows[map_rows[side_col] == "Blue"] if side_col in map_rows.columns else pd.DataFrame()
+        unknown_rows = map_rows[map_rows[side_col] == "Unknown side"] if side_col in map_rows.columns else pd.DataFrame()
+        if red_rows.empty and blue_rows.empty and unknown_rows.empty:
             continue
 
         st.markdown(f"### {map_name}")
         with _streamlit_container(border=True):
-            usage_values = pd.to_numeric(
-                map_rows.get("Usage rounds", pd.Series(dtype=float)),
-                errors="coerce",
-            )
+            usage_values = pd.to_numeric(map_rows.get("total_rounds", pd.Series(dtype=float)), errors="coerce")
             usage_total = usage_values.fillna(0).sum()
-            red_rows = map_rows[map_rows["Side"] == "Red"] if "Side" in map_rows.columns else pd.DataFrame()
-            blue_rows = map_rows[map_rows["Side"] == "Blue"] if "Side" in map_rows.columns else pd.DataFrame()
-            unknown_rows = map_rows[map_rows["Side"] == "Unknown side"] if "Side" in map_rows.columns else pd.DataFrame()
             red_summary = _side_summary(red_rows)
             blue_summary = _side_summary(blue_rows)
+            best_rate_values = pd.to_numeric(map_rows.get("total_win_pct", pd.Series(dtype=float)), errors="coerce").dropna()
+            best_total_win = None if best_rate_values.empty else float(best_rate_values.max())
 
-            summary_cols = st.columns(5, gap="small")
+            summary_cols = st.columns(4, gap="small")
             summary_cols[0].metric("Red tactics shown", _fmt_int(red_summary["tactics_shown"]))
             summary_cols[1].metric("Blue tactics shown", _fmt_int(blue_summary["tactics_shown"]))
-            summary_cols[2].metric("Total usage rounds", _fmt_int(usage_total))
-            summary_cols[3].metric("Best Red win rate", _fmt_win_rate(red_summary["best_win_rate"]))
-            summary_cols[4].metric("Best Blue win rate", _fmt_win_rate(blue_summary["best_win_rate"]))
+            summary_cols[2].metric("Total rounds", _fmt_int(usage_total))
+            summary_cols[3].metric("Best total win %", _fmt_win_rate(best_total_win))
             if not unknown_rows.empty:
                 st.caption(f"Unknown side tactics shown: {_fmt_int(len(unknown_rows))}")
 
-            side_labels = sorted(map_rows["Side"].dropna().unique().tolist(), key=_side_sort_key)
+            side_labels = sorted(map_rows[side_col].dropna().unique().tolist(), key=_side_sort_key)
             for side in side_labels:
-                side_sort_col = "Rank" if "Rank" in map_rows.columns else "Usage rounds"
-                side_rows = map_rows[map_rows["Side"] == side].sort_values(side_sort_col)
+                side_rows = map_rows[map_rows[side_col] == side].sort_values("Rank")
                 if side_rows.empty:
                     continue
-                _render_side_tactics(side, side_rows.head(TACTIC_TOP_N))
+                _render_side_tactics(side, side_rows)
 
 
 def _render_tactics_table(top_tactics: pd.DataFrame, season: int) -> None:
-    _render_tactics_by_map(top_tactics, season, min_rounds=1)
+    _render_tactics_by_map(top_tactics, season, min_rounds=1, sort_by="Usage rounds", sort_direction="Descending", tactics_per_side=TACTIC_TOP_N)
 
 
 def render(data: dict):
@@ -892,6 +1116,14 @@ def render(data: dict):
             show_tactics = st.toggle("Show tactics tables", value=True, key="season_preview_show_tactics")
         with c6:
             show_players = st.toggle("Show detailed player cards", value=True, key="season_preview_show_players")
+        st.caption("Tactics table controls apply to every season/map/side table below.")
+        c7, c8, c9 = st.columns([1.5, 1.1, 1.4], gap="small")
+        with c7:
+            tactic_sort_by = st.selectbox("Sort tactics by", options=TACTIC_SORT_OPTIONS, index=0, key="season_preview_tactic_sort_by")
+        with c8:
+            tactic_sort_direction = st.selectbox("Tactic sort direction", options=["Descending", "Ascending"], index=0, key="season_preview_tactic_sort_direction")
+        with c9:
+            tactics_per_side = st.slider("Tactics shown per side", min_value=3, max_value=15, value=TACTIC_TOP_N, step=1, key="season_preview_tactics_per_side")
 
     selected_seasons = [int(s) for s in selected_seasons]
     if not selected_seasons:
@@ -907,7 +1139,7 @@ def render(data: dict):
         st.dataframe(comparison, use_container_width=True, hide_index=True)
 
     section_header("Season rows", "Each section uses official player match rows and official tactics rows only.")
-    top_tactics = aggregate_top_tactics_by_map(_filter_seasons(tactics, selected_seasons), min_rounds=tactic_min_rounds, top_n=TACTIC_TOP_N)
+    top_tactics = aggregate_top_tactics_by_map(_filter_seasons(tactics, selected_seasons), min_rounds=tactic_min_rounds, top_n=None)
     for season in selected_seasons:
         season_df = _filter_season(roster_matches, season)
         season_tactics = _filter_season(tactics, season)
@@ -919,5 +1151,5 @@ def render(data: dict):
                 payloads = build_player_card_payloads(season_df, season_tactics, players, achievements_df, min_player_matches, season)
                 render_player_card_grid(payloads)
             if show_tactics:
-                section_header("Most-used tactics by map and side", f"Top {TACTIC_TOP_N} per side. Red and Blue are ranked separately by usage rounds, matches used, and win rate.")
-                _render_tactics_by_map(top_tactics, season, tactic_min_rounds)
+                section_header("Most-used tactics by map and side", f"Top {tactics_per_side} per side. Red and Blue are ranked separately within each map using the selected sorting controls.")
+                _render_tactics_by_map(top_tactics, season, tactic_min_rounds, tactic_sort_by, tactic_sort_direction, tactics_per_side)
