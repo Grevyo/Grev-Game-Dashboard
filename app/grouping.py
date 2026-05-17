@@ -7,12 +7,13 @@ import pandas as pd
 _SUPERSCRIPT_DIGITS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
 
 SEASON_TOKEN_RE = re.compile(r"(?i)(?:\bseason\s*(\d+)\b|\bs\s*(\d+)(?:\.(\d+))?\b)")
-HARDCODED_SEASON_WINDOWS: tuple[tuple[pd.Timestamp, pd.Timestamp, int], ...] = (
-    (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-02-02"), 8),
-    (pd.Timestamp("2026-02-03"), pd.Timestamp("2026-03-03"), 9),
-    (pd.Timestamp("2026-03-04"), pd.Timestamp("2026-04-12"), 10),
-    (pd.Timestamp("2026-04-13"), pd.Timestamp("2026-12-31"), 11),
+FALLBACK_SEASON_WINDOWS: tuple[tuple[pd.Timestamp, pd.Timestamp | None, int], ...] = (
+    (pd.Timestamp("2025-12-29"), pd.Timestamp("2026-02-01"), 8),
+    (pd.Timestamp("2026-02-02"), pd.Timestamp("2026-03-08"), 9),
+    (pd.Timestamp("2026-03-09"), pd.Timestamp("2026-04-12"), 10),
+    (pd.Timestamp("2026-04-13"), None, 11),
 )
+SEASON_WINDOW_COLUMNS = ["season", "start_date", "end_date"]
 
 
 @dataclass
@@ -84,8 +85,73 @@ def parse_competition_details(name: str) -> CompetitionParseResult:
     return CompetitionParseResult(raw, None, raw, season, instance, False, False)
 
 
-def resolve_season_from_date(row_date: pd.Timestamp | None) -> int | None:
-    """Authoritative row-level season resolver using fixed inclusive date windows."""
+def _empty_season_windows() -> pd.DataFrame:
+    return pd.DataFrame(columns=SEASON_WINDOW_COLUMNS)
+
+
+def _coerce_season_windows(season_windows: pd.DataFrame | None) -> pd.DataFrame:
+    if season_windows is None or season_windows.empty:
+        return _empty_season_windows()
+    required = set(SEASON_WINDOW_COLUMNS)
+    if not required.issubset(season_windows.columns):
+        return _empty_season_windows()
+
+    windows = season_windows[SEASON_WINDOW_COLUMNS].copy()
+    windows["season"] = pd.to_numeric(windows["season"], errors="coerce").astype("Int64")
+    windows["start_date"] = pd.to_datetime(windows["start_date"], errors="coerce").dt.normalize()
+    windows["end_date"] = pd.to_datetime(windows["end_date"], errors="coerce").dt.normalize()
+    windows = windows.dropna(subset=["season", "start_date"]).sort_values("start_date").reset_index(drop=True)
+    return windows
+
+
+def fallback_season_windows() -> pd.DataFrame:
+    """Corrected safe fallback used only when timeline season starts are unavailable."""
+    return pd.DataFrame(
+        [
+            {"season": season, "start_date": start_date, "end_date": end_date}
+            for start_date, end_date, season in FALLBACK_SEASON_WINDOWS
+        ],
+        columns=SEASON_WINDOW_COLUMNS,
+    )
+
+
+def build_timeline_season_windows(timeline_df: pd.DataFrame) -> pd.DataFrame:
+    """Build inclusive season windows from timeline ``season_start`` rows.
+
+    The timeline is authoritative: each ``season_start`` row supplies the
+    inclusive start date for that season, and each season ends the day before
+    the next known season start. The final known season is left open-ended.
+    """
+    if timeline_df is None or timeline_df.empty:
+        return _empty_season_windows()
+    required = {"event_type", "season", "date"}
+    if not required.issubset(timeline_df.columns):
+        return _empty_season_windows()
+
+    starts = timeline_df.copy()
+    starts = starts[starts["event_type"].astype("string").str.strip().str.casefold().eq("season_start")].copy()
+    if starts.empty:
+        return _empty_season_windows()
+
+    starts["season"] = pd.to_numeric(starts["season"], errors="coerce").astype("Int64")
+    starts["start_date"] = pd.to_datetime(starts["date"], errors="coerce").dt.normalize()
+    starts = starts.dropna(subset=["season", "start_date"])
+    if starts.empty:
+        return _empty_season_windows()
+
+    windows = (
+        starts.groupby("season", as_index=False)["start_date"]
+        .min()
+        .sort_values("start_date")
+        .reset_index(drop=True)
+    )
+    next_start = windows["start_date"].shift(-1)
+    windows["end_date"] = next_start - pd.Timedelta(days=1)
+    return windows[SEASON_WINDOW_COLUMNS].copy()
+
+
+def resolve_season_from_date(row_date: pd.Timestamp | None, season_windows: pd.DataFrame | None = None) -> int | None:
+    """Resolve row-level season from inclusive timeline windows with corrected fallback."""
     if pd.isna(row_date):
         return None
     normalized = pd.to_datetime(row_date, errors="coerce")
@@ -93,9 +159,15 @@ def resolve_season_from_date(row_date: pd.Timestamp | None) -> int | None:
         return None
 
     ts = pd.Timestamp(normalized).normalize()
-    for start_date, end_date, season in HARDCODED_SEASON_WINDOWS:
-        if start_date <= ts <= end_date:
-            return season
+    windows = _coerce_season_windows(season_windows)
+    if windows.empty:
+        windows = fallback_season_windows()
+
+    for _, window in windows.iterrows():
+        start_date = window["start_date"]
+        end_date = window["end_date"]
+        if start_date <= ts and (pd.isna(end_date) or ts <= end_date):
+            return int(window["season"])
     return None
 
 
@@ -250,7 +322,12 @@ def resolve_row_season(
     )
 
 
-def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_name", date_col: str = "date") -> pd.DataFrame:
+def normalize_competitions(
+    df: pd.DataFrame,
+    name_col: str = "raw_competition_name",
+    date_col: str = "date",
+    season_windows: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     if df.empty or name_col not in df.columns:
         return df
 
@@ -270,9 +347,13 @@ def normalize_competitions(df: pd.DataFrame, name_col: str = "raw_competition_na
     resolve_strategies: list[str] = []
     for _, row in out.iterrows():
         date_value = row.get("date_for_season_inference")
-        season_from_date = resolve_season_from_date(date_value)
+        season_from_date = resolve_season_from_date(date_value, season_windows=season_windows)
         resolved_seasons.append(season_from_date)
-        resolve_strategies.append("hardcoded_date_window" if season_from_date is not None else "unresolved_no_valid_date")
+        if season_from_date is not None:
+            method = "timeline_season_window" if season_windows is not None and not season_windows.empty else "fallback_season_window"
+        else:
+            method = "unresolved_no_valid_date"
+        resolve_strategies.append(method)
 
     final_season = pd.Series(resolved_seasons, index=out.index, dtype="object")
 

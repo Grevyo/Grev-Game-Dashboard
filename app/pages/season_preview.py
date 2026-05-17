@@ -119,6 +119,27 @@ def _date_range(df: pd.DataFrame) -> str:
     return f"{dates.min().strftime('%Y-%m-%d')} → {dates.max().strftime('%Y-%m-%d')}"
 
 
+def _season_window_range(season_windows: pd.DataFrame | None, season: int) -> str:
+    if season_windows is None or season_windows.empty:
+        return NOT_AVAILABLE
+    required = {"season", "start_date", "end_date"}
+    if not required.issubset(season_windows.columns):
+        return NOT_AVAILABLE
+    windows = season_windows.copy()
+    windows["season"] = pd.to_numeric(windows["season"], errors="coerce").astype("Int64")
+    rows = windows[windows["season"] == int(season)]
+    if rows.empty:
+        return NOT_AVAILABLE
+    row = rows.iloc[0]
+    start = pd.to_datetime(row.get("start_date"), errors="coerce")
+    end = pd.to_datetime(row.get("end_date"), errors="coerce")
+    if pd.isna(start):
+        return NOT_AVAILABLE
+    if pd.isna(end):
+        return f"{start.strftime('%Y-%m-%d')} → onwards"
+    return f"{start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')}"
+
+
 def _numeric_mean(df: pd.DataFrame, col: str) -> float | None:
     if df.empty or col not in df.columns:
         return None
@@ -510,14 +531,15 @@ def aggregate_top_tactics(tactics: pd.DataFrame, min_rounds: int = 1, top_n: int
     return aggregate_top_tactics_by_map(tactics, min_rounds=min_rounds, top_n=top_n)
 
 
-def _season_team_summary(season_df: pd.DataFrame, season_tactics: pd.DataFrame, season: int) -> dict:
+def _season_team_summary(season_df: pd.DataFrame, season_tactics: pd.DataFrame, season: int, season_windows: pd.DataFrame | None = None) -> dict:
     comp_col = "grouped_competition_name" if "grouped_competition_name" in season_df.columns else "competition"
     kills = _numeric_sum(season_df, "kills")
     deaths = _numeric_sum(season_df, "deaths")
     return {
         "season": season,
         "Season": _season_label(season),
-        "Date range": _date_range(season_df),
+        "Season Window": _season_window_range(season_windows, season),
+        "Match Data Range": _date_range(season_df),
         "Matches": _match_count(season_df),
         "Unique opponents": _unique_count(season_df, "opponent_team"),
         "Competitions": _unique_count(season_df, comp_col),
@@ -538,13 +560,14 @@ def build_season_comparison(
     seasons: list[int],
     min_player_matches: int = 1,
     tactic_min_rounds: int = 1,
+    season_windows: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     top_tactics = aggregate_top_tactics(_filter_seasons(tactics, seasons), min_rounds=tactic_min_rounds, top_n=10_000)
     rows = []
     for season in seasons:
         season_df = _filter_season(roster_matches, season)
         season_tactics = _filter_season(tactics, season)
-        row = _season_team_summary(season_df, season_tactics, season)
+        row = _season_team_summary(season_df, season_tactics, season, season_windows=season_windows)
         tactic_rows = top_tactics[top_tactics["resolved_season"] == int(season)] if not top_tactics.empty else pd.DataFrame()
         if not tactic_rows.empty:
             tactic_usage = tactic_rows.groupby("Tactic name", dropna=False).agg(usage=("Usage rounds", "sum"), matches=("Matches used", "sum")).reset_index()
@@ -583,7 +606,8 @@ def build_season_comparison(
         [
             "Season",
             "Matches",
-            "Date range",
+            "Season Window",
+            "Match Data Range",
             "Avg GrevScore",
             "Avg K/D",
             "Avg Impact",
@@ -601,7 +625,8 @@ def build_season_comparison(
 
 def _render_season_stat_cards(summary: dict) -> None:
     cards = [
-        ("Date Range", summary["Date range"], "Official match dates", "mid"),
+        ("Season Window", summary["Season Window"], "Official timeline dates", "mid"),
+        ("Match Data Range", summary["Match Data Range"], "Available official match rows", "mid"),
         ("Matches Played", summary["Matches"], "Unique match IDs", "good"),
         ("Unique Opponents", summary["Unique opponents"], "Distinct opponents", "mid"),
         ("Competitions Entered", summary["Competitions"], "Grouped when available", "mid"),
@@ -729,6 +754,7 @@ def render(data: dict):
     tactics = data.get("tactics", pd.DataFrame()).copy()
     players = data.get("players", pd.DataFrame()).copy()
     achievements_df = data.get("achievements", pd.DataFrame()).copy()
+    season_windows = data.get("season_windows", pd.DataFrame()).copy()
 
     section_header(
         "Season Preview",
@@ -783,7 +809,7 @@ def render(data: dict):
     selected_seasons = sorted(selected_seasons, reverse=(sort_order == "Newest first"))
 
     section_header("All-season comparison summary", "Compact comparison across selected official seasons.")
-    comparison = build_season_comparison(roster_matches, tactics, selected_seasons, min_player_matches, tactic_min_rounds)
+    comparison = build_season_comparison(roster_matches, tactics, selected_seasons, min_player_matches, tactic_min_rounds, season_windows=season_windows)
     if comparison.empty:
         st.info("No season comparison rows are available for the current selection.")
     else:
@@ -794,7 +820,7 @@ def render(data: dict):
     for season in selected_seasons:
         season_df = _filter_season(roster_matches, season)
         season_tactics = _filter_season(tactics, season)
-        summary = _season_team_summary(season_df, season_tactics, season)
+        summary = _season_team_summary(season_df, season_tactics, season, season_windows=season_windows)
         with st.expander(_season_label(season), expanded=(int(season) == int(latest))):
             _render_season_stat_cards(summary)
             if show_players:
