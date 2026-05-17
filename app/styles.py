@@ -525,6 +525,151 @@ def inject_styles(theme_name: str = "Dark"):
       background: rgba(19,29,43,.9);
     }}
 
+
+    .season-preview-controls-head,
+    .season-preview-map-panel,
+    .season-preview-side-panel,
+    .season-preview-table-frame {{
+      border: 1px solid var(--line);
+      border-radius: var(--radius-m);
+      background:
+        linear-gradient(180deg, rgba(18,28,40,.98) 0%, rgba(13,20,29,.98) 100%);
+      box-shadow: 0 14px 26px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.045);
+    }}
+    div[data-testid="stVerticalBlock"]:has(> div .season-preview-controls-head),
+    div[data-testid="stVerticalBlock"]:has(> div .season-preview-map-panel),
+    div[data-testid="stVerticalBlock"]:has(> div .season-preview-side-panel),
+    div[data-testid="stVerticalBlock"]:has(> div .season-preview-table-frame) {{
+      border: 1px solid var(--line);
+      border-radius: var(--radius-m);
+      background:
+        linear-gradient(180deg, rgba(18,28,40,.92) 0%, rgba(11,17,25,.95) 100%);
+      box-shadow: 0 14px 26px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.035);
+      padding: .58rem;
+    }}
+    .season-preview-controls-head {{
+      padding:.62rem .72rem;
+      margin-bottom:.42rem;
+      border-top:2px solid color-mix(in srgb, var(--accent) 70%, #6d8196 30%);
+    }}
+    .season-preview-controls-title,
+    .season-preview-map-title,
+    .season-preview-side-title {{
+      margin:0;
+      color:#f6fbff;
+      font-weight:820;
+      letter-spacing:.015em;
+      line-height:1.12;
+    }}
+    .season-preview-controls-title {{
+      font-size:.88rem;
+      text-transform:uppercase;
+      letter-spacing:.13em;
+    }}
+    .season-preview-map-panel {{
+      padding:.68rem .78rem;
+      margin:.35rem 0 .45rem;
+      border-top:2px solid color-mix(in srgb, var(--accent) 72%, #546b80 28%);
+    }}
+    .season-preview-map-head,
+    .season-preview-side-head {{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }}
+    .season-preview-map-title {{ font-size:1.02rem; }}
+    .season-preview-map-meta,
+    .season-preview-side-meta {{
+      margin-top:.16rem;
+      color:var(--muted);
+      font-size:.68rem;
+      text-transform:uppercase;
+      letter-spacing:.11em;
+      font-weight:720;
+    }}
+    .season-preview-side-panel {{
+      padding:.58rem .64rem;
+      margin:.24rem 0 .32rem;
+      border-left:2px solid #607891;
+    }}
+    .season-preview-side-panel.side-red {{ border-left-color:var(--crimson); }}
+    .season-preview-side-panel.side-blue {{ border-left-color:#60a5fa; }}
+    .season-preview-side-title {{
+      font-size:.88rem;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+    }}
+    .season-preview-chip-row {{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:stretch;
+      gap:6px;
+      margin-top:.5rem;
+    }}
+    .season-preview-chip {{
+      display:inline-flex;
+      flex-direction:column;
+      justify-content:center;
+      min-width: 112px;
+      border:1px solid var(--line-soft);
+      border-radius: var(--radius-s);
+      background: linear-gradient(180deg, rgba(19,29,41,.98), rgba(13,21,31,.98));
+      padding:.38rem .48rem;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    }}
+    .season-preview-chip-label {{
+      color:#8fa3ba;
+      font-size:.56rem;
+      text-transform:uppercase;
+      letter-spacing:.13em;
+      font-weight:760;
+      line-height:1.1;
+    }}
+    .season-preview-chip-value {{
+      margin-top:.12rem;
+      color:#edf5ff;
+      font-size:.82rem;
+      line-height:1.15;
+      font-weight:800;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 260px;
+    }}
+    .season-preview-chip-good {{ border-color:color-mix(in srgb, var(--lime) 54%, #31404f 46%); }}
+    .season-preview-chip-good .season-preview-chip-value {{ color:var(--lime); }}
+    .season-preview-chip-mid {{ border-color:color-mix(in srgb, var(--gold) 54%, #31404f 46%); }}
+    .season-preview-chip-mid .season-preview-chip-value {{ color:var(--gold); }}
+    .season-preview-chip-poor {{ border-color:color-mix(in srgb, var(--ember) 54%, #31404f 46%); }}
+    .season-preview-chip-poor .season-preview-chip-value {{ color:var(--ember); }}
+    .season-preview-chip-bad {{ border-color:color-mix(in srgb, var(--crimson) 54%, #31404f 46%); }}
+    .season-preview-chip-bad .season-preview-chip-value {{ color:var(--crimson); }}
+    .season-preview-chip-muted .season-preview-chip-value {{ color:var(--muted); }}
+    .season-preview-table-frame {{
+      padding:.4rem .48rem .46rem;
+      margin:.28rem 0 .1rem;
+      border-color:rgba(75,94,113,.72);
+      background: linear-gradient(180deg, rgba(11,17,25,.98), rgba(8,13,20,.98));
+    }}
+    .season-preview-table-frame-label {{
+      color:#8fa3ba;
+      font-size:.56rem;
+      text-transform:uppercase;
+      letter-spacing:.14em;
+      font-weight:760;
+    }}
+    div[data-testid="stVerticalBlock"]:has(.season-preview-table-frame) [data-testid="stDataFrame"] {{
+      border:1px solid rgba(72,91,110,.72);
+      border-radius: var(--radius-s);
+      background: linear-gradient(180deg, rgba(12,18,27,.98), rgba(8,13,20,.98));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    }}
+    div[data-testid="stVerticalBlock"]:has(.season-preview-table-frame) [data-testid="stDataFrame"] * {{
+      font-size:.72rem;
+    }}
+
     @media (min-width: 1200px) {{
       .heatmap-stage--fullbleed {{
         width: min(99vw, 2300px);
