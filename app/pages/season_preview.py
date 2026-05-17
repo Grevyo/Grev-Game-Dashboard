@@ -17,7 +17,7 @@ from app.presentation_helpers import nationality_label
 
 
 NOT_AVAILABLE = "N/A"
-TACTIC_TOP_N = 9
+TACTIC_TOP_N = 10
 
 
 def _season_col(df: pd.DataFrame) -> str | None:
@@ -826,9 +826,9 @@ def _tone_for_win_rate(value) -> str:
 
 
 def _chip(label: str, value, tone: str = "neutral") -> str:
-    tone_class = f" season-preview-chip-{tone}" if tone and tone != "neutral" else ""
+    tone_class = f" season-preview-chip-{tone} chip-{tone}" if tone and tone != "neutral" else ""
     return (
-        f"<div class='season-preview-chip{tone_class}'>"
+        f"<div class='season-preview-chip chip{tone_class}'>"
         f"<span class='season-preview-chip-label'>{_html_escape(label)}</span>"
         f"<span class='season-preview-chip-value'>{_html_escape(value)}</span>"
         "</div>"
@@ -897,9 +897,6 @@ def _format_tactics_display_df(rows: pd.DataFrame) -> pd.DataFrame:
         "c_tier_win_pct": "C-tier win %",
         "tier_spread": "Tier spread",
         "last_used": "Last used",
-        "avg_rounds_per_match": "Avg rounds per match",
-        "best_tier": "Best tier",
-        "worst_tier": "Worst tier",
     }
     visible_columns = [
         "Rank",
@@ -915,83 +912,40 @@ def _format_tactics_display_df(rows: pd.DataFrame) -> pd.DataFrame:
         "c_tier_win_pct",
         "tier_spread",
         "last_used",
-        "avg_rounds_per_match",
-        "best_tier",
-        "worst_tier",
     ]
     display = rows.loc[:, [col for col in visible_columns if col in rows.columns]].copy().rename(columns=rename_map)
 
     for col in ("Rank", "Total rounds", "Total matches", "Wins", "Losses"):
         if col in display.columns:
             display[col] = pd.to_numeric(display[col], errors="coerce")
-    for col in ("Total win %", "S-tier win %", "A-tier win %", "B-tier win %", "C-tier win %", "Avg rounds per match"):
+    for col in ("Total win %", "S-tier win %", "A-tier win %", "B-tier win %", "C-tier win %"):
         if col in display.columns:
             display[col] = pd.to_numeric(display[col], errors="coerce")
     if "Last used" in display.columns:
         dates = pd.to_datetime(display["Last used"], errors="coerce")
         display["Last used"] = dates.dt.strftime("%Y-%m-%d").fillna(NOT_AVAILABLE)
-    for col in ("Tactic", "Tier spread", "Best tier", "Worst tier"):
+    for col in ("Tactic", "Tier spread"):
         if col in display.columns:
             display[col] = display[col].fillna(NOT_AVAILABLE).astype(str)
     return display
 
 
-def _win_rate_cell_style(value) -> str:
-    if value is None or pd.isna(value):
-        return "background-color: rgba(31, 41, 55, 0.72); color: #91a1b4;"
-    rate = float(value)
-    base = "border-left: 2px solid rgba(255,255,255,.10); font-weight: 760;"
-    if rate >= 75:
-        return f"{base} background-color: rgba(159, 232, 112, 0.18); color: #9FE870;"
-    if rate >= 60:
-        return f"{base} background-color: rgba(159, 232, 112, 0.12); color: #b9f58e;"
-    if rate >= 50:
-        return f"{base} background-color: rgba(211, 168, 92, 0.13); color: #d3a85c;"
-    if rate >= 40:
-        return f"{base} background-color: rgba(255, 159, 67, 0.14); color: #ffb26c;"
-    return f"{base} background-color: rgba(255, 77, 94, 0.16); color: #ff7f8c;"
-
-
-def _prominent_cell_style(value) -> str:
-    return "font-weight: 780; color: #f8fafc; background-color: rgba(18, 28, 40, 0.72);"
-
-
-def _rank_cell_style(value) -> str:
-    return "font-weight: 820; color: #9FE870; background-color: rgba(159, 232, 112, 0.10); text-align: center;"
-
-
-def _style_tactics_df(display_df: pd.DataFrame):
-    """Style tactics rows for st.dataframe while supporting multiple pandas versions."""
-    int_cols = [col for col in ("Rank", "Total rounds", "Total matches", "Wins", "Losses") if col in display_df.columns]
-    pct_cols = [col for col in ("Total win %", "S-tier win %", "A-tier win %", "B-tier win %", "C-tier win %") if col in display_df.columns]
-    formatters = {col: "{:.0f}" for col in int_cols}
-    formatters.update({col: "{:.1f}%" for col in pct_cols})
-    if "Avg rounds per match" in display_df.columns:
-        formatters["Avg rounds per match"] = "{:.1f}"
-
-    styled = display_df.style.format(formatters, na_rep=NOT_AVAILABLE).set_table_styles(
-        [
-            {"selector": "th", "props": [("background-color", "#121c28"), ("color", "#9fb4ca"), ("font-size", ".68rem"), ("text-transform", "uppercase"), ("letter-spacing", ".08em"), ("border-color", "#273443")]},
-            {"selector": "td", "props": [("background-color", "#0d141d"), ("color", "#dce7f3"), ("border-color", "#1f2935"), ("font-size", ".72rem"), ("padding", "4px 6px")]},
-            {"selector": "tbody tr:nth-child(even) td", "props": [("background-color", "#101925")]},
-        ]
-    )
-    if pct_cols:
-        if hasattr(styled, "map"):
-            styled = styled.map(_win_rate_cell_style, subset=pct_cols)
-        else:
-            styled = styled.applymap(_win_rate_cell_style, subset=pct_cols)
-    if "Rank" in display_df.columns:
-        if hasattr(styled, "map"):
-            styled = styled.map(_rank_cell_style, subset=["Rank"])
-        else:
-            styled = styled.applymap(_rank_cell_style, subset=["Rank"])
-    if "Tactic" in display_df.columns:
-        if hasattr(styled, "map"):
-            styled = styled.map(_prominent_cell_style, subset=["Tactic"])
-        else:
-            styled = styled.applymap(_prominent_cell_style, subset=["Tactic"])
-    return styled
+def _tactics_column_config() -> dict:
+    return {
+        "Rank": st.column_config.NumberColumn("Rank", format="%d"),
+        "Tactic": st.column_config.TextColumn("Tactic", width="large"),
+        "Total rounds": st.column_config.NumberColumn("Total rounds", format="%d"),
+        "Total matches": st.column_config.NumberColumn("Total matches", format="%d"),
+        "Wins": st.column_config.NumberColumn("Wins", format="%d"),
+        "Losses": st.column_config.NumberColumn("Losses", format="%d"),
+        "Total win %": st.column_config.ProgressColumn("Total win %", min_value=0, max_value=100, format="%.1f%%"),
+        "S-tier win %": st.column_config.ProgressColumn("S-tier win %", min_value=0, max_value=100, format="%.1f%%"),
+        "A-tier win %": st.column_config.ProgressColumn("A-tier win %", min_value=0, max_value=100, format="%.1f%%"),
+        "B-tier win %": st.column_config.ProgressColumn("B-tier win %", min_value=0, max_value=100, format="%.1f%%"),
+        "C-tier win %": st.column_config.ProgressColumn("C-tier win %", min_value=0, max_value=100, format="%.1f%%"),
+        "Tier spread": st.column_config.TextColumn("Tier spread", width="medium"),
+        "Last used": st.column_config.TextColumn("Last used", width="small"),
+    }
 
 
 def _side_summary(side_df: pd.DataFrame) -> dict:
@@ -1023,7 +977,7 @@ def _streamlit_container(border: bool = True):
         return st.container()
 
 
-def _render_side_header(side_name: str, side_df: pd.DataFrame) -> None:
+def _render_side_header(side_name: str, side_df: pd.DataFrame, tactics_per_side: int) -> None:
     summary = _side_summary(side_df)
     side_label = {"Red": "Red side", "Blue": "Blue side"}.get(side_name, str(side_name or "Unknown side"))
     side_class = "side-red" if side_name == "Red" else "side-blue" if side_name == "Blue" else "side-unknown"
@@ -1038,7 +992,7 @@ def _render_side_header(side_name: str, side_df: pd.DataFrame) -> None:
     st.markdown(
         f"<div class='season-preview-side-panel {side_class}'>"
         "<div class='season-preview-side-head'>"
-        f"<div><div class='season-preview-side-title'>{_html_escape(side_label)}</div>"
+        f"<div><div class='season-preview-side-title'>{_html_escape(side_label)} — Top {_html_escape(tactics_per_side)}</div>"
         "<div class='season-preview-side-meta'>Rank resets for this map side</div></div>"
         "</div>"
         f"{_chip_row(chips)}"
@@ -1047,27 +1001,27 @@ def _render_side_header(side_name: str, side_df: pd.DataFrame) -> None:
     )
 
 
-def _render_tactics_dataframe(side_df: pd.DataFrame) -> None:
+def _render_tactics_dataframe(side_df: pd.DataFrame, side_name: str) -> None:
     display_df = _format_tactics_display_df(side_df)
     table_height = min(520, 44 + (len(display_df) + 1) * 34)
-    st.markdown(
-        "<div class='season-preview-table-frame'><span class='season-preview-table-frame-label'>Official tactic rows · Streamlit dataframe</span></div>",
-        unsafe_allow_html=True,
-    )
+    side_class = "side-red" if side_name == "Red" else "side-blue" if side_name == "Blue" else "side-unknown"
+    st.markdown(f"<div class='table-frame season-preview-table-shell {side_class}'>", unsafe_allow_html=True)
     st.dataframe(
-        _style_tactics_df(display_df),
+        display_df,
         use_container_width=True,
         hide_index=True,
         height=table_height,
+        column_config=_tactics_column_config(),
     )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _render_side_tactics(side_name: str, side_df: pd.DataFrame) -> None:
+def _render_side_tactics(side_name: str, side_df: pd.DataFrame, tactics_per_side: int) -> None:
     if side_df.empty:
         return
     with _streamlit_container(border=False):
-        _render_side_header(side_name, side_df)
-        _render_tactics_dataframe(side_df)
+        _render_side_header(side_name, side_df, tactics_per_side)
+        _render_tactics_dataframe(side_df, side_name)
 
 
 def _side_sort_key(side: str) -> tuple[int, str]:
@@ -1141,7 +1095,7 @@ def _render_tactics_by_map(top_tactics: pd.DataFrame, season: int, min_rounds: i
                 side_rows = map_rows[map_rows[side_col] == side].sort_values("Rank")
                 if side_rows.empty:
                     continue
-                _render_side_tactics(side, side_rows)
+                _render_side_tactics(side, side_rows, tactics_per_side)
 
 
 def _render_tactics_table(top_tactics: pd.DataFrame, season: int) -> None:
