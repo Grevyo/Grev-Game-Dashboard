@@ -670,8 +670,8 @@ def _fmt_win_rate(value) -> str:
     return _fmt(value, 1, "%") if value is not None and pd.notna(value) else NOT_AVAILABLE
 
 
-def _format_tactics_table(rows: pd.DataFrame) -> pd.DataFrame:
-    """Return Streamlit-ready tactic rows with only user-facing columns."""
+def _format_tactics_display_df(rows: pd.DataFrame) -> pd.DataFrame:
+    """Return tactic rows with only Streamlit-facing columns and safe display names."""
     visible_columns = [
         "Rank",
         "Tactic name",
@@ -684,15 +684,97 @@ def _format_tactics_table(rows: pd.DataFrame) -> pd.DataFrame:
         "Last used date",
     ]
     display = rows.loc[:, [col for col in visible_columns if col in rows.columns]].copy()
+    display = display.rename(columns={"Tactic name": "Tactic", "Last used date": "Last used"})
+
     for col in ("Rank", "Usage rounds", "Matches used", "Wins", "Losses"):
         if col in display.columns:
-            display[col] = display[col].map(_fmt_int)
+            display[col] = pd.to_numeric(display[col], errors="coerce")
     if "Win rate %" in display.columns:
-        display["Win rate %"] = display["Win rate %"].map(_fmt_win_rate)
-    for col in ("Tactic name", "Tier spread", "Last used date"):
+        display["Win rate %"] = pd.to_numeric(display["Win rate %"], errors="coerce")
+    if "Last used" in display.columns:
+        dates = pd.to_datetime(display["Last used"], errors="coerce")
+        display["Last used"] = dates.dt.strftime("%Y-%m-%d").fillna(NOT_AVAILABLE)
+    for col in ("Tactic", "Tier spread"):
         if col in display.columns:
             display[col] = display[col].fillna(NOT_AVAILABLE).astype(str)
     return display
+
+
+def _win_rate_cell_style(value) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    rate = float(value)
+    if rate >= 75:
+        return "background-color: rgba(34, 197, 94, 0.32); color: #dcfce7; font-weight: 700;"
+    if rate >= 55:
+        return "background-color: rgba(59, 130, 246, 0.22); color: #dbeafe; font-weight: 600;"
+    if rate >= 45:
+        return "background-color: rgba(148, 163, 184, 0.16); color: #e5e7eb;"
+    return "background-color: rgba(239, 68, 68, 0.22); color: #fee2e2; font-weight: 600;"
+
+
+def _style_tactics_df(display_df: pd.DataFrame):
+    """Style tactics rows for st.dataframe while supporting multiple pandas versions."""
+    int_cols = [col for col in ("Rank", "Usage rounds", "Matches used", "Wins", "Losses") if col in display_df.columns]
+    formatters = {col: "{:.0f}" for col in int_cols}
+    if "Win rate %" in display_df.columns:
+        formatters["Win rate %"] = "{:.1f}%"
+
+    styled = display_df.style.format(formatters, na_rep=NOT_AVAILABLE)
+    if "Win rate %" in display_df.columns:
+        if hasattr(styled, "map"):
+            styled = styled.map(_win_rate_cell_style, subset=["Win rate %"])
+        else:
+            styled = styled.applymap(_win_rate_cell_style, subset=["Win rate %"])
+    return styled
+
+
+def _side_summary(side_df: pd.DataFrame) -> dict:
+    usage = pd.to_numeric(side_df.get("Usage rounds", pd.Series(dtype=float)), errors="coerce").fillna(0)
+    rates = pd.to_numeric(side_df.get("Win rate %", pd.Series(dtype=float)), errors="coerce").dropna()
+    tactic_col = "Tactic name" if "Tactic name" in side_df.columns else "Tactic"
+    most_used_tactic = NOT_AVAILABLE
+    if tactic_col in side_df.columns and not side_df.empty:
+        sort_cols = [col for col in ("Usage rounds", "Matches used", "Win rate %") if col in side_df.columns]
+        sorted_rows = side_df.sort_values(sort_cols, ascending=[False] * len(sort_cols), na_position="last") if sort_cols else side_df
+        most_used_tactic = _first_text(sorted_rows[tactic_col])
+    return {
+        "tactics_shown": int(len(side_df)),
+        "usage_rounds": float(usage.sum()),
+        "best_win_rate": None if rates.empty else float(rates.max()),
+        "most_used_tactic": most_used_tactic,
+    }
+
+
+def _streamlit_container(border: bool = True):
+    try:
+        return st.container(border=border)
+    except TypeError:
+        return st.container()
+
+
+def _render_side_tactics(side_name: str, side_df: pd.DataFrame) -> None:
+    if side_df.empty:
+        return
+
+    heading = {"Red": "🔴 Red side", "Blue": "🔵 Blue side"}.get(side_name, str(side_name or "Unknown side"))
+    st.markdown(f"#### {heading}")
+
+    summary = _side_summary(side_df)
+    metric_cols = st.columns([1, 1, 1, 2], gap="small")
+    metric_cols[0].metric("Tactics shown", _fmt_int(summary["tactics_shown"]))
+    metric_cols[1].metric("Usage rounds", _fmt_int(summary["usage_rounds"]))
+    metric_cols[2].metric("Best win rate", _fmt_win_rate(summary["best_win_rate"]))
+    metric_cols[3].metric("Most used tactic", summary["most_used_tactic"])
+
+    display_df = _format_tactics_display_df(side_df)
+    table_height = min(420, 38 + (len(display_df) + 1) * 35)
+    st.dataframe(
+        _style_tactics_df(display_df),
+        use_container_width=True,
+        hide_index=True,
+        height=table_height,
+    )
 
 
 def _side_sort_key(side: str) -> tuple[int, str]:
@@ -723,23 +805,27 @@ def _render_tactics_by_map(top_tactics: pd.DataFrame, season: int, min_rounds: i
         if map_rows.empty:
             continue
 
-        with st.container():
-            st.markdown(f"### {map_name}")
+        st.markdown(f"### {map_name}")
+        with _streamlit_container(border=True):
             usage_values = pd.to_numeric(
                 map_rows.get("Usage rounds", pd.Series(dtype=float)),
                 errors="coerce",
             )
             usage_total = usage_values.fillna(0).sum()
-            red_count = int((map_rows["Side"] == "Red").sum()) if "Side" in map_rows.columns else 0
-            blue_count = int((map_rows["Side"] == "Blue").sum()) if "Side" in map_rows.columns else 0
-            unknown_count = int((map_rows["Side"] == "Unknown side").sum()) if "Side" in map_rows.columns else 0
+            red_rows = map_rows[map_rows["Side"] == "Red"] if "Side" in map_rows.columns else pd.DataFrame()
+            blue_rows = map_rows[map_rows["Side"] == "Blue"] if "Side" in map_rows.columns else pd.DataFrame()
+            unknown_rows = map_rows[map_rows["Side"] == "Unknown side"] if "Side" in map_rows.columns else pd.DataFrame()
+            red_summary = _side_summary(red_rows)
+            blue_summary = _side_summary(blue_rows)
 
-            summary_cols = st.columns(3 if unknown_count == 0 else 4, gap="small")
-            summary_cols[0].metric("Red tactics shown", red_count)
-            summary_cols[1].metric("Blue tactics shown", blue_count)
+            summary_cols = st.columns(5, gap="small")
+            summary_cols[0].metric("Red tactics shown", _fmt_int(red_summary["tactics_shown"]))
+            summary_cols[1].metric("Blue tactics shown", _fmt_int(blue_summary["tactics_shown"]))
             summary_cols[2].metric("Total usage rounds", _fmt_int(usage_total))
-            if unknown_count:
-                summary_cols[3].metric("Unknown side tactics shown", unknown_count)
+            summary_cols[3].metric("Best Red win rate", _fmt_win_rate(red_summary["best_win_rate"]))
+            summary_cols[4].metric("Best Blue win rate", _fmt_win_rate(blue_summary["best_win_rate"]))
+            if not unknown_rows.empty:
+                st.caption(f"Unknown side tactics shown: {_fmt_int(len(unknown_rows))}")
 
             side_labels = sorted(map_rows["Side"].dropna().unique().tolist(), key=_side_sort_key)
             for side in side_labels:
@@ -747,13 +833,7 @@ def _render_tactics_by_map(top_tactics: pd.DataFrame, season: int, min_rounds: i
                 side_rows = map_rows[map_rows["Side"] == side].sort_values(side_sort_col)
                 if side_rows.empty:
                     continue
-                side_rows = side_rows.head(TACTIC_TOP_N)
-                st.markdown(f"#### {side} side" if side in {"Red", "Blue"} else f"#### {side}")
-                st.dataframe(
-                    _format_tactics_table(side_rows),
-                    use_container_width=True,
-                    hide_index=True,
-                )
+                _render_side_tactics(side, side_rows.head(TACTIC_TOP_N))
 
 
 def _render_tactics_table(top_tactics: pd.DataFrame, season: int) -> None:
