@@ -10,7 +10,7 @@ import streamlit as st
 
 from app.config import FILES, REQUIRED_FILES
 from app.datetime_utils import coerce_date_columns, normalize_time_series
-from app.grouping import build_season_resolution_debug_table, normalize_competitions
+from app.grouping import normalize_competitions
 from app.map_utils import normalize_map_series
 
 SYNONYMS = {
@@ -143,19 +143,55 @@ TIMELINE_COLUMNS = [
 TIMELINE_NUMERIC_COLUMNS = ("fee_cpl", "ranking_from", "ranking_to", "season")
 
 def normalize_player_key(name: str | None) -> str:
-    """Normalize player names into a stable comparison key."""
+    """Normalize player names into a stable identity key.
+
+    Medisports player labels have existed in multiple display formats, notably
+    ``ⓜ | Name`` and ``ⓜ » Name``. Unicode compatibility normalization turns
+    the circled marker into ``m``, so we strip an optional leading Medisports
+    marker plus separator before case-folding the actual player identity.
+    """
     text = str(name or "").strip()
     if not text:
         return ""
+
     text = unicodedata.normalize("NFKD", text)
-    text = re.sub(r"\s*\|\s*", " | ", text)
-    parts = [part.strip() for part in text.split("|") if part.strip()]
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # Strip a leading Medisports marker with either old (`|`) or new (`»`)
+    # separators, while also tolerating the post-NFKD plain `m` marker.
+    text = re.sub(
+        r"^\s*(?:ⓜ|m)\s*(?:[|»]+|[^A-Za-z0-9\s]+)\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # Failsafe for unexpected prefixed labels: keep the final token after known
+    # separators, then remove any remaining leading punctuation.
+    parts = [part.strip() for part in re.split(r"[|»]+", text) if part.strip()]
     if parts:
         text = parts[-1]
-    text = re.sub(r"^(?:ⓜ|m)\b", "", text, flags=re.IGNORECASE).strip()
-    text = re.sub(r"^[^a-zA-Z0-9]+", "", text)
+    text = re.sub(r"^[^A-Za-z0-9]+", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text.casefold()
+
+
+def _looks_like_medisports_player_label(player_name: str | None) -> bool:
+    text = str(player_name or "").strip()
+    if not text:
+        return False
+    normalized = unicodedata.normalize("NFKD", text)
+    return bool(re.match(r"^\s*(?:ⓜ|m)\s*(?:[|»]+|[^A-Za-z0-9\s]+)", normalized, flags=re.IGNORECASE))
+
+
+def _assert_player_key_compatibility() -> None:
+    expected = "8eer"
+    examples = ("ⓜ | 8eeR", "ⓜ » 8eeR", "m | 8eeR", "m » 8eeR", "8eeR")
+    if any(normalize_player_key(example) != expected for example in examples):
+        raise AssertionError("Medisports player-name normalization compatibility check failed")
+
+
+_assert_player_key_compatibility()
 
 def normalize_team_name(team_name: str | None) -> str:
     """Normalize stylized team names into a compact comparison key."""
@@ -172,7 +208,7 @@ def is_medisports_team(team_name: str | None) -> bool:
 
 
 def is_medisports_player(player_name: str | None) -> bool:
-    return MEDISPORTS_PLAYER_MARKER in str(player_name or "")
+    return MEDISPORTS_PLAYER_MARKER in str(player_name or "") or _looks_like_medisports_player_label(player_name)
 
 
 def normalize_side_label(value: str | None) -> str:
@@ -198,11 +234,16 @@ def get_medisports_player_names(df: pd.DataFrame, player_col: str = "player") ->
     if names.empty:
         return []
 
-    cleaned = names.str.replace(r"\s+", " ", regex=True).str.replace(r"\s*\|\s*", " | ", regex=True).str.strip()
+    cleaned = (
+        names.str.replace(r"\s+", " ", regex=True)
+        .str.replace(r"\s*\|\s*", " | ", regex=True)
+        .str.replace(r"\s*»\s*", " » ", regex=True)
+        .str.strip()
+    )
     unique = {}
     for value in cleaned.sort_values(key=lambda s: s.str.casefold()).tolist():
-        key = value.casefold()
-        if key not in unique:
+        key = normalize_player_key(value)
+        if key and key not in unique:
             unique[key] = value
     return list(unique.values())
 
@@ -557,42 +598,6 @@ def _load_data_cached(_file_signature: tuple[tuple[str, str, int, int], ...]) ->
 
     if "player_clean" in players.columns:
         players["player_clean"] = players["player_clean"].map(normalize_player_key)
-
-    # Temporary debug export to validate row-level season resolution.
-    if not player_matches.empty:
-        debug_table = build_season_resolution_debug_table(player_matches)
-        if not debug_table.empty:
-            debug_table.to_csv(Path("data/season_resolution_debug.csv"), index=False)
-
-    # Focused debug trace for CPL Open achievement retention.
-    achievement_path = FILES["achievements"]
-    print(f"[ACH_DEBUG] achievements_file_path={achievement_path}")
-    print(f"[ACH_DEBUG] achievements_row_count={len(achievements)}")
-    print(f"[ACH_DEBUG] achievements_columns={list(achievements.columns)}")
-    if "achievement_name" in achievements.columns:
-        cpl_open_mask = achievements["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)
-        cpl_open_rows = achievements[cpl_open_mask]
-        print("[ACH_DEBUG] loaded_rows_where_achievement_name_contains_CPL_Open")
-        if cpl_open_rows.empty:
-            print("[ACH_DEBUG] (none)")
-        else:
-            cols = [c for c in ["player", "achievement_name", "season_name", "position"] if c in cpl_open_rows.columns]
-            print(cpl_open_rows[cols].to_string(index=False))
-    if {"player", "achievement_name"}.issubset(achievements.columns):
-        debug_player = "ⓜ | 8eeR"
-        player_rows = achievements[achievements["player"].astype(str) == debug_player]
-        print(f"[ACH_DEBUG] all_loaded_rows_for_player={debug_player}")
-        if player_rows.empty:
-            print("[ACH_DEBUG] (none)")
-        else:
-            cols = [c for c in ["player", "achievement_name", "season_name", "position"] if c in player_rows.columns]
-            print(player_rows[cols].to_string(index=False))
-            player_cpl_rows = player_rows[player_rows["achievement_name"].astype(str).str.contains("CPL Open", case=False, na=False)]
-            print(f"[ACH_DEBUG] loaded_rows_for_player_where_achievement_name_contains_CPL_Open={debug_player}")
-            if player_cpl_rows.empty:
-                print("[ACH_DEBUG] (none)")
-            else:
-                print(player_cpl_rows[cols].to_string(index=False))
 
     return {
         "player_matches": player_matches,

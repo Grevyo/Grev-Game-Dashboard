@@ -1,5 +1,7 @@
 import pandas as pd
 
+from app.data_loader import normalize_player_key
+
 
 def resolve_match_result(match_row: pd.Series, tactics_context: pd.DataFrame) -> str | None:
     direct_result_candidates = ["result", "match_result", "outcome", "wl"]
@@ -40,7 +42,7 @@ def _iter_valid_player_matches(df_context: pd.DataFrame, tactics_context: pd.Dat
     if df_context.empty or any(col not in df_context.columns for col in required_cols):
         return
 
-    subset = df_context[df_context["player"].astype(str) == str(player_name)].copy()
+    subset = df_context[df_context["player"].map(normalize_player_key) == normalize_player_key(player_name)].copy()
     if subset.empty:
         return
 

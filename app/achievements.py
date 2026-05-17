@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from app.data_loader import normalize_player_key
 from app.image_helpers import image_data_uri, image_data_uri_thumbnail, resolve_achievement_image
 
 TIER_PRIORITY = {"S": 90, "A": 75, "B": 60, "C": 45, "D": 30}
@@ -45,7 +46,7 @@ def _resolve_achievement_image_for_overview(row: pd.Series) -> tuple[str | None,
 
 
 def _player_key(player_name: str | None) -> str:
-    return re.sub(r"^ⓜ\s*\|\s*", "", str(player_name or ""), flags=re.IGNORECASE).strip().casefold()
+    return normalize_player_key(player_name)
 
 
 def normalize_season_label(season_value: str | int | float | None) -> str:
@@ -159,7 +160,7 @@ def achievements_for_player(
     if "player_clean" in pool.columns:
         # Use both normalized raw player names and player_clean to avoid dropping
         # rows when player_clean is missing/corrupted for a subset of entries.
-        clean_mask = pool["player_clean"].astype(str).str.strip().str.casefold() == key
+        clean_mask = pool["player_clean"].map(_player_key) == key
         mask = clean_mask | raw_player_mask
     else:
         mask = raw_player_mask

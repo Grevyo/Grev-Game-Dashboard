@@ -8,6 +8,7 @@ from app.pages import (
     medisports_timeline,
     overview,
     player_viewer,
+    season_preview,
     recent_tactics_breakdown,
     tactic_set_recommendations,
     tactics_breakdown,
@@ -24,6 +25,7 @@ from app.transforms import with_player_metrics
 PAGE_REGISTRY = [
     ("Overview", overview.render),
     ("Medisports Timeline", medisports_timeline.render),
+    ("Season Preview", season_preview.render),
     ("Player Stats Viewer", player_viewer.render),
     ("Medisports vs Teams", vs_teams.render),
     ("Medisports vs Team", vs_team.render),
@@ -39,6 +41,7 @@ PAGES = dict(PAGE_REGISTRY)
 TEAM_PAGE_PREFERENCE = [
     "Overview",
     "Medisports Timeline",
+    "Season Preview",
     "Player Stats Viewer",
     "Medisports vs Teams",
     "Medisports vs Team",

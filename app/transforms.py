@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from app.data_loader import normalize_player_key
 from app.datetime_utils import safe_to_datetime
 
 
@@ -215,7 +216,8 @@ def with_player_metrics(df: pd.DataFrame) -> pd.DataFrame:
         + (out.get("kpr", 0).fillna(0) / baseline_kpr) * 0.35
     )
     out["impact"] = compute_impact(out)
-    out["form"] = out.groupby("player", dropna=False)["grevscore"].transform(lambda s: s.rolling(5, min_periods=1).mean())
+    player_group = out["player_clean"] if "player_clean" in out.columns else out.get("player", pd.Series(index=out.index, dtype=object)).map(normalize_player_key)
+    out["form"] = out.groupby(player_group, dropna=False)["grevscore"].transform(lambda s: s.rolling(5, min_periods=1).mean())
     return out
 
 
@@ -237,8 +239,22 @@ def latest_window(df: pd.DataFrame, days: int | None = None, matches: int | None
 def summarize_player(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
+
+    working = df.copy()
+    if "player" not in working.columns:
+        return pd.DataFrame()
+    working["player_key"] = working.get("player_clean", working["player"]).map(normalize_player_key)
+    working = working[working["player_key"] != ""]
+    if working.empty:
+        return pd.DataFrame()
+
+    display_names = (
+        working.sort_values([c for c in ["date", "time", "player"] if c in working.columns])
+        .groupby("player_key", dropna=False)["player"]
+        .first()
+    )
     grp = (
-        df.groupby("player", dropna=False)
+        working.groupby("player_key", dropna=False)
         .agg(
             matches=("match_id", "nunique"),
             grevscore=("grevscore", "mean"),
@@ -252,7 +268,9 @@ def summarize_player(df: pd.DataFrame) -> pd.DataFrame:
         )
         .reset_index()
     )
-    return grp.sort_values("grevscore", ascending=False)
+    grp["player"] = grp["player_key"].map(display_names).fillna(grp["player_key"])
+    ordered_cols = ["player", "player_key", *[col for col in grp.columns if col not in {"player", "player_key"}]]
+    return grp[ordered_cols].sort_values("grevscore", ascending=False)
 
 
 def best_contexts(df: pd.DataFrame, by: str) -> pd.DataFrame:

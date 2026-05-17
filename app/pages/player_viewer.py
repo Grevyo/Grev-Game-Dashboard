@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import re
 
 try:
     import plotly.express as px
@@ -12,7 +11,7 @@ except ModuleNotFoundError:
 
 from app.components import render_achievement_mini_tile, stat_card
 from app.achievements import achievements_for_player
-from app.data_loader import get_medisports_player_names, get_medisports_roster_df
+from app.data_loader import get_medisports_player_names, get_medisports_roster_df, normalize_player_key
 from app.filters import filter_panel_toggle
 from app.image_helpers import image_data_uri, find_team_logo, resolve_player_photo
 from app.map_utils import normalize_map_series
@@ -22,7 +21,7 @@ from app.page_layout import is_mobile_view, section_header
 
 
 def _player_key(name: str) -> str:
-    return re.sub(r"^ⓜ\s*\|\s*", "", str(name or ""), flags=re.IGNORECASE).strip().casefold()
+    return normalize_player_key(name)
 
 
 def _form_delta(p):
@@ -250,7 +249,7 @@ def render(ctx):
     map_focus = st.session_state.get("player_viewer_map_focus", []) if st.session_state.get("player_viewer_expand_profile_filters", False) else []
     side_focus = st.session_state.get("player_viewer_side_focus", []) if st.session_state.get("player_viewer_expand_profile_filters", False) else []
 
-    mask = df["player"] == player
+    mask = df["player"].map(_player_key) == _player_key(player)
     if show_recent and "date" in df.columns:
         cutoff = df["date"].max() - pd.Timedelta(days=30)
         mask &= df["date"] >= cutoff

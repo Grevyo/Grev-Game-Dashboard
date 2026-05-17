@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.config import IMAGES
+from app.data_loader import normalize_player_key
 
 SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".svg"}
 
@@ -14,9 +15,10 @@ SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".svg"}
 def _normalize_name(value: str | None) -> str:
     if not value:
         return ""
-    text = unicodedata.normalize("NFKD", str(value)).casefold()
+    key = normalize_player_key(value)
+    text = unicodedata.normalize("NFKD", key or str(value)).casefold()
     text = text.replace("ⓜ", "m")
-    text = text.replace("|", " ")
+    text = text.replace("|", " ").replace("»", " ")
     text = re.sub(r"[^a-z0-9]+", "", text)
     return text
 
@@ -27,6 +29,7 @@ def _clean_display_name(value: str | None) -> str:
     text = unicodedata.normalize("NFC", str(value)).strip()
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"\s*\|\s*", " | ", text)
+    text = re.sub(r"\s*»\s*", " » ", text)
     return text
 
 
@@ -110,7 +113,7 @@ def resolve_player_photo(player_name: str | None) -> dict[str, str | bool | None
 
     # 2) normalized match (preserves ability to match names with ⓜ)
     query_norm = _normalize_name(query)
-    cleaned_query = re.sub(r"^\s*ⓜ\s*\|\s*", "", query, flags=re.IGNORECASE).strip()
+    cleaned_query = normalize_player_key(query)
     cleaned_norm = _normalize_name(cleaned_query)
 
     for path in candidates:

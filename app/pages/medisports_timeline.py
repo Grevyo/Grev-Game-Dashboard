@@ -365,7 +365,7 @@ def _normalize_for_match(value: object) -> str:
         text = str(value)
     text = unicodedata.normalize("NFKD", text).casefold()
     text = text.replace("ⓜ", "m")
-    text = re.sub(r"[|/\\•·]+", " ", text)
+    text = re.sub(r"[|»/\\•·]+", " ", text)
     text = re.sub(r"[^a-z0-9]+", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
@@ -374,7 +374,7 @@ def _normalize_player_plain(value: object) -> str:
     text = _display_value(value)
     if not text:
         return ""
-    parts = [part.strip() for part in re.split(r"\|", text) if part.strip()]
+    parts = [part.strip() for part in re.split(r"[|»]+", text) if part.strip()]
     if parts:
         text = parts[-1]
     text = re.sub(r"^[^a-zA-Z0-9]+", "", text)
