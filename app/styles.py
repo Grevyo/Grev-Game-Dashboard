@@ -528,8 +528,7 @@ def inject_styles(theme_name: str = "Dark"):
 
     .season-preview-controls-head,
     .season-preview-map-panel,
-    .season-preview-side-panel,
-    .season-preview-table-frame {{
+    .season-preview-side-panel {{
       border: 1px solid var(--line);
       border-radius: var(--radius-m);
       background:
@@ -538,8 +537,7 @@ def inject_styles(theme_name: str = "Dark"):
     }}
     div[data-testid="stVerticalBlock"]:has(> div .season-preview-controls-head),
     div[data-testid="stVerticalBlock"]:has(> div .season-preview-map-panel),
-    div[data-testid="stVerticalBlock"]:has(> div .season-preview-side-panel),
-    div[data-testid="stVerticalBlock"]:has(> div .season-preview-table-frame) {{
+    div[data-testid="stVerticalBlock"]:has(> div .season-preview-side-panel) {{
       border: 1px solid var(--line);
       border-radius: var(--radius-m);
       background:
@@ -593,9 +591,18 @@ def inject_styles(theme_name: str = "Dark"):
       padding:.58rem .64rem;
       margin:.24rem 0 .32rem;
       border-left:2px solid #607891;
+      border-radius: var(--radius-s);
     }}
-    .season-preview-side-panel.side-red {{ border-left-color:var(--crimson); }}
-    .season-preview-side-panel.side-blue {{ border-left-color:#60a5fa; }}
+    .season-preview-side-panel.side-red {{
+      border-left-color:var(--crimson);
+      border-top-color:color-mix(in srgb, var(--crimson) 58%, #273443 42%);
+      box-shadow: 0 14px 24px rgba(0,0,0,.28), inset 2px 0 0 rgba(255,77,94,.28);
+    }}
+    .season-preview-side-panel.side-blue {{
+      border-left-color:#60a5fa;
+      border-top-color:color-mix(in srgb, #60a5fa 58%, #273443 42%);
+      box-shadow: 0 14px 24px rgba(0,0,0,.28), inset 2px 0 0 rgba(96,165,250,.26);
+    }}
     .season-preview-side-title {{
       font-size:.88rem;
       text-transform:uppercase;
@@ -647,27 +654,30 @@ def inject_styles(theme_name: str = "Dark"):
     .season-preview-chip-bad {{ border-color:color-mix(in srgb, var(--crimson) 54%, #31404f 46%); }}
     .season-preview-chip-bad .season-preview-chip-value {{ color:var(--crimson); }}
     .season-preview-chip-muted .season-preview-chip-value {{ color:var(--muted); }}
-    .season-preview-table-frame {{
-      padding:.4rem .48rem .46rem;
-      margin:.28rem 0 .1rem;
-      border-color:rgba(75,94,113,.72);
+    .season-preview-table-shell {{
+      padding:.45rem;
+      margin-top:.35rem;
+      border-radius: var(--radius-s);
+      border-top: 2px solid color-mix(in srgb, var(--accent) 70%, #546b80 30%);
       background: linear-gradient(180deg, rgba(11,17,25,.98), rgba(8,13,20,.98));
     }}
-    .season-preview-table-frame-label {{
-      color:#8fa3ba;
-      font-size:.56rem;
-      text-transform:uppercase;
-      letter-spacing:.14em;
-      font-weight:760;
+    .season-preview-table-shell.side-red {{
+      border-top-color:color-mix(in srgb, var(--crimson) 78%, #546b80 22%);
+      box-shadow: 0 14px 26px rgba(0,0,0,.32), inset 0 2px 0 rgba(255,77,94,.22);
     }}
-    div[data-testid="stVerticalBlock"]:has(.season-preview-table-frame) [data-testid="stDataFrame"] {{
-      border:1px solid rgba(72,91,110,.72);
-      border-radius: var(--radius-s);
-      background: linear-gradient(180deg, rgba(12,18,27,.98), rgba(8,13,20,.98));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    .season-preview-table-shell.side-blue {{
+      border-top-color:color-mix(in srgb, #60a5fa 78%, #546b80 22%);
+      box-shadow: 0 14px 26px rgba(0,0,0,.32), inset 0 2px 0 rgba(96,165,250,.22);
     }}
-    div[data-testid="stVerticalBlock"]:has(.season-preview-table-frame) [data-testid="stDataFrame"] * {{
+    .season-preview-table-shell [data-testid="stDataFrame"] {{
+      border-color: rgba(124,142,163,.42);
+      background: linear-gradient(180deg, rgba(13,20,31,.96), rgba(10,16,26,.96));
+    }}
+    .season-preview-table-shell [data-testid="stDataFrame"] * {{
       font-size:.72rem;
+    }}
+    .season-preview-table-shell [data-testid="stDataFrame"] thead tr th {{
+      background: rgba(19,29,43,.9);
     }}
 
     @media (min-width: 1200px) {{
